@@ -80,6 +80,11 @@ function baseApi(): WorkbenchApi {
       adjust: vi.fn(),
       confirm: vi.fn(),
     },
+    states: {
+      getWorkspace: vi.fn().mockResolvedValue({ state: 'needs_stage' }),
+      adjust: vi.fn(),
+      confirm: vi.fn(),
+    },
   }
 }
 

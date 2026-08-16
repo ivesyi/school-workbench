@@ -33,6 +33,11 @@ describe('SchoolListPage', () => {
         adjust: vi.fn(),
         confirm: vi.fn(),
       },
+      states: {
+        getWorkspace: vi.fn().mockResolvedValue({ state: 'needs_stage' }),
+        adjust: vi.fn(),
+        confirm: vi.fn(),
+      },
     }
 
     render(
