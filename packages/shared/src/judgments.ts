@@ -1,11 +1,7 @@
 import { z } from 'zod'
 import { schoolIdSchema } from './schools'
 
-export const situationTextSchema = z
-  .string()
-  .trim()
-  .min(1, '请先说说发生了什么')
-  .max(20000)
+export const situationTextSchema = z.string().trim().min(1, '请先说说发生了什么').max(20000)
 
 export const submitSituationInputSchema = z.object({
   schoolId: schoolIdSchema,
