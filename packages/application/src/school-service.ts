@@ -10,7 +10,7 @@ function toSchoolView(school: School): SchoolView {
   return {
     id: school.id,
     name: school.name,
-    currentStageId: school.currentStageId,
+    currentStageId: null,
     currentStageTitle: null,
     createdAt: school.createdAt,
   }

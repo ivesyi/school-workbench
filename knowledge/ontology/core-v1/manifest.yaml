@@ -1,6 +1,6 @@
 id: swb-core
 version: 1.0.0
-status: active
+status: draft
 title: School Workbench Core Ontology
 namespace: 'urn:school-workbench:ontology:core:v1:'
 releasedAt: '2026-08-17'

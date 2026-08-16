@@ -4,9 +4,6 @@ import { ulid } from 'ulid'
 export type School = {
   id: string
   name: string
-  currentStageId: string | null
-  baselineSnapshotId: string | null
-  currentSnapshotId: string | null
   createdAt: string
   archivedAt: string | null
 }
@@ -30,9 +27,6 @@ export function createSchool(
   return {
     id: dependencies.createId(),
     name: parsed.name,
-    currentStageId: null,
-    baselineSnapshotId: null,
-    currentSnapshotId: null,
     createdAt: dependencies.now().toISOString(),
     archivedAt: null,
   }

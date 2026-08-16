@@ -7,9 +7,6 @@ function toDomain(row: SchoolRow): School {
   return {
     id: row.id,
     name: row.name,
-    currentStageId: row.currentStageId,
-    baselineSnapshotId: row.baselineSnapshotId,
-    currentSnapshotId: row.currentSnapshotId,
     createdAt: row.createdAt,
     archivedAt: row.archivedAt,
   }

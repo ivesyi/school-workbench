@@ -11,18 +11,38 @@ relations:
     to: swb:DesiredResult
     cardinality: one-to-many
   - id: swb:assessedAcross
-    label: 按维度评估
+    label: 按维度观察
     from: swb:Stage
     to: swb:Dimension
     cardinality: many-to-many
-  - id: swb:holdsRole
-    label: 承担角色
-    from: swb:Actor
+  - id: swb:assignsPerson
+    label: 指派人员
+    from: swb:RoleAssignment
+    to: swb:Person
+    cardinality: many-to-one
+  - id: swb:assignsRole
+    label: 指派角色
+    from: swb:RoleAssignment
     to: swb:Role
+    cardinality: many-to-one
+  - id: swb:withinSchool
+    label: 位于学校
+    from: swb:RoleAssignment
+    to: swb:School
+    cardinality: many-to-one
+  - id: swb:hasMember
+    label: 包含成员
+    from: swb:Team
+    to: swb:Person
     cardinality: many-to-many
-  - id: swb:performsPractice
-    label: 产生实践
-    from: swb:Actor
+  - id: swb:performsPracticePerson
+    label: 个人产生实践
+    from: swb:Person
+    to: swb:Practice
+    cardinality: one-to-many
+  - id: swb:performsPracticeTeam
+    label: 团队产生实践
+    from: swb:Team
     to: swb:Practice
     cardinality: one-to-many
   - id: swb:documents
@@ -31,15 +51,20 @@ relations:
     to: swb:ObservationFact
     cardinality: one-to-many
   - id: swb:supports
-    label: 支持候选判断
+    label: 支持主张
     from: swb:ObservationFact
-    to: swb:DiagnosisProposal
+    to: swb:Claim
     cardinality: many-to-many
   - id: swb:counters
-    label: 反驳候选判断
+    label: 反驳主张
     from: swb:ObservationFact
-    to: swb:DiagnosisProposal
+    to: swb:Claim
     cardinality: many-to-many
+  - id: swb:assertsClaim
+    label: 提出主张
+    from: swb:DiagnosisProposal
+    to: swb:Claim
+    cardinality: one-to-many
   - id: swb:operationalizedBy
     label: 由准则操作化
     from: swb:MethodologyConstruct
@@ -52,7 +77,7 @@ relations:
     cardinality: many-to-many
   - id: swb:aboutDimension
     label: 涉及维度
-    from: swb:DiagnosisProposal
+    from: swb:Claim
     to: swb:Dimension
     cardinality: many-to-many
   - id: swb:identifiesProblem
@@ -60,11 +85,21 @@ relations:
     from: swb:DiagnosisProposal
     to: swb:PracticeProblem
     cardinality: many-to-many
-  - id: swb:approvedAs
-    label: 经人工批准为
-    from: swb:DiagnosisProposal
-    to: swb:ApprovedDiagnosis
+  - id: swb:reviews
+    label: 审核候选判断
+    from: swb:HumanReview
+    to: swb:DiagnosisProposal
+    cardinality: many-to-one
+  - id: swb:producesJudgment
+    label: 形成正式判断
+    from: swb:HumanReview
+    to: swb:AcceptedJudgment
     cardinality: one-to-one
+  - id: swb:judgesClaim
+    label: 正式裁定主张
+    from: swb:AcceptedJudgment
+    to: swb:Claim
+    cardinality: many-to-many
   - id: swb:addresses
     label: 处理实践问题
     from: swb:Action
@@ -75,8 +110,23 @@ relations:
     from: swb:ImpactIndicator
     to: swb:Action
     cardinality: many-to-one
-  - id: swb:records
+  - id: swb:assessmentUsesJudgment
+    label: 评估使用正式判断
+    from: swb:Assessment
+    to: swb:AcceptedJudgment
+    cardinality: many-to-many
+  - id: swb:assessmentAboutDimension
+    label: 评估对应维度
+    from: swb:Assessment
+    to: swb:Dimension
+    cardinality: many-to-one
+  - id: swb:recordsJudgment
     label: 记录正式判断
     from: swb:StateSnapshot
-    to: swb:ApprovedDiagnosis
+    to: swb:AcceptedJudgment
     cardinality: many-to-many
+  - id: swb:recordsAssessment
+    label: 记录状态评估
+    from: swb:StateSnapshot
+    to: swb:Assessment
+    cardinality: one-to-many

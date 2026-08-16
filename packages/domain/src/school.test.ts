@@ -13,9 +13,6 @@ describe('createSchool', () => {
     expect(school).toEqual({
       id: '01K00000000000000000000000',
       name: '南山实验学校',
-      currentStageId: null,
-      baselineSnapshotId: null,
-      currentSnapshotId: null,
       createdAt: '2026-08-17T00:00:00.000Z',
       archivedAt: null,
     })

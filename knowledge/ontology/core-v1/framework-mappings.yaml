@@ -9,7 +9,7 @@ mappings:
       - sourceId: SBD.BACKWARD_DESIGN
         targetIds: [swb:DesiredResult, swb:Criterion, swb:Action]
       - sourceId: SBD.VISION_REALITY_GAP
-        targetIds: [swb:DiagnosisProposal, swb:StateSnapshot]
+        targetIds: [swb:Claim, swb:DiagnosisProposal, swb:StateSnapshot]
       - sourceId: SBD.ACCEPTABLE_EVIDENCE
         targetIds: [swb:Evidence, swb:ImpactIndicator]
       - sourceId: SBD.ALIGNED_ACTION
@@ -23,21 +23,21 @@ mappings:
       - sourceId: DW.EVIDENCE
         targetIds: [swb:Evidence, swb:ObservationFact]
       - sourceId: DW.LEARNING_PROBLEM
-        targetIds: [swb:DesiredResult, swb:DiagnosisProposal]
+        targetIds: [swb:DesiredResult, swb:Claim, swb:DiagnosisProposal]
       - sourceId: DW.PRACTICE_EVIDENCE
         targetIds: [swb:Practice, swb:Evidence, swb:ObservationFact]
       - sourceId: DW.PROBLEM_OF_PRACTICE
         targetIds: [swb:PracticeProblem]
       - sourceId: DW.LADDER_DISCIPLINE
-        targetIds: [swb:ObservationFact, swb:DiagnosisProposal]
+        targetIds: [swb:ObservationFact, swb:Claim, swb:DiagnosisProposal]
       - sourceId: DW.ACTION_IMPACT
         targetIds: [swb:Action, swb:ImpactIndicator]
 boundaries:
   - sourcePack: congruence-framework-v1
     status: pending-review
-    allowedTargetIds: [swb:Dimension, swb:Stage, swb:DesiredResult]
-    prohibition: 未审核前不得把维度材料转化为正式阶段或分数。
+    allowedTargetIds: [swb:Dimension, swb:Claim, swb:DiagnosisProposal]
+    prohibition: 未审核前不得用于正式 Diagnosis；即使审核后也只用于匹配/失配分析，不直接生成成熟等级或阶段。
   - sourcePack: role-standards-v1
     status: pending-review
-    allowedTargetIds: [swb:Role, swb:Practice, swb:Criterion]
-    prohibition: 未审核前不得形成个人绩效结论。
+    allowedTargetIds: [swb:Role, swb:Practice, swb:Criterion, swb:Claim]
+    prohibition: 未审核前不得形成个人绩效结论；角色锚点只用于专业能力与行为判断。

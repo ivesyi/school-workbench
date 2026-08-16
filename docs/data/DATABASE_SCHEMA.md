@@ -1,442 +1,288 @@
 # 学校变革陪跑工作台
 
-## DATABASE_SCHEMA v1.1 — Methodology & Assessment Provenance
+## DATABASE_SCHEMA v1.2 — Ontology & Epistemic Alignment
 
-**状态：数据库冻结基线**  
+**状态：语义冻结前基线**  
 **数据库：SQLite / WAL / better-sqlite3 / Drizzle ORM**
 
----
+## 0. Data principles
 
-# 0. 数据原则
-
-1. Workbench 是学校正式状态的唯一 System of Record。
-2. Agent 只能登记 Evidence、提取 Claim、提出 Diagnosis。
-3. Human Review 才能把候选判断变成正式判断。
-4. State Snapshot 不可变；变化通过新 Snapshot 表达。
-5. Methodology Pack 和 Criterion 按版本不可变，历史判断不得随方法更新漂移。
-6. Observation Fact、Interpretation、Judgment 分开保存。
+1. Workbench 是学校正式知识状态的 System of Record，不声称数据库等于学校客观现实。
+2. Agent 只能登记 Evidence、提取 ObservationFact / Claim、提出 DiagnosisProposal。
+3. HumanReview 才能形成 AcceptedJudgment。
+4. StateSnapshot 不可变；它记录某一时点经顾问确认的知识状态，不是现实本身。
+5. Methodology Pack / Criterion 按版本追溯，历史判断不得随方法更新漂移。
+6. ObservationFact、Claim、Interpretation、Proposal、AcceptedJudgment 分开。
 7. 所有跨实体写入必须校验 `school_id`，禁止跨学校引用。
 
----
+## 1. School
 
-# 1. 通用约定
-
-```text
-Primary Key       TEXT（ULID）
-Timestamp         TEXT（UTC ISO 8601）
-Boolean           INTEGER 0 / 1
-Structured value  TEXT JSON，由 Zod 在 Domain 边界校验
-Delete            默认软删除或禁止删除正式记录
-```
-
-启动数据库时必须执行：
-
-```sql
-PRAGMA foreign_keys = ON;
-PRAGMA journal_mode = WAL;
-PRAGMA busy_timeout = 5000;
-```
-
----
-
-# 2. School 与阶段
-
-## `schools`
+`schools` 只保存学校自身身份，不缓存可派生的“当前指针”。
 
 ```text
-id                    PK
-name                  NOT NULL
-current_stage_id      FK stages.id NULL
-baseline_snapshot_id  FK state_snapshots.id NULL
-current_snapshot_id   FK state_snapshots.id NULL
-created_at            NOT NULL
-archived_at           NULL
-```
-
-创建学校时唯一必填业务字段为 `name`。
-
-## `stages`
-
-```text
+schools
 id          PK
-school_id   FK schools.id NOT NULL
-title       NOT NULL
-summary     NULL
-sequence    INTEGER NOT NULL
-status      planned | active | completed | cancelled
-starts_at   NULL
-ends_at     NULL
+name        NOT NULL
 created_at  NOT NULL
-updated_at  NOT NULL
+archived_at NULL
 ```
 
-每所学校最多一个 `active` Stage，由 Domain Service 保证。
-
-## `dimensions`
-
-系统种子数据：
+禁止在 `schools` 保存：
 
 ```text
-leadership
-key_tasks
-structure
-culture
-capability
+current_stage_id
+baseline_snapshot_id
+current_snapshot_id
 ```
 
-字段：`key PK`、`title`、`description`、`sequence`。
+当前 Stage 由 `stages.status = active` 推导；当前 Snapshot 由最新 sequence 推导；Baseline 由 `is_baseline` 推导。Read Model / Experience 负责组装 SchoolView。
 
-## `stage_targets`
+## 2. Stage and targets
 
 ```text
-id             PK
-stage_id       FK stages.id NOT NULL
-dimension_key  FK dimensions.key NOT NULL
-title          NOT NULL
-description    NOT NULL
-status         draft | confirmed | retired
-sequence       INTEGER NOT NULL
-created_at     NOT NULL
-updated_at     NOT NULL
+stages
+id, school_id, title, summary, sequence,
+status(planned|active|completed|cancelled),
+starts_at, ends_at, created_at, updated_at
 ```
 
----
-
-# 3. Methodology
-
-## `methodology_packs`
+每所学校最多一个 active Stage。
 
 ```text
-id            PK
-key           NOT NULL
-version       NOT NULL
-title         NOT NULL
-source_type   book | framework | standard
-source_ref    NOT NULL
-content_hash  NOT NULL
-status        draft | active | retired
-created_at    NOT NULL
+dimensions
+key PK: leadership | key_tasks | structure | culture | capability
 ```
 
-约束：`UNIQUE(key, version)`。已经被 Diagnosis 引用的 Pack 不原地修改。
-
-V1 Pack：
+Dimension 属于五维全等诊断框架，用于描述匹配/失配，不自带成熟等级。
 
 ```text
-schooling-by-design-v1
-data-wise-v3
-congruence-framework-v1
-role-standards-v1
+stage_targets
+id, stage_id, dimension_key, title, description,
+status(draft|confirmed|retired), sequence, created_at, updated_at
 ```
 
-## `methodology_criteria`
+“明显低于 / 部分达到 / 基本达到 / 达到且稳定”等状态必须相对于 StageTarget 判断。
+
+## 3. Methodology
 
 ```text
-id                       PK
-pack_id                  FK methodology_packs.id NOT NULL
-stable_key               NOT NULL
-parent_id                FK methodology_criteria.id NULL
-construct_key            NOT NULL
-dimension_key            FK dimensions.key NULL
-practice_type            school | leadership | middle_leader | teacher | team
-title                     NOT NULL
-description               NOT NULL
-evidence_guidance_json    NOT NULL
-counter_indicators_json   NOT NULL
-guardrails_json           NOT NULL
-source_locator_json       NOT NULL
-sequence                  INTEGER NOT NULL
+methodology_packs
+id, key, version, title, source_type, source_ref,
+content_hash, status, created_at
+UNIQUE(key, version)
 ```
 
-约束：`UNIQUE(pack_id, stable_key)`。
-
-## `behavior_anchors`
+V1 Pack：Schooling by Design、Data Wise、Congruence、Role Standards。
 
 ```text
-id                   PK
-criterion_id         FK methodology_criteria.id NOT NULL
-level_key            NOT NULL
-label                NOT NULL
-description          NOT NULL
-source_locator_json  NOT NULL
-sequence             INTEGER NOT NULL
+methodology_criteria
+id, pack_id, stable_key, parent_id, construct_key,
+dimension_key, practice_type, title, description,
+evidence_guidance_json, counter_indicators_json,
+guardrails_json, source_locator_json, sequence
+UNIQUE(pack_id, stable_key)
 ```
 
-行为锚点不是自动分值，只帮助 Agent 和顾问判断当前实践表现。
-
----
-
-# 4. Evidence 与可观察事实
-
-## `evidence`
-
 ```text
-id             PK
-school_id      FK schools.id NOT NULL
-source_type    feishu_doc | feishu_minutes | audio | local_file | observation | other
-uri            NOT NULL
-title          NOT NULL
-locator_json   NULL
-content_hash   NULL
-captured_at    NULL
-registered_by  agent | human
-agent_run_id   FK agent_runs.id NULL
-created_at     NOT NULL
+behavior_anchors
+id, criterion_id, level_key, label, description,
+source_locator_json, sequence
 ```
 
-推荐唯一索引：`(school_id, content_hash)`，`content_hash IS NOT NULL` 时生效。
+行为锚点不是自动分值。
 
-## `evidence_claims`
-
-只保存可定位、具体、描述性的事实陈述。
+## 4. Evidence and ObservationFact
 
 ```text
-id                  PK
-school_id           FK schools.id NOT NULL
-evidence_id         FK evidence.id NOT NULL
-claim_type          learner | adult_practice | organization | context
-text                NOT NULL
-locator_json        NOT NULL
-directness          low | medium | high
-extracted_by        agent | human
-agent_run_id        FK agent_runs.id NULL
-created_at          NOT NULL
+evidence
+id, school_id,
+source_type(feishu_doc|feishu_minutes|audio|local_file|observation|pasted_text|other),
+uri NULL,
+inline_text NULL,
+title, locator_json, content_hash, captured_at,
+registered_by(agent|human), agent_run_id, created_at
 ```
 
-解释和诊断不得写入 `evidence_claims.text`。
-
----
-
-# 5. Diagnosis 与审核
-
-## `diagnosis_cards`
+约束：`uri` 与 `inline_text` 至少一个非空。用户直接说的一段情况可以登记为 `pasted_text` 或 `observation`，不要求伪造 URI。
 
 ```text
-id                              PK
-school_id                       FK schools.id NOT NULL
-agent_run_id                    FK agent_runs.id NULL
-type                            state | characteristic | mismatch | practice
-title                           NOT NULL
-observed_facts                  NOT NULL
-judgment                        NOT NULL
-mechanism                       NULL
-alternative_hypotheses_json     NOT NULL
-unresolved_questions_json       NOT NULL
-proposed_actions_json           NOT NULL
-recommended_observations_json   NOT NULL
-impact_measures_json            NOT NULL
-evidence_quality_json           NOT NULL
-confidence                      low | medium | high
-status                          proposed | accepted | modified | rejected
-created_at                      NOT NULL
-updated_at                      NOT NULL
+observation_facts
+id, school_id, evidence_id,
+fact_type(learner|adult_practice|organization|context),
+text, locator_json, directness(low|medium|high),
+extracted_by(agent|human), agent_run_id, created_at
 ```
 
-`status` 只能由 Human Review Domain Service 改变。
+`ObservationFact.text` 只允许低推论、可定位描述。
 
-## `diagnosis_evidence`
+## 5. Claim
 
 ```text
-diagnosis_id  FK diagnosis_cards.id
-evidence_id   FK evidence.id
-claim_id      FK evidence_claims.id NULL
-stance        supporting | counter
-sequence      INTEGER NOT NULL
-PRIMARY KEY (diagnosis_id, evidence_id, claim_id, stance)
+claims
+id, school_id,
+subject_ref_json,
+predicate_key,
+object_ref_json NULL,
+statement,
+valid_from NULL,
+valid_to NULL,
+scope_json NOT NULL,
+created_by(agent|human),
+agent_run_id NULL,
+created_at
 ```
 
-## `diagnosis_criteria`
+Claim 是关于学校现实的判断性陈述，可被支持、反驳、修改。它不是 Team/Person 的永久属性。
 
 ```text
-diagnosis_id  FK diagnosis_cards.id
-criterion_id  FK methodology_criteria.id
-PRIMARY KEY (diagnosis_id, criterion_id)
+claim_facts
+claim_id, fact_id, stance(supporting|counter), sequence
+PRIMARY KEY(claim_id, fact_id, stance)
 ```
 
-Criterion 所属 Pack 版本即为该判断的方法论版本来源。
-
-## `diagnosis_stage_targets`
+## 6. DiagnosisProposal
 
 ```text
-diagnosis_id   FK diagnosis_cards.id
-stage_target_id FK stage_targets.id
-PRIMARY KEY (diagnosis_id, stage_target_id)
+diagnosis_proposals
+id, school_id, agent_run_id,
+type(state|characteristic|mismatch|practice),
+title,
+scope_json,
+interpretations_json,
+provisional_judgment NULL,
+mechanism NULL,
+alternative_hypotheses_json,
+unresolved_questions_json,
+recommended_actions_json,
+next_observations_json,
+impact_evidence_plan_json,
+evidence_quality_json,
+confidence(low|medium|high),
+status(proposed|insufficient_evidence),
+created_at
 ```
 
-## `human_reviews`
+Proposal 创建后不可原地修改。
 
 ```text
-id             PK
-diagnosis_id   FK diagnosis_cards.id NOT NULL
-decision       accepted | modified | rejected
-feedback       NULL
-final_text     NULL
-reason         NULL
-reviewed_at    NOT NULL
+diagnosis_claims(proposal_id, claim_id)
+diagnosis_criteria(proposal_id, criterion_id)
+diagnosis_stage_targets(proposal_id, stage_target_id)
 ```
 
-每次调整都新增 Review，不覆盖 Agent 原判断。
+`methodology_criteria.pack_id` 已固定 Pack/version 来源，不再重复保存 frameworkVersionIds。
 
----
-
-# 6. 正式学校状态
-
-## `state_snapshots`
+## 7. HumanReview and AcceptedJudgment
 
 ```text
-id                    PK
-school_id             FK schools.id NOT NULL
-stage_id              FK stages.id NULL
-previous_snapshot_id  FK state_snapshots.id NULL
-sequence              INTEGER NOT NULL
-summary               NOT NULL
-is_baseline           INTEGER NOT NULL DEFAULT 0
-confirmed_at          NOT NULL
-created_at            NOT NULL
+human_reviews
+id, proposal_id,
+decision(accepted|modified|rejected|needs_more_evidence),
+feedback NULL,
+final_text NULL,
+reason NULL,
+reviewed_at
 ```
 
-约束：`UNIQUE(school_id, sequence)`；每所学校最多一个 `is_baseline = 1`。
-
-## `dimension_assessments`
+HumanReview 是审核记录，不修改原 Proposal。
 
 ```text
-id             PK
-snapshot_id    FK state_snapshots.id NOT NULL
-dimension_key  FK dimensions.key NOT NULL
-status         unverified | far_below | partial | mostly | stable
-summary        NOT NULL
-created_at     NOT NULL
+accepted_judgments
+id, school_id, review_id,
+statement,
+scope_json,
+valid_from NULL,
+valid_to NULL,
+created_at
+```
+
+只有 `accepted` / `modified` Review 可以产生 AcceptedJudgment。
+
+```text
+judgment_claims(judgment_id, claim_id)
+```
+
+## 8. Formal school state
+
+```text
+state_snapshots
+id, school_id, stage_id NULL,
+previous_snapshot_id NULL,
+sequence,
+summary,
+is_baseline DEFAULT 0,
+confirmed_at,
+created_at
+UNIQUE(school_id, sequence)
+```
+
+历史 Snapshot immutable。
+
+```text
+dimension_assessments
+id, snapshot_id, dimension_key,
+status(unverified|far_below|partial|mostly|stable),
+summary, created_at
 UNIQUE(snapshot_id, dimension_key)
 ```
 
-## `snapshot_diagnoses`
+Assessment 必须由 AcceptedJudgment 支撑：
 
 ```text
-snapshot_id   FK state_snapshots.id
-diagnosis_id  FK diagnosis_cards.id
-PRIMARY KEY (snapshot_id, diagnosis_id)
+assessment_judgments(assessment_id, judgment_id)
+snapshot_judgments(snapshot_id, judgment_id)
 ```
 
-只能引用 `accepted` 或 `modified` Diagnosis。
+“当前团队特点”不再维护自由文本事实表；UI View 由当前 Snapshot 的 AcceptedJudgment 投影生成。
 
-## `team_characteristics`
+## 9. Person / Role / Team
+
+Ontology 已定义 `Person / Role / RoleAssignment / Team`，但 V0.1 **不因此强制建表**。只有真实纵切需要跨材料稳定识别人、角色或团队时才实现对应关系表。
+
+教师实践当前可继续使用不透明 `teacher_ref`，避免为了本体完整性提前建设人员管理系统。
+
+## 10. Teacher practice
 
 ```text
-id            PK
-school_id     FK schools.id NOT NULL
-snapshot_id   FK state_snapshots.id NOT NULL
-scope         school | leadership | middle_leaders | teachers | subject_group
-text          NOT NULL
-created_at    NOT NULL
+teacher_practice_records
+id, school_id, teacher_ref NULL, title,
+occurred_at NULL, summary NULL, created_at, updated_at
+
+teacher_practice_evidence
+record_id, evidence_id,
+role(lesson_plan|classroom|reflection|team_discussion|learner_work|other)
+
+teacher_practice_diagnoses
+record_id, proposal_id
 ```
 
----
+## 11. Agent Runtime
 
-# 7. 教师实践
-
-## `teacher_practice_records`
+`runtime_profiles / agent_sessions / agent_runs` 保持原设计。
 
 ```text
-id                 PK
-school_id          FK schools.id NOT NULL
-teacher_ref        NULL
-title              NOT NULL
-occurred_at        NULL
-summary            NULL
-created_at         NOT NULL
-updated_at         NOT NULL
+agent_runs.status = queued|running|needs_input|completed|failed|cancelled
 ```
 
-`teacher_ref` 是本地不透明引用，不要求建立教师用户体系。
+飞书授权等待继续复用 `needs_input`，具体原因属于 Experience transient state。
 
-## `teacher_practice_evidence`
+## 12. Domain invariants
 
-```text
-record_id    FK teacher_practice_records.id
-evidence_id  FK evidence.id
-role         lesson_plan | classroom | reflection | team_discussion | learner_work | other
-PRIMARY KEY (record_id, evidence_id)
-```
+提交前必须验证：
 
-## `teacher_practice_diagnoses`
+- Evidence、Fact、Claim、Proposal、Review、Judgment、StageTarget、Snapshot 属于同一 School；
+- ObservationFact 有 Evidence + locator，且不包含评价/因果推断；
+- Claim 至少有 supporting Fact；counter search 必须显式完成；
+- Proposal 至少有一个 Claim 和一个 Criterion；
+- Proposal immutable；
+- 只有 HumanReview 可产生 AcceptedJudgment；
+- Snapshot 只能记录 AcceptedJudgment / Assessment；
+- Agent Token 只能访问当前 school_id / agent_run_id；
+- Renderer、Agent、MCP Server 均不能直接写 SQLite；
+- Pack 更新产生新版本，不覆盖历史 Criterion。
 
-```text
-record_id     FK teacher_practice_records.id
-diagnosis_id  FK diagnosis_cards.id
-PRIMARY KEY (record_id, diagnosis_id)
-```
+## 13. Implementation baseline
 
----
+当前仓库尚无生产用户数据库。Foundation migration 只保留最小 `schools` 表；后续按纵切增加 Stage、Evidence/Fact/Claim、Proposal/Review/Judgment、Snapshot/Assessment、Runtime。
 
-# 8. Agent Runtime
-
-## `runtime_profiles`
-
-保存 provider、ACP command、args、env reference、启用状态和兼容级别。敏感值不直接写入普通日志。
-
-## `agent_sessions`
-
-保存 `school_id`、`runtime_profile_id`、opaque `external_session_id`、`resumable` 和时间。Session 不是业务状态。
-
-## `agent_runs`
-
-```text
-id                  PK
-school_id           FK schools.id NOT NULL
-runtime_profile_id  FK runtime_profiles.id NOT NULL
-session_id          FK agent_sessions.id NULL
-user_instruction    NOT NULL
-status              queued | running | needs_input | completed | failed | cancelled
-started_at          NULL
-ended_at            NULL
-created_at          NOT NULL
-```
-
-授权等待继续使用 `needs_input`；具体原因由 Experience Event 表达，不扩展数据库 Enum。
-
----
-
-# 9. 关键索引
-
-```text
-stages(school_id, status)
-stage_targets(stage_id, dimension_key)
-methodology_criteria(pack_id, construct_key, dimension_key)
-evidence(school_id, captured_at)
-evidence_claims(school_id, evidence_id)
-diagnosis_cards(school_id, status, created_at)
-human_reviews(diagnosis_id, reviewed_at)
-state_snapshots(school_id, sequence)
-agent_runs(school_id, created_at)
-```
-
-为 Methodology 与必要短摘录建立 FTS5 虚拟表；原始 PDF 不写入业务表。
-
----
-
-# 10. Domain Invariants
-
-事务提交前必须验证：
-
-- Evidence、Claim、Diagnosis、StageTarget 属于同一 School；
-- Diagnosis 至少有一条 supporting Evidence；
-- 每个 Diagnosis 至少引用一个 Methodology Criterion；
-- counter Evidence 可以为空，但必须显式完成反证搜索；
-- 正式 Snapshot 只能引用顾问已确认判断；
-- Agent Token 只能访问当前 `school_id` 与 `agent_run_id`；
-- Renderer、Agent 和 MCP Server 均不能直接写 SQLite；
-- Pack 更新产生新版本，不原地覆盖历史 Criterion。
-
----
-
-# 11. Migration Baseline
-
-当前工作区没有已运行的应用数据库，因此 v1.1 作为首个实现基线：
-
-```text
-0001_initial_domain
-0002_methodology_and_provenance
-0003_runtime_and_teacher_practice
-```
-
-即使首装一次执行全部 Migration，也保留分段文件，便于测试边界和未来升级。
+在下一纵切开始前，先完成本 v1.2 与 Ontology draft 的测试校准；不为尚未实现的表制造兼容迁移包袱。

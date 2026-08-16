@@ -31,6 +31,7 @@ export const conceptsFileSchema = z.object({
       id: conceptIdSchema,
       label: z.string().min(1),
       kind: z.enum(['entity', 'classification', 'record', 'rule']),
+      layer: z.enum(['ontic', 'normative', 'epistemic', 'methodology']),
       definition: z.string().min(1),
     }),
   ),
