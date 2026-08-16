@@ -63,6 +63,18 @@ describe('methodology pack loader and registry', () => {
     expect(packs.flatMap((pack) => pack.behaviorAnchors)).toEqual([])
   })
 
+  it('keeps canonical content hash stable when only lifecycle status changes', () => {
+    const review = cloneSbd()
+    const contentHash = computeCanonicalContentHash(review)
+    const active = { ...review, status: 'active' }
+
+    expect(computeCanonicalContentHash(active)).toBe(contentHash)
+    active.canonicalContentHash = { algorithm: 'sha256', value: contentHash }
+    expect(parseMethodologyPack(JSON.stringify(active), sourceManifestFor(review)).status).toBe(
+      'active',
+    )
+  })
+
   it('queries by pack, stable criterion, construct, dimension and practice type without exposing mutable values', () => {
     const registry = loadMethodologyRegistry(methodologyRoot, sourceManifestPath)
     const sbd = registry.getPack('schooling-by-design', '1')
