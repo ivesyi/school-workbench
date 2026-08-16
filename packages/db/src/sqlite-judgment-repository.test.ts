@@ -72,4 +72,37 @@ describe('Judgment vertical slice persistence', () => {
     expect(judgments[0]?.proposalId).toBe(proposal.proposal.id)
     secondDatabase.close()
   })
+
+  it('persists needs-more-evidence as HumanReview without AcceptedJudgment', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'school-workbench-needs-evidence-'))
+    temporaryDirectories.push(directory)
+    const databasePath = join(directory, 'workbench.sqlite')
+    const migrationsFolder = resolve('packages/db/drizzle')
+
+    const database = openWorkbenchDatabase(databasePath, migrationsFolder)
+    const schoolRepository = new SqliteSchoolRepository(database.db)
+    const school = await new SchoolService(schoolRepository).create({ name: '南山实验学校' })
+    const judgmentService = new JudgmentService(
+      schoolRepository,
+      new SqliteJudgmentRepository(database.db),
+    )
+
+    const proposal = await judgmentService.submitSituation({
+      schoolId: school.id,
+      text: '中层会议里仍由校长完成任务拆解。',
+    })
+    const outcome = await judgmentService.review({
+      schoolId: school.id,
+      diagnosisId: proposal.proposal.id,
+      decision: 'needs_more_evidence',
+    })
+
+    expect(outcome.decision).toBe('needs_more_evidence')
+    expect(outcome.acceptedJudgment).toBeNull()
+    expect(countRows(database.client, 'human_reviews')).toBe(1)
+    expect(countRows(database.client, 'accepted_judgments')).toBe(0)
+    expect(countRows(database.client, 'judgment_claims')).toBe(0)
+    expect(await judgmentService.listAccepted(school.id)).toEqual([])
+    database.close()
+  })
 })
