@@ -1,5 +1,12 @@
 import { sql } from 'drizzle-orm'
-import { integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import {
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+  type AnySQLiteColumn,
+} from 'drizzle-orm/sqlite-core'
 
 export const schools = sqliteTable('schools', {
   id: text('id').primaryKey(),
@@ -222,8 +229,81 @@ export const stageJudgments = sqliteTable(
   ],
 )
 
+export const stateSnapshots = sqliteTable(
+  'state_snapshots',
+  {
+    id: text('id').primaryKey(),
+    schoolId: text('school_id')
+      .notNull()
+      .references(() => schools.id, { onDelete: 'cascade' }),
+    stageId: text('stage_id').references(() => stages.id),
+    previousSnapshotId: text('previous_snapshot_id').references(
+      (): AnySQLiteColumn => stateSnapshots.id,
+    ),
+    sequence: integer('sequence').notNull(),
+    summary: text('summary').notNull(),
+    isBaseline: integer('is_baseline', { mode: 'boolean' }).notNull().default(false),
+    confirmedAt: text('confirmed_at').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('state_snapshots_school_sequence_unique').on(table.schoolId, table.sequence),
+    uniqueIndex('state_snapshots_one_baseline_per_school')
+      .on(table.schoolId)
+      .where(sql`${table.isBaseline} = 1`),
+  ],
+)
+
+export const dimensionAssessments = sqliteTable(
+  'dimension_assessments',
+  {
+    id: text('id').primaryKey(),
+    snapshotId: text('snapshot_id')
+      .notNull()
+      .references(() => stateSnapshots.id, { onDelete: 'cascade' }),
+    dimensionKey: text('dimension_key').notNull(),
+    status: text('status').notNull(),
+    summary: text('summary').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('dimension_assessments_snapshot_dimension_unique').on(
+      table.snapshotId,
+      table.dimensionKey,
+    ),
+  ],
+)
+
+export const assessmentJudgments = sqliteTable(
+  'assessment_judgments',
+  {
+    assessmentId: text('assessment_id')
+      .notNull()
+      .references(() => dimensionAssessments.id, { onDelete: 'cascade' }),
+    judgmentId: text('judgment_id')
+      .notNull()
+      .references(() => acceptedJudgments.id),
+  },
+  (table) => [primaryKey({ columns: [table.assessmentId, table.judgmentId] })],
+)
+
+export const snapshotJudgments = sqliteTable(
+  'snapshot_judgments',
+  {
+    snapshotId: text('snapshot_id')
+      .notNull()
+      .references(() => stateSnapshots.id, { onDelete: 'cascade' }),
+    judgmentId: text('judgment_id')
+      .notNull()
+      .references(() => acceptedJudgments.id),
+  },
+  (table) => [primaryKey({ columns: [table.snapshotId, table.judgmentId] })],
+)
+
 export type SchoolRow = typeof schools.$inferSelect
 export type DiagnosisProposalRow = typeof diagnosisProposals.$inferSelect
 export type AcceptedJudgmentRow = typeof acceptedJudgments.$inferSelect
 export type StageRow = typeof stages.$inferSelect
 export type StageTargetRow = typeof stageTargets.$inferSelect
+export type StateSnapshotRow = typeof stateSnapshots.$inferSelect
+export type DimensionAssessmentRow = typeof dimensionAssessments.$inferSelect

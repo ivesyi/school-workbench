@@ -204,8 +204,16 @@ export function SchoolWorkspacePage(): React.JSX.Element {
       </Link>
 
       <header className="mt-7">
-        <p className="mb-2 text-sm font-medium text-primary">工作台</p>
         <h1 className="text-3xl font-semibold tracking-tight">{school.name}</h1>
+        <nav className="mt-5 flex gap-5 text-sm" aria-label="学校内导航">
+          <span className="font-medium text-foreground">工作台</span>
+          <Link
+            to={`/schools/${schoolId}/state`}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            学校状态
+          </Link>
+        </nav>
       </header>
 
       <section className="mt-10 rounded-xl border border-border bg-surface p-7">
