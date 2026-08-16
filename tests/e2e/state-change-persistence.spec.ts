@@ -85,10 +85,20 @@ test('second confirmed school state compares with baseline and survives restart 
     await expect(secondWindow.getByRole('button', { name: '确认现在的状态' })).toHaveCount(0)
 
     const repeated = await secondWindow.evaluate(async () => {
-      const api = (window as typeof window & { workbench: Window['workbench'] }).workbench
-      return api.states.confirm({ schoolId: '南山实验学校' })
-    }).catch(() => null)
-    expect(repeated).toBeNull()
+      const api = (
+        window as unknown as {
+          workbench: {
+            schools: { list(): Promise<Array<{ id: string; name: string }>> }
+            states: { confirm(input: { schoolId: string }): Promise<{ state: string }> }
+          }
+        }
+      ).workbench
+      const schools = await api.schools.list()
+      const target = schools.find((item) => item.name === '南山实验学校')
+      if (!target) throw new Error('school not found')
+      return api.states.confirm({ schoolId: target.id })
+    })
+    expect(repeated.state).toBe('current')
 
     await secondApp.close()
   } finally {
