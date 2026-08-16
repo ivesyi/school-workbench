@@ -271,9 +271,7 @@ export function createReviewOutcome(
   }
 
   const statement =
-    input.decision === 'modified'
-      ? input.finalText!.trim()
-      : proposal.provisionalJudgment.trim()
+    input.decision === 'modified' ? input.finalText!.trim() : proposal.provisionalJudgment.trim()
 
   return {
     review,
