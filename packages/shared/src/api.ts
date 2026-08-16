@@ -6,6 +6,7 @@ import type {
   SubmitSituationInput,
 } from './judgments'
 import type { CreateSchoolInput, SchoolView } from './schools'
+import type { AdjustStageInput, ConfirmStageInput, StageWorkspaceView } from './stages'
 
 export type WorkbenchApi = {
   schools: {
@@ -17,5 +18,10 @@ export type WorkbenchApi = {
     submitSituation(input: SubmitSituationInput): Promise<JudgmentReviewView>
     review(input: ReviewDiagnosisInput): Promise<ReviewOutcomeView>
     listAccepted(schoolId: string): Promise<AcceptedJudgmentView[]>
+  }
+  stages: {
+    getWorkspace(schoolId: string): Promise<StageWorkspaceView>
+    adjust(input: AdjustStageInput): Promise<StageWorkspaceView>
+    confirm(input: ConfirmStageInput): Promise<StageWorkspaceView>
   }
 }

@@ -11,6 +11,7 @@ import type {
   JudgmentReviewView,
   ReviewDiagnosisInput,
   SchoolView,
+  StageWorkspaceView,
 } from '@school-workbench/shared'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -29,7 +30,12 @@ export function SchoolWorkspacePage(): React.JSX.Element {
   const [accepted, setAccepted] = useState<AcceptedJudgmentView[]>([])
   const [editing, setEditing] = useState(false)
   const [editedJudgment, setEditedJudgment] = useState('')
+  const [stageWorkspace, setStageWorkspace] = useState<StageWorkspaceView>({ state: 'none' })
+  const [stageFeedbackOpen, setStageFeedbackOpen] = useState(false)
+  const [stageFeedback, setStageFeedback] = useState('')
+  const [stageSubmitting, setStageSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [stageError, setStageError] = useState<string | null>(null)
   const [resultMessage, setResultMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -49,10 +55,31 @@ export function SchoolWorkspacePage(): React.JSX.Element {
       .finally(() => {
         if (current) setLoading(false)
       })
+
+    void api.stages
+      .getWorkspace(schoolId)
+      .then((result) => {
+        if (current) setStageWorkspace(result)
+      })
+      .catch((reason: unknown) => {
+        if (current) {
+          setStageError(reason instanceof Error ? reason.message : '暂时没能整理当前阶段')
+        }
+      })
+
     return () => {
       current = false
     }
   }, [api, schoolId])
+
+  async function refreshStage(): Promise<void> {
+    try {
+      setStageError(null)
+      setStageWorkspace(await api.stages.getWorkspace(schoolId))
+    } catch (reason) {
+      setStageError(reason instanceof Error ? reason.message : '暂时没能整理当前阶段')
+    }
+  }
 
   async function submitSituation(): Promise<void> {
     if (!message.trim()) return
@@ -91,6 +118,7 @@ export function SchoolWorkspacePage(): React.JSX.Element {
         setResultMessage(
           decision === 'modified' ? '已经按你的修改记录这条判断。' : '已经记录这条判断。',
         )
+        await refreshStage()
       } else if (decision === 'needs_more_evidence') {
         setResultMessage('已记下：先补充更多依据，这条判断暂不进入正式记录。')
       } else {
@@ -103,6 +131,42 @@ export function SchoolWorkspacePage(): React.JSX.Element {
       setError(reason instanceof Error ? reason.message : '确认判断时遇到问题')
     } finally {
       setReviewing(false)
+    }
+  }
+
+  async function adjustStage(): Promise<void> {
+    if (stageWorkspace.state !== 'suggested' || !stageFeedback.trim()) return
+    setStageSubmitting(true)
+    setStageError(null)
+    try {
+      const result = await api.stages.adjust({
+        schoolId,
+        stageId: stageWorkspace.stage.id,
+        feedback: stageFeedback,
+      })
+      setStageWorkspace(result)
+      setStageFeedback('')
+      setStageFeedbackOpen(false)
+    } catch (reason) {
+      setStageError(reason instanceof Error ? reason.message : '暂时没能重新整理阶段建议')
+    } finally {
+      setStageSubmitting(false)
+    }
+  }
+
+  async function confirmStage(): Promise<void> {
+    if (stageWorkspace.state !== 'suggested') return
+    setStageSubmitting(true)
+    setStageError(null)
+    try {
+      const result = await api.stages.confirm({ schoolId, stageId: stageWorkspace.stage.id })
+      setStageWorkspace(result)
+      setStageFeedbackOpen(false)
+      setResultMessage('已经把这个阶段记下来了。之后会围绕这个阶段持续看变化。')
+    } catch (reason) {
+      setStageError(reason instanceof Error ? reason.message : '确认当前阶段时遇到问题')
+    } finally {
+      setStageSubmitting(false)
     }
   }
 
@@ -170,6 +234,13 @@ export function SchoolWorkspacePage(): React.JSX.Element {
         <Alert variant="destructive" className="mt-5">
           <AlertTitle>这一步没有完成</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {stageError ? (
+        <Alert variant="destructive" className="mt-5">
+          <AlertTitle>阶段建议暂时没有更新</AlertTitle>
+          <AlertDescription>{stageError}</AlertDescription>
         </Alert>
       ) : null}
 
@@ -281,6 +352,87 @@ export function SchoolWorkspacePage(): React.JSX.Element {
               不认同
             </Button>
           </div>
+        </section>
+      ) : null}
+
+      {stageWorkspace.state === 'suggested' ? (
+        <section className="mt-6 rounded-xl border border-border bg-surface p-7">
+          <p className="text-sm font-medium text-primary">根据目前已经确认的判断</p>
+          <h2 className="mt-2 text-xl font-semibold">{stageWorkspace.stage.summary}</h2>
+          <p className="mt-4 leading-7 text-muted-foreground">{stageWorkspace.stage.focus}</p>
+          <p className="mt-4 text-sm font-medium">这样理解基本对吗？</p>
+
+          <details className="mt-5 rounded-lg border border-border px-4 py-3 text-sm">
+            <summary className="cursor-pointer font-medium">这个阶段我会重点看什么</summary>
+            <div className="mt-4 space-y-3">
+              {stageWorkspace.stage.targets.map((target) => (
+                <div key={target.id}>
+                  <p className="font-medium text-foreground">{target.label}</p>
+                  <p className="mt-1 leading-6 text-muted-foreground">{target.text}</p>
+                </div>
+              ))}
+            </div>
+          </details>
+
+          {stageFeedbackOpen ? (
+            <div className="mt-5 rounded-lg bg-muted/40 p-4">
+              <label className="text-sm font-medium" htmlFor="stage-feedback">
+                哪里需要调整？
+              </label>
+              <Textarea
+                id="stage-feedback"
+                className="mt-2"
+                value={stageFeedback}
+                onChange={(event) => setStageFeedback(event.target.value)}
+                placeholder="例如：现在中层其实已经能独立推进，只是校长还没有真正放手……"
+              />
+              <div className="mt-3 flex justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={stageSubmitting || stageFeedback.trim().length === 0}
+                  onClick={() => void adjustStage()}
+                >
+                  {stageSubmitting ? '正在重新整理…' : '重新整理建议'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-6 flex gap-3">
+            <Button type="button" disabled={stageSubmitting} onClick={() => void confirmStage()}>
+              基本对
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={stageSubmitting}
+              onClick={() => setStageFeedbackOpen((value) => !value)}
+            >
+              调整一下
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
+      {stageWorkspace.state === 'active' ? (
+        <section className="mt-6 rounded-xl border border-border bg-surface px-6 py-5">
+          <p className="text-xs font-medium text-muted-foreground">当前阶段</p>
+          <h2 className="mt-2 text-lg font-semibold">{stageWorkspace.stage.title}</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {stageWorkspace.stage.focus}
+          </p>
+          <details className="mt-4 text-sm">
+            <summary className="cursor-pointer font-medium">这个阶段重点看什么</summary>
+            <div className="mt-3 space-y-2 text-muted-foreground">
+              {stageWorkspace.stage.targets.map((target) => (
+                <p key={target.id}>
+                  <span className="font-medium text-foreground">{target.label}：</span>
+                  {target.text}
+                </p>
+              ))}
+            </div>
+          </details>
         </section>
       ) : null}
 

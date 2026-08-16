@@ -1,14 +1,16 @@
-import { JudgmentService, SchoolService } from '@school-workbench/application'
+import { JudgmentService, SchoolService, StageService } from '@school-workbench/application'
 import {
   openWorkbenchDatabase,
   SqliteJudgmentRepository,
   SqliteSchoolRepository,
+  SqliteStageRepository,
 } from '@school-workbench/db'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createJudgmentIpcHandlers, registerJudgmentIpc } from './judgment-ipc'
 import { createSchoolIpcHandlers, registerSchoolIpc } from './school-ipc'
+import { createStageIpcHandlers, registerStageIpc } from './stage-ipc'
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url))
 
@@ -60,11 +62,14 @@ app.whenReady().then(() => {
 
   const schoolRepository = new SqliteSchoolRepository(database.db)
   const judgmentRepository = new SqliteJudgmentRepository(database.db)
+  const stageRepository = new SqliteStageRepository(database.db)
   const schoolService = new SchoolService(schoolRepository)
   const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
+  const stageService = new StageService(schoolRepository, judgmentRepository, stageRepository)
 
   registerSchoolIpc(ipcMain, createSchoolIpcHandlers(schoolService))
   registerJudgmentIpc(ipcMain, createJudgmentIpcHandlers(judgmentService))
+  registerStageIpc(ipcMain, createStageIpcHandlers(stageService))
 
   createMainWindow()
 

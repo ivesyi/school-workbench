@@ -1,5 +1,7 @@
 import {
   acceptedJudgmentListSchema,
+  adjustStageInputSchema,
+  confirmStageInputSchema,
   createSchoolInputSchema,
   judgmentIpcChannels,
   judgmentReviewViewSchema,
@@ -9,6 +11,8 @@ import {
   schoolIpcChannels,
   schoolListSchema,
   schoolViewSchema,
+  stageIpcChannels,
+  stageWorkspaceViewSchema,
   submitSituationInputSchema,
   type WorkbenchApi,
 } from '@school-workbench/shared'
@@ -55,6 +59,29 @@ const api: WorkbenchApi = {
         schoolIdSchema.parse(schoolId),
       )
       return acceptedJudgmentListSchema.parse(result)
+    },
+  },
+  stages: {
+    async getWorkspace(schoolId) {
+      const result: unknown = await ipcRenderer.invoke(
+        stageIpcChannels.getWorkspace,
+        schoolIdSchema.parse(schoolId),
+      )
+      return stageWorkspaceViewSchema.parse(result)
+    },
+    async adjust(input) {
+      const result: unknown = await ipcRenderer.invoke(
+        stageIpcChannels.adjust,
+        adjustStageInputSchema.parse(input),
+      )
+      return stageWorkspaceViewSchema.parse(result)
+    },
+    async confirm(input) {
+      const result: unknown = await ipcRenderer.invoke(
+        stageIpcChannels.confirm,
+        confirmStageInputSchema.parse(input),
+      )
+      return stageWorkspaceViewSchema.parse(result)
     },
   },
 }

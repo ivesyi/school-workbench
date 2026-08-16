@@ -15,6 +15,13 @@
       "when": 1786908600000,
       "tag": "0001_epistemic_vertical_slice",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786912976930,
+      "tag": "0002_loud_hobgoblin",
+      "breakpoints": true
     }
   ]
 }
