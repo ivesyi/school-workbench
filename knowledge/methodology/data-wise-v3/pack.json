@@ -258,13 +258,34 @@
     }
   ],
   "inferenceGuardrails": [
-    { "scope": "pack", "statement": "先形成学习者中心问题，再讨论成人实践。" },
-    { "scope": "pack", "statement": "标注使用了哪些实践证据及其局限。" },
-    { "scope": "pack", "statement": "分开列出观察事实、解释和暂定判断。" },
-    { "scope": "pack", "statement": "引用 Criterion ID，列出支持与相反证据。" },
-    { "scope": "pack", "statement": "避免把相关性写成单因果。" },
-    { "scope": "pack", "statement": "给出可执行的小步行动与影响取证计划。" },
-    { "scope": "pack", "statement": "将诊断定位为团队学习建议，而非教师绩效结论。" },
+    {
+      "scope": "pack",
+      "statement": "先形成学习者中心问题，再讨论成人实践。"
+    },
+    {
+      "scope": "pack",
+      "statement": "标注使用了哪些实践证据及其局限。"
+    },
+    {
+      "scope": "pack",
+      "statement": "分开列出观察事实、解释和暂定判断。"
+    },
+    {
+      "scope": "pack",
+      "statement": "引用 Criterion ID，列出支持与相反证据。"
+    },
+    {
+      "scope": "pack",
+      "statement": "避免把相关性写成单因果。"
+    },
+    {
+      "scope": "pack",
+      "statement": "给出可执行的小步行动与影响取证计划。"
+    },
+    {
+      "scope": "pack",
+      "statement": "将诊断定位为团队学习建议，而非教师绩效结论。"
+    },
     {
       "scope": "criterion",
       "criterionId": "DW.C4.INFERENCE_DISCIPLINE",
@@ -273,6 +294,6 @@
   ],
   "canonicalContentHash": {
     "algorithm": "sha256",
-    "value": "856533543b2926bbb1df68ee192a23e7ac31c7696787aa9d7528810f286adf78"
+    "value": "390a504d2149cf6192cca6a3b09536ac724917bbaab0dd576e351c4964417750"
   }
 }

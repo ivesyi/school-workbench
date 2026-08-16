@@ -25,6 +25,12 @@ const dimensionKeys: CanonicalDimensionKey[] = [
   'culture',
   'capability',
 ]
+const nextStatus: Readonly<Record<MethodologyPackStatus, MethodologyPackStatus | null>> = {
+  draft: 'review',
+  review: 'active',
+  active: 'retired',
+  retired: null,
+}
 
 function parseJson(value: string): unknown {
   return JSON.parse(value) as unknown
@@ -52,11 +58,33 @@ function assertDimension(value: string | null): CanonicalDimensionKey | null {
   return value as CanonicalDimensionKey
 }
 
-function sameProjection(
+function comparableProjection(projection: MethodologyPackProjection): unknown {
+  return {
+    id: projection.id,
+    key: projection.key,
+    version: projection.version,
+    title: projection.title,
+    sourceType: projection.sourceType,
+    sourceRef: projection.sourceRef,
+    sourceFingerprint: projection.sourceFingerprint,
+    contentHash: projection.contentHash,
+    criteria: projection.criteria,
+    behaviorAnchors: projection.behaviorAnchors,
+  }
+}
+
+function sameProjectionContent(
   left: MethodologyPackProjection,
   right: MethodologyPackProjection,
 ): boolean {
-  return JSON.stringify(left) === JSON.stringify(right)
+  return JSON.stringify(comparableProjection(left)) === JSON.stringify(comparableProjection(right))
+}
+
+function assertStatusTransition(from: MethodologyPackStatus, to: MethodologyPackStatus): void {
+  if (from === to) return
+  if (nextStatus[from] !== to) {
+    throw new Error(`Invalid methodology status transition: ${from} -> ${to}`)
+  }
 }
 
 export class SqliteMethodologyRepository implements MethodologyRepository {
@@ -140,9 +168,24 @@ export class SqliteMethodologyRepository implements MethodologyRepository {
         )
       }
       const persisted = this.loadProjection(existing.id)
-      if (!sameProjection(persisted, projection)) {
+      if (!sameProjectionContent(persisted, projection)) {
         throw new Error(
           `Methodology ${projection.key}@${projection.version} persisted content does not match registry`,
+        )
+      }
+      if (persisted.status === projection.status) return
+
+      assertStatusTransition(persisted.status, projection.status)
+      const result = this.database
+        .update(methodologyPacks)
+        .set({ status: projection.status })
+        .where(
+          and(eq(methodologyPacks.id, existing.id), eq(methodologyPacks.status, persisted.status)),
+        )
+        .run()
+      if (result.changes !== 1) {
+        throw new Error(
+          `Methodology ${projection.key}@${projection.version} status changed during transition`,
         )
       }
       return

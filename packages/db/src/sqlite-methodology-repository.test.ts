@@ -5,6 +5,7 @@ import {
   methodologyPackSchema,
   projectMethodologyPack,
   type MethodologyPack,
+  type MethodologyPackStatus,
 } from '@school-workbench/methodology'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -26,6 +27,12 @@ function versionedPack(pack: MethodologyPack, version: string, title: string): M
     algorithm: 'sha256',
     value: computeCanonicalContentHash(raw),
   }
+  return methodologyPackSchema.parse(raw) as MethodologyPack
+}
+
+function packWithStatus(pack: MethodologyPack, status: MethodologyPackStatus): MethodologyPack {
+  const raw = JSON.parse(JSON.stringify(pack)) as Record<string, unknown>
+  raw.status = status
   return methodologyPackSchema.parse(raw) as MethodologyPack
 }
 
@@ -65,6 +72,74 @@ describe('SqliteMethodologyRepository', () => {
       'DW.C4.INFERENCE_DISCIPLINE',
     )
     expect(await repository.findCriteria({ practiceType: 'school_design' })).toHaveLength(5)
+  })
+
+  it('allows review to active without changing immutable methodology content', async () => {
+    await repository.syncRegistry(registry)
+    const original = registry.getPack('schooling-by-design', '1')
+    if (!original) throw new Error('missing SBD pack')
+
+    const beforePack = database.client
+      .prepare(
+        'SELECT id, status, created_at AS createdAt, content_hash AS contentHash FROM methodology_packs WHERE key = ? AND version = ?',
+      )
+      .get(original.key, original.version) as {
+      id: string
+      status: string
+      createdAt: string
+      contentHash: string
+    }
+    const beforeCriteria = database.client
+      .prepare('SELECT * FROM methodology_criteria WHERE pack_id = ? ORDER BY sequence')
+      .all(beforePack.id)
+    const beforeAnchorCount = database.client
+      .prepare(
+        `SELECT count(*) AS count FROM behavior_anchors a
+         JOIN methodology_criteria c ON c.id = a.criterion_id
+         WHERE c.pack_id = ?`,
+      )
+      .get(beforePack.id) as { count: number }
+
+    const active = packWithStatus(original, 'active')
+    expect(active.canonicalContentHash.value).toBe(original.canonicalContentHash.value)
+    await repository.syncRegistry(new MethodologyRegistry([active]))
+
+    const afterPack = database.client
+      .prepare(
+        'SELECT id, status, created_at AS createdAt, content_hash AS contentHash FROM methodology_packs WHERE key = ? AND version = ?',
+      )
+      .get(original.key, original.version) as typeof beforePack
+    const afterCriteria = database.client
+      .prepare('SELECT * FROM methodology_criteria WHERE pack_id = ? ORDER BY sequence')
+      .all(beforePack.id)
+    const afterAnchorCount = database.client
+      .prepare(
+        `SELECT count(*) AS count FROM behavior_anchors a
+         JOIN methodology_criteria c ON c.id = a.criterion_id
+         WHERE c.pack_id = ?`,
+      )
+      .get(beforePack.id) as { count: number }
+
+    expect(afterPack).toEqual({ ...beforePack, status: 'active' })
+    expect(afterCriteria).toEqual(beforeCriteria)
+    expect(afterAnchorCount).toEqual(beforeAnchorCount)
+    expect((await repository.getPack(original.key, original.version))?.status).toBe('active')
+  })
+
+  it('rejects lifecycle rollback and skipped lifecycle states', async () => {
+    await repository.syncRegistry(registry)
+    const original = registry.getPack('schooling-by-design', '1')
+    if (!original) throw new Error('missing SBD pack')
+
+    await expect(
+      repository.syncRegistry(new MethodologyRegistry([packWithStatus(original, 'retired')])),
+    ).rejects.toThrow(/review -> retired/)
+
+    const active = packWithStatus(original, 'active')
+    await repository.syncRegistry(new MethodologyRegistry([active]))
+    await expect(
+      repository.syncRegistry(new MethodologyRegistry([packWithStatus(original, 'review')])),
+    ).rejects.toThrow(/active -> review/)
   })
 
   it('refuses to overwrite a key+version when canonical content changes', async () => {
