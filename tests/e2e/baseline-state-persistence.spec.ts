@@ -36,7 +36,7 @@ test('baseline school state is confirmed once and survives restart with five ass
     await expect(firstWindow.getByText('当前阶段')).toBeVisible()
 
     await firstWindow.getByRole('link', { name: '学校状态' }).click()
-    await expect(firstWindow.getByText('现在的状态')).toBeVisible()
+    await expect(firstWindow.getByText('现在的状态', { exact: true })).toBeVisible()
     for (const label of ['领导力', '关键任务', '结构与机制', '文化', '能力']) {
       await expect(firstWindow.getByRole('heading', { name: label })).toBeVisible()
     }
