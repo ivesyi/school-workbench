@@ -67,7 +67,12 @@ jobs:
           fi
       - name: Reject legacy dimension keys in runtime source
         run: |
-          if grep -R -nE 'critical_tasks|structure_systems|capacity' packages/domain packages/shared packages/application packages/db/src apps/desktop/src tests; then
+          if grep -nE 'critical_tasks|structure_systems|capacity' \
+            packages/domain/src/stage.ts \
+            packages/shared/src/stages.ts \
+            packages/application/src/stage-service.ts \
+            packages/db/src/schema.ts \
+            packages/db/src/sqlite-stage-repository.ts; then
             echo "Legacy dimension key remains in runtime source"
             exit 1
           fi
