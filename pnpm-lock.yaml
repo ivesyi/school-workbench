@@ -130,6 +130,9 @@ importers:
       '@school-workbench/domain':
         specifier: workspace:*
         version: link:../domain
+      '@school-workbench/methodology':
+        specifier: workspace:*
+        version: link:../methodology
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3
@@ -196,6 +199,16 @@ importers:
       '@types/react-dom':
         specifier: 19.2.4
         version: 19.2.4(@types/react@19.2.18)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/methodology:
+    dependencies:
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
       typescript:
         specifier: 5.9.3
         version: 5.9.3

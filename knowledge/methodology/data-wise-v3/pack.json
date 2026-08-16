@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 1,
+  "id": "data-wise-v3",
+  "key": "data-wise",
+  "version": "3",
+  "title": "Data Wise Third Edition Methodology Pack",
+  "status": "review",
+  "sourceType": "book",
+  "sourceRef": "references/books/data-wise-third-edition.pdf",
+  "sourceFingerprint": {
+    "algorithm": "sha256",
+    "value": "3fa3122b437d4c7c8054f83235c400d318b7af7b4266bd084706e829bb9376e8"
+  },
+  "constructs": [
+    {
+      "id": "DW.ACE",
+      "title": "行动—评估—调整习惯",
+      "assessmentQuestion": "团队是否在行动中持续取证并调整？",
+      "sourceLocator": {
+        "label": "ACE：行动、协作与证据习惯",
+        "chapter": "Introduction and Integration chapters"
+      }
+    },
+    {
+      "id": "DW.COLLABORATION",
+      "title": "有意协作",
+      "assessmentQuestion": "是否形成能共同看证据、提出异议和承担工作的协作结构？",
+      "sourceLocator": {
+        "label": "ACE：行动、协作与证据习惯",
+        "chapter": "Introduction and Integration chapters"
+      }
+    },
+    {
+      "id": "DW.EVIDENCE",
+      "title": "对证据的持续追问",
+      "assessmentQuestion": "结论能否回到可观察的学习者与成人实践证据？",
+      "sourceLocator": {
+        "label": "ACE：行动、协作与证据习惯",
+        "chapter": "Introduction and Integration chapters"
+      }
+    },
+    {
+      "id": "DW.LEARNING_PROBLEM",
+      "title": "以学习者为中心的问题",
+      "assessmentQuestion": "问题是否具体、可行动、基于多类证据并包含学习者优势？",
+      "sourceLocator": {
+        "label": "由学习问题转向成人实践",
+        "chapter": "Chapter 5",
+        "printedPages": "148–152"
+      }
+    },
+    {
+      "id": "DW.PRACTICE_EVIDENCE",
+      "title": "成人实践证据",
+      "assessmentQuestion": "是否通过产物、自述、观察或视频看见实际实践？",
+      "sourceLocator": {
+        "label": "产物、自述、观察和教学核心",
+        "chapter": "Chapter 5",
+        "printedPages": "152–156"
+      }
+    },
+    {
+      "id": "DW.PROBLEM_OF_PRACTICE",
+      "title": "实践问题",
+      "assessmentQuestion": "成人正在做或未做什么，与学习问题如何相关？",
+      "sourceLocator": {
+        "label": "Learning-centered problem / Problem of practice / Action / Impact throughline",
+        "chapter": "Throughline Overview",
+        "printedPages": "235–238"
+      }
+    },
+    {
+      "id": "DW.LADDER_DISCIPLINE",
+      "title": "推论阶梯纪律",
+      "assessmentQuestion": "团队是否区分选择的数据、解释和结论？",
+      "sourceLocator": {
+        "label": "为学习而观察、客观性与具体性",
+        "chapter": "Chapter 5",
+        "printedPages": "157–166"
+      }
+    },
+    {
+      "id": "DW.ACTION_IMPACT",
+      "title": "行动与影响计划",
+      "assessmentQuestion": "谁在何时做什么，以及如何观察学习者体验和表现的变化？",
+      "sourceLocator": {
+        "label": "影响评估、行动与调整",
+        "chapter": "Chapters 7–8 and Integrate",
+        "printedPages": "265–267"
+      }
+    }
+  ],
+  "criteria": [
+    {
+      "id": "DW.C1.LEARNING_PROBLEM_QUALITY",
+      "constructId": "DW.LEARNING_PROBLEM",
+      "dimensionKey": null,
+      "practiceType": "adult_practice",
+      "title": "学习问题质量",
+      "description": "学习问题质量",
+      "applicability": {
+        "appliesTo": ["团队探究", "实践证据", "问题陈述", "行动计划", "影响评估"],
+        "doesNotApplyTo": [
+          "单凭一次听课给教师定级",
+          "把学生结果直接归因于单一教师",
+          "以合规检查代替专业学习"
+        ]
+      },
+      "sourceLocator": {
+        "label": "由学习问题转向成人实践",
+        "chapter": "Chapter 5",
+        "printedPages": "148–152"
+      }
+    },
+    {
+      "id": "DW.C2.PRACTICE_VISIBILITY",
+      "constructId": "DW.PRACTICE_EVIDENCE",
+      "dimensionKey": null,
+      "practiceType": "adult_practice",
+      "title": "实践可见性",
+      "description": "实践可见性",
+      "applicability": {
+        "appliesTo": ["团队探究", "实践证据", "问题陈述", "行动计划", "影响评估"],
+        "doesNotApplyTo": [
+          "单凭一次听课给教师定级",
+          "把学生结果直接归因于单一教师",
+          "以合规检查代替专业学习"
+        ]
+      },
+      "sourceLocator": {
+        "label": "产物、自述、观察和教学核心",
+        "chapter": "Chapter 5",
+        "printedPages": "152–156"
+      }
+    },
+    {
+      "id": "DW.C3.PROBLEM_OF_PRACTICE_QUALITY",
+      "constructId": "DW.PROBLEM_OF_PRACTICE",
+      "dimensionKey": null,
+      "practiceType": "adult_practice",
+      "title": "实践问题质量",
+      "description": "实践问题质量",
+      "applicability": {
+        "appliesTo": ["团队探究", "实践证据", "问题陈述", "行动计划", "影响评估"],
+        "doesNotApplyTo": [
+          "单凭一次听课给教师定级",
+          "把学生结果直接归因于单一教师",
+          "以合规检查代替专业学习"
+        ]
+      },
+      "sourceLocator": {
+        "label": "Learning-centered problem / Problem of practice / Action / Impact throughline",
+        "chapter": "Throughline Overview",
+        "printedPages": "235–238"
+      }
+    },
+    {
+      "id": "DW.C4.INFERENCE_DISCIPLINE",
+      "constructId": "DW.LADDER_DISCIPLINE",
+      "dimensionKey": null,
+      "practiceType": "adult_practice",
+      "title": "推论纪律",
+      "description": "推论纪律",
+      "applicability": {
+        "appliesTo": ["团队探究", "实践证据", "问题陈述", "行动计划", "影响评估"],
+        "doesNotApplyTo": [
+          "单凭一次听课给教师定级",
+          "把学生结果直接归因于单一教师",
+          "以合规检查代替专业学习"
+        ]
+      },
+      "sourceLocator": {
+        "label": "为学习而观察、客观性与具体性",
+        "chapter": "Chapter 5",
+        "printedPages": "157–166"
+      }
+    },
+    {
+      "id": "DW.C5.ACTION_IMPACT_COHERENCE",
+      "constructId": "DW.ACTION_IMPACT",
+      "dimensionKey": null,
+      "practiceType": "adult_practice",
+      "title": "行动—影响连贯性",
+      "description": "行动—影响连贯性",
+      "applicability": {
+        "appliesTo": ["团队探究", "实践证据", "问题陈述", "行动计划", "影响评估"],
+        "doesNotApplyTo": [
+          "单凭一次听课给教师定级",
+          "把学生结果直接归因于单一教师",
+          "以合规检查代替专业学习"
+        ]
+      },
+      "sourceLocator": {
+        "label": "影响评估、行动与调整",
+        "chapter": "Chapters 7–8 and Integrate",
+        "printedPages": "265–267"
+      }
+    }
+  ],
+  "behaviorAnchors": [],
+  "evidenceGuidance": [
+    {
+      "criterionId": "DW.C1.LEARNING_PROBLEM_QUALITY",
+      "supportingIndicators": [
+        "连接优先问题；使用多类证据；同时识别学习者资产与重要差距；在学校可影响范围内；具体、可行动。"
+      ],
+      "counterIndicators": ["问题描述成人不满意、课程覆盖或学生标签，却没有可观察的学习表现。"],
+      "insufficientEvidence": ["只有汇总成绩，无法区分任务、群体、体验或具体表现。"],
+      "counterexampleChecks": [],
+      "collectionPrinciples": [],
+      "adjustmentConditions": []
+    },
+    {
+      "criterionId": "DW.C2.PRACTICE_VISIBILITY",
+      "supportingIndicators": [
+        "团队结合产物、自述、观察或视频，关注教师、学习者、内容与任务之间实际发生的互动。"
+      ],
+      "counterIndicators": [
+        "只看教案中的“规定任务”，不看课堂中的“实际任务”；以自报替代全部实践证据。"
+      ],
+      "insufficientEvidence": [],
+      "counterexampleChecks": [],
+      "collectionPrinciples": ["观察用于学习，不用于绩效评价；记录先保持客观、具体，再解释。"],
+      "adjustmentConditions": []
+    },
+    {
+      "criterionId": "DW.C3.PROBLEM_OF_PRACTICE_QUALITY",
+      "supportingIndicators": [
+        "与学习问题相关；基于成人实践证据；承认教育者已有优势和下一步工作；在控制范围内；具体、可行动。"
+      ],
+      "counterIndicators": ["归咎学生、家庭或不可控环境；直接跳到解决方案；用人格标签解释实践。"],
+      "insufficientEvidence": [],
+      "counterexampleChecks": ["同一实践是否在某些学习者、课程或条件下产生不同结果？"],
+      "collectionPrinciples": [],
+      "adjustmentConditions": []
+    },
+    {
+      "criterionId": "DW.C4.INFERENCE_DISCIPLINE",
+      "supportingIndicators": [
+        "事实、解释、结论分开记录；团队能回到低推论、具体的描述，并主动寻找矛盾证据。"
+      ],
+      "counterIndicators": ["从单个片段跳到能力、动机或因果判断；只进行避免分歧的“正向闲谈”。"],
+      "insufficientEvidence": [],
+      "counterexampleChecks": [],
+      "collectionPrinciples": [],
+      "adjustmentConditions": []
+    },
+    {
+      "criterionId": "DW.C5.ACTION_IMPACT_COHERENCE",
+      "supportingIndicators": [
+        "行动计划明确谁、做什么、何时做；策略具有杠杆作用；影响计划同时观察学习者体验和表现，并有可测目标。"
+      ],
+      "counterIndicators": ["只记录培训完成率、教师满意度或交付物；没有学习者层面的影响证据。"],
+      "insufficientEvidence": [],
+      "counterexampleChecks": [],
+      "collectionPrinciples": [],
+      "adjustmentConditions": ["预先说明什么证据会支持继续、修改或停止当前行动。"]
+    }
+  ],
+  "inferenceGuardrails": [
+    { "scope": "pack", "statement": "先形成学习者中心问题，再讨论成人实践。" },
+    { "scope": "pack", "statement": "标注使用了哪些实践证据及其局限。" },
+    { "scope": "pack", "statement": "分开列出观察事实、解释和暂定判断。" },
+    { "scope": "pack", "statement": "引用 Criterion ID，列出支持与相反证据。" },
+    { "scope": "pack", "statement": "避免把相关性写成单因果。" },
+    { "scope": "pack", "statement": "给出可执行的小步行动与影响取证计划。" },
+    { "scope": "pack", "statement": "将诊断定位为团队学习建议，而非教师绩效结论。" },
+    {
+      "scope": "criterion",
+      "criterionId": "DW.C4.INFERENCE_DISCIPLINE",
+      "statement": "不输出或保存隐藏思维链，只保存可审核的事实、短理由和引用。"
+    }
+  ],
+  "canonicalContentHash": {
+    "algorithm": "sha256",
+    "value": "856533543b2926bbb1df68ee192a23e7ac31c7696787aa9d7528810f286adf78"
+  }
+}

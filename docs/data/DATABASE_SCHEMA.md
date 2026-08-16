@@ -88,11 +88,13 @@ PRIMARY KEY(stage_id, judgment_id)
 ```text
 methodology_packs
 id, key, version, title, source_type, source_ref,
-content_hash, status, created_at
+source_fingerprint, content_hash, status, created_at
 UNIQUE(key, version)
 ```
 
-V1 Pack：Schooling by Design、Data Wise、Congruence、Role Standards。
+`source_fingerprint` 保存 `references/SOURCE_MANIFEST.md` 中对应本地原始来源的 SHA-256；`content_hash` 保存结构化 Pack 去除 hash 字段后的 canonical SHA-256。两者语义不同，均用于 fail-closed 追溯。
+
+V1 规划包含 Schooling by Design、Data Wise、Congruence、Role Standards；当前 Methodology Registry Foundation 只实现已有人审文本基线的 Schooling by Design 与 Data Wise，另外两套不得因“齐全”而提前编造。
 
 ```text
 methodology_criteria
@@ -103,13 +105,19 @@ guardrails_json, source_locator_json, sequence
 UNIQUE(pack_id, stable_key)
 ```
 
+`parent_id` 是同表 FK，并由 Repository 额外校验必须与子 Criterion 属于同一个 Pack。`guardrails_json` 在当前冻结列集内保存 Criterion 适用边界与有效 inference guardrails；它保存 JSON value，不保存跨实体 ID 列表。
+
 ```text
 behavior_anchors
 id, criterion_id, level_key, label, description,
 source_locator_json, sequence
 ```
 
-行为锚点不是自动分值。
+行为锚点不是自动分值。当前两个机器 Pack 没有可靠的人审行为锚点，因此 `behavior_anchors` 可为空，不为填表制造等级内容。
+
+机器可加载 Pack 当前使用 `status = review`，不是 `active`。现有 `PACK.md` 能证明 Human-review baseline，但不能证明对应 JSON 工程转译已经被顾问批准为 active runtime standard。激活前必须人工复核 stable ID、Criterion 文本、证据指导、适用边界/guardrail、来源定位、source fingerprint 与 canonical content hash。
+
+Construct 定义继续由版本化文件 Registry 持有；v1.2 持久化 schema 只冻结 Pack、Criterion 与 BehaviorAnchor 三类表，不为了本轮 foundation 额外制造 Construct 表。
 
 ## 4. Evidence and ObservationFact
 
@@ -314,7 +322,9 @@ agent_runs.status = queued|running|needs_input|completed|failed|cancelled
 - Snapshot / Assessment / Judgment / Stage 的 FK 写入必须同校；Snapshot 与历史 Assessment immutable；
 - Agent Token 只能访问当前 school_id / agent_run_id；
 - Renderer、Agent、MCP Server 均不能直接写 SQLite；
-- Pack 更新产生新版本，不覆盖历史 Criterion。
+- Pack 更新产生新版本，不覆盖历史 Criterion；同 `key + version` 只能接受完全相同的 canonical content hash；
+- Criterion `parent_id` 与 BehaviorAnchor `criterion_id` 必须落在正确的 Pack / Criterion 作用域，Repository 读取异常数据时 fail closed；
+- Methodology Pack 的 source fingerprint 必须与 `references/SOURCE_MANIFEST.md` 对应 SHA-256 一致。
 
 ## 13. Implementation baseline
 
@@ -324,4 +334,6 @@ Baseline State 纵切使用 forward migration 新增 `state_snapshots`、`dimens
 
 有新的 AcceptedJudgment 时，StateAssessmentEngine 使用 active Stage 的 confirmed Targets 与当前全部 AcceptedJudgment 形成更新草稿；确认时在一个事务内验证 expected previous 仍为 latest，并原子写入下一份 immutable Snapshot、五维 Assessment 与完整 FK provenance。重启后“和上一次相比”由 latest 与其 `previous_snapshot_id` 指向的上一份正式状态重新计算，不修改历史状态。
 
-尚未实现阶段迁移、任意历史版本浏览/比较、教师实践或真实 Agent Runtime、MCP、飞书、RAG、Methodology Pack runtime；这些能力继续按真实纵切增加，不为未实现能力制造额外基础设施。
+Methodology Registry Foundation 已用新的 forward migration 实现 `methodology_packs`、`methodology_criteria`、`behavior_anchors`，并增加文件 Registry 与 SQLite Repository seam。当前仅加载 Schooling by Design v1 与 Data Wise v3 的人审文本工程转译；两者均为 `review`，不参与 AssessmentEngine、Diagnosis 或任何自动评分。相同 `key + version + hash` 重复 sync 无副作用；相同版本内容变化拒绝覆盖；新版本可并存。原始 PDF 只通过 `references/SOURCE_MANIFEST.md` 的 SHA-256 追溯，不进入 runtime pack、测试夹具或安装产物。
+
+尚未实现阶段迁移、任意历史版本浏览/比较、教师实践或真实 Agent Runtime、MCP、飞书、RAG；Methodology 尚未接入 AssessmentEngine / Diagnosis criterion mapping / `standards_get`，Congruence 与 Role Standards Pack 也仍等待各自充分的人审结构化基线。这些能力继续按真实纵切增加，不为未实现能力制造额外基础设施。
