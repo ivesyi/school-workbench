@@ -38,7 +38,7 @@ test('baseline school state is confirmed once and survives restart with five ass
     await firstWindow.getByRole('link', { name: '学校状态' }).click()
     await expect(firstWindow.getByText('现在的状态', { exact: true })).toBeVisible()
     for (const label of ['领导力', '关键任务', '结构与机制', '文化', '能力']) {
-      await expect(firstWindow.getByRole('heading', { name: label })).toBeVisible()
+      await expect(firstWindow.getByRole('heading', { name: label, exact: true })).toBeVisible()
     }
     await expect(firstWindow.getByText('起点状态', { exact: true })).toHaveCount(0)
 
@@ -65,7 +65,7 @@ test('baseline school state is confirmed once and survives restart with five ass
     await secondWindow.getByRole('link', { name: '学校状态' }).click()
     await expect(secondWindow.getByText('起点状态', { exact: true })).toBeVisible()
     for (const label of ['领导力', '关键任务', '结构与机制', '文化', '能力']) {
-      await expect(secondWindow.getByRole('heading', { name: label })).toBeVisible()
+      await expect(secondWindow.getByRole('heading', { name: label, exact: true })).toBeVisible()
     }
     const restoredLeadership = secondWindow.locator('article').filter({ hasText: '领导力' })
     await expect(restoredLeadership.getByText('还需要更多观察', { exact: true })).toBeVisible()
