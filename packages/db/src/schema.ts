@@ -1,4 +1,5 @@
-import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { sql } from 'drizzle-orm'
+import { integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export const schools = sqliteTable('schools', {
   id: text('id').primaryKey(),
@@ -151,6 +152,55 @@ export const judgmentClaims = sqliteTable(
   (table) => [primaryKey({ columns: [table.judgmentId, table.claimId] })],
 )
 
+export const stages = sqliteTable(
+  'stages',
+  {
+    id: text('id').primaryKey(),
+    schoolId: text('school_id')
+      .notNull()
+      .references(() => schools.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    summary: text('summary').notNull(),
+    focus: text('focus').notNull(),
+    status: text('status').notNull(),
+    sourceJudgmentIdsJson: text('source_judgment_ids_json').notNull(),
+    adjustmentFeedback: text('adjustment_feedback'),
+    createdAt: text('created_at').notNull(),
+    activatedAt: text('activated_at'),
+  },
+  (table) => [
+    uniqueIndex('stages_one_active_per_school')
+      .on(table.schoolId)
+      .where(sql`${table.status} = 'active'`),
+    uniqueIndex('stages_one_planned_per_school')
+      .on(table.schoolId)
+      .where(sql`${table.status} = 'planned'`),
+  ],
+)
+
+export const stageTargets = sqliteTable(
+  'stage_targets',
+  {
+    id: text('id').primaryKey(),
+    stageId: text('stage_id')
+      .notNull()
+      .references(() => stages.id, { onDelete: 'cascade' }),
+    schoolId: text('school_id')
+      .notNull()
+      .references(() => schools.id, { onDelete: 'cascade' }),
+    dimensionKey: text('dimension_key').notNull(),
+    text: text('text').notNull(),
+    status: text('status').notNull(),
+    createdAt: text('created_at').notNull(),
+    confirmedAt: text('confirmed_at'),
+  },
+  (table) => [
+    uniqueIndex('stage_targets_stage_dimension_unique').on(table.stageId, table.dimensionKey),
+  ],
+)
+
 export type SchoolRow = typeof schools.$inferSelect
 export type DiagnosisProposalRow = typeof diagnosisProposals.$inferSelect
 export type AcceptedJudgmentRow = typeof acceptedJudgments.$inferSelect
+export type StageRow = typeof stages.$inferSelect
+export type StageTargetRow = typeof stageTargets.$inferSelect

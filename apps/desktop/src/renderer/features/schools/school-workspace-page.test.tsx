@@ -44,6 +44,50 @@ const reviewView = {
   },
 }
 
+const suggestedStage = {
+  state: 'suggested' as const,
+  stage: {
+    id: 'stage-1',
+    title: '建立共同推动改进的组织基础',
+    summary: '我理解这个学校目前大致处于“建立共同推动改进的组织基础”的阶段。',
+    focus: '这个阶段现在最需要看到：中层开始独立承担关键任务。',
+    targets: [
+      { id: 't1', dimensionKey: 'leadership' as const, label: '领导与责任', text: '目标 1' },
+      { id: 't2', dimensionKey: 'critical_tasks' as const, label: '关键工作', text: '目标 2' },
+      {
+        id: 't3',
+        dimensionKey: 'structure_systems' as const,
+        label: '协作机制',
+        text: '目标 3',
+      },
+      { id: 't4', dimensionKey: 'culture' as const, label: '团队氛围', text: '目标 4' },
+      { id: 't5', dimensionKey: 'capacity' as const, label: '推进能力', text: '目标 5' },
+    ],
+  },
+}
+
+const activeStage = { ...suggestedStage, state: 'active' as const }
+
+function baseApi(): WorkbenchApi {
+  return {
+    schools: {
+      list: vi.fn(),
+      create: vi.fn(),
+      get: vi.fn().mockResolvedValue(school),
+    },
+    judgments: {
+      listAccepted: vi.fn().mockResolvedValue([]),
+      submitSituation: vi.fn().mockResolvedValue(reviewView),
+      review: vi.fn(),
+    },
+    stages: {
+      getWorkspace: vi.fn().mockResolvedValue({ state: 'none' }),
+      adjust: vi.fn(),
+      confirm: vi.fn(),
+    },
+  }
+}
+
 function renderWorkspace(api: WorkbenchApi): void {
   render(
     <WorkbenchApiProvider api={api}>
@@ -76,19 +120,8 @@ describe('SchoolWorkspacePage', () => {
       text: reviewView.proposal.provisionalJudgment,
       createdAt: '2026-08-17T00:01:00.000Z',
     }
-
-    const api: WorkbenchApi = {
-      schools: {
-        list: vi.fn(),
-        create: vi.fn(),
-        get: vi.fn().mockResolvedValue(school),
-      },
-      judgments: {
-        listAccepted: vi.fn().mockResolvedValue([]),
-        submitSituation: vi.fn().mockResolvedValue(reviewView),
-        review: vi.fn().mockResolvedValue({ decision: 'accepted', acceptedJudgment }),
-      },
-    }
+    const api = baseApi()
+    vi.mocked(api.judgments.review).mockResolvedValue({ decision: 'accepted', acceptedJudgment })
 
     renderWorkspace(api)
     await submitSituation()
@@ -103,23 +136,15 @@ describe('SchoolWorkspacePage', () => {
     )
     expect(await screen.findByText('已经记录这条判断。')).toBeInTheDocument()
     expect(screen.getByText(acceptedJudgment.text)).toBeInTheDocument()
+    await waitFor(() => expect(api.stages.getWorkspace).toHaveBeenCalledTimes(2))
   })
 
   it('lets the consultant request more evidence without creating an accepted judgment', async () => {
-    const api: WorkbenchApi = {
-      schools: {
-        list: vi.fn(),
-        create: vi.fn(),
-        get: vi.fn().mockResolvedValue(school),
-      },
-      judgments: {
-        listAccepted: vi.fn().mockResolvedValue([]),
-        submitSituation: vi.fn().mockResolvedValue(reviewView),
-        review: vi
-          .fn()
-          .mockResolvedValue({ decision: 'needs_more_evidence', acceptedJudgment: null }),
-      },
-    }
+    const api = baseApi()
+    vi.mocked(api.judgments.review).mockResolvedValue({
+      decision: 'needs_more_evidence',
+      acceptedJudgment: null,
+    })
 
     renderWorkspace(api)
     await submitSituation()
@@ -136,5 +161,45 @@ describe('SchoolWorkspacePage', () => {
       await screen.findByText('已记下：先补充更多依据，这条判断暂不进入正式记录。'),
     ).toBeInTheDocument()
     expect(screen.queryByText('已由你确认')).not.toBeInTheDocument()
+  })
+
+  it('shows a quiet stage suggestion, accepts natural-language adjustment, then confirms it', async () => {
+    const adjustedStage = {
+      ...suggestedStage,
+      stage: {
+        ...suggestedStage.stage,
+        title: '让改进进入教师实践',
+        summary: '我理解这个学校目前大致处于“让改进进入教师实践”的阶段。',
+      },
+    }
+    const api = baseApi()
+    vi.mocked(api.stages.getWorkspace).mockResolvedValue(suggestedStage)
+    vi.mocked(api.stages.adjust).mockResolvedValue(adjustedStage)
+    vi.mocked(api.stages.confirm).mockResolvedValue({
+      ...activeStage,
+      stage: adjustedStage.stage,
+    })
+
+    renderWorkspace(api)
+
+    expect(await screen.findByText(suggestedStage.stage.summary)).toBeInTheDocument()
+    expect(screen.getByText('这样理解基本对吗？')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '调整一下' }))
+    await userEvent.type(
+      screen.getByLabelText('哪里需要调整？'),
+      '现在中层已经比较稳定，更应该看教师实践。',
+    )
+    await userEvent.click(screen.getByRole('button', { name: '重新整理建议' }))
+
+    expect(await screen.findByText(adjustedStage.stage.summary)).toBeInTheDocument()
+    expect(api.stages.adjust).toHaveBeenCalledWith({
+      schoolId: 'school-1',
+      stageId: 'stage-1',
+      feedback: '现在中层已经比较稳定，更应该看教师实践。',
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: '基本对' }))
+    expect(await screen.findByText('当前阶段')).toBeInTheDocument()
+    expect(screen.getByText('让改进进入教师实践')).toBeInTheDocument()
   })
 })

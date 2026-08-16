@@ -28,6 +28,11 @@ describe('SchoolListPage', () => {
         review: vi.fn(),
         listAccepted: vi.fn().mockResolvedValue([]),
       },
+      stages: {
+        getWorkspace: vi.fn().mockResolvedValue({ state: 'none' }),
+        adjust: vi.fn(),
+        confirm: vi.fn(),
+      },
     }
 
     render(
