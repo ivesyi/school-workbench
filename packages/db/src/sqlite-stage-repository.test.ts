@@ -130,7 +130,9 @@ describe('stage recommendation persistence', () => {
       first.school.id,
       '教师已经开始稳定教研复盘。',
     )
-    const judgmentsUsedForAdjustment = await judgmentRepository.listAcceptedJudgments(first.school.id)
+    const judgmentsUsedForAdjustment = await judgmentRepository.listAcceptedJudgments(
+      first.school.id,
+    )
     await service.adjust({
       schoolId: first.school.id,
       stageId: suggested.stage.id,
