@@ -36,7 +36,10 @@ describe('SqliteMethodologyRepository', () => {
 
   beforeEach(() => {
     database = openWorkbenchDatabase(':memory:', migrationsFolder)
-    repository = new SqliteMethodologyRepository(database.db, () => new Date('2026-08-17T00:00:00Z'))
+    repository = new SqliteMethodologyRepository(
+      database.db,
+      () => new Date('2026-08-17T00:00:00Z'),
+    )
     registry = loadMethodologyRegistry(methodologyRoot, sourceManifestPath)
   })
 

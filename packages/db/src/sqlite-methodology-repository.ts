@@ -52,7 +52,10 @@ function assertDimension(value: string | null): CanonicalDimensionKey | null {
   return value as CanonicalDimensionKey
 }
 
-function sameProjection(left: MethodologyPackProjection, right: MethodologyPackProjection): boolean {
+function sameProjection(
+  left: MethodologyPackProjection,
+  right: MethodologyPackProjection,
+): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
@@ -93,7 +96,9 @@ export class SqliteMethodologyRepository implements MethodologyRepository {
       .filter((pack) => !selector?.version || pack.version === selector.version)
       .flatMap((pack) => pack.criteria.filter((criterion) => criterion.stableKey === stableId))
     if (matches.length > 1) {
-      throw new Error(`Criterion ${stableId} exists in multiple persisted versions; select a version`)
+      throw new Error(
+        `Criterion ${stableId} exists in multiple persisted versions; select a version`,
+      )
     }
     return matches[0] ?? null
   }
@@ -200,7 +205,8 @@ export class SqliteMethodologyRepository implements MethodologyRepository {
           inserted.add(criterion.stableKey)
           remaining.splice(index, 1)
         }
-        if (remaining.length === before) throw new Error('Criterion parent graph cannot be persisted')
+        if (remaining.length === before)
+          throw new Error('Criterion parent graph cannot be persisted')
       }
 
       for (const anchor of projection.behaviorAnchors) {
@@ -237,7 +243,9 @@ export class SqliteMethodologyRepository implements MethodologyRepository {
       .all()
     const stableKeyByRowId = new Map(criterionRows.map((row) => [row.id, row.stableKey]))
     const criteria = criterionRows.map((row) => {
-      const guardrailEnvelope = criterionGuardrailEnvelopeSchema.parse(parseJson(row.guardrailsJson))
+      const guardrailEnvelope = criterionGuardrailEnvelopeSchema.parse(
+        parseJson(row.guardrailsJson),
+      )
       return {
         id: row.id,
         stableKey: row.stableKey,

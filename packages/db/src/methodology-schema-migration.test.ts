@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest'
 import { openWorkbenchDatabase } from './database'
 
 function methodologyMigrationPath(): string {
-  const file = readdirSync(resolve('packages/db/drizzle')).find((name) => /^0005_.*\.sql$/.test(name))
+  const file = readdirSync(resolve('packages/db/drizzle')).find((name) =>
+    /^0005_.*\.sql$/.test(name),
+  )
   if (!file) throw new Error('0005 methodology migration was not generated')
   return resolve('packages/db/drizzle', file)
 }

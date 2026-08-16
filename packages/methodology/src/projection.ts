@@ -1,8 +1,4 @@
-import type {
-  EvidenceGuidance,
-  MethodologyPack,
-  MethodologyPackProjection,
-} from './contracts'
+import type { EvidenceGuidance, MethodologyPack, MethodologyPackProjection } from './contracts'
 import { deepFreeze } from './immutable'
 
 function persistenceGuidance(

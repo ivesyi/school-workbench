@@ -95,7 +95,9 @@ export class MethodologyRegistry {
         .filter(
           (criterion) => !filter.dimensionKey || criterion.dimensionKey === filter.dimensionKey,
         )
-        .filter((criterion) => !filter.practiceType || criterion.practiceType === filter.practiceType)
+        .filter(
+          (criterion) => !filter.practiceType || criterion.practiceType === filter.practiceType,
+        )
         .map((criterion) => this.resolveCriterion(pack, criterion))
     })
     return deepFreeze(matches)

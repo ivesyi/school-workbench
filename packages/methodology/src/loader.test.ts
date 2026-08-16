@@ -29,7 +29,11 @@ function rehash(pack: Record<string, unknown>): string {
 function sourceManifestFor(pack: Record<string, unknown>): ReadonlyMap<string, string> {
   const sourceRef = pack.sourceRef
   const fingerprint = pack.sourceFingerprint
-  if (typeof sourceRef !== 'string' || !isRecord(fingerprint) || typeof fingerprint.value !== 'string') {
+  if (
+    typeof sourceRef !== 'string' ||
+    !isRecord(fingerprint) ||
+    typeof fingerprint.value !== 'string'
+  ) {
     throw new Error('fixture source metadata is invalid')
   }
   return new Map([[sourceRef, fingerprint.value]])
@@ -47,11 +51,14 @@ describe('methodology pack loader and registry', () => {
     expect(
       packs.every(
         (pack) =>
-          pack.sourceFingerprint.value.length === 64 && pack.canonicalContentHash.value.length === 64,
+          pack.sourceFingerprint.value.length === 64 &&
+          pack.canonicalContentHash.value.length === 64,
       ),
     ).toBe(true)
     expect(
-      packs.flatMap((pack) => pack.criteria).every((criterion) => criterion.sourceLocator.label.length > 0),
+      packs
+        .flatMap((pack) => pack.criteria)
+        .every((criterion) => criterion.sourceLocator.label.length > 0),
     ).toBe(true)
     expect(packs.flatMap((pack) => pack.behaviorAnchors)).toEqual([])
   })
@@ -91,7 +98,8 @@ describe('methodology pack loader and registry', () => {
 
     const illegalDimension = cloneSbd()
     const criteria = illegalDimension.criteria
-    if (!Array.isArray(criteria) || !isRecord(criteria[0])) throw new Error('fixture criteria missing')
+    if (!Array.isArray(criteria) || !isRecord(criteria[0]))
+      throw new Error('fixture criteria missing')
     criteria[0].dimensionKey = 'mystery'
     expect(() => parseMethodologyPack(JSON.stringify(illegalDimension), manifest)).toThrow()
 
@@ -115,9 +123,9 @@ describe('methodology pack loader and registry', () => {
       throw new Error('fixture criteria missing')
     }
     duplicateCriteria[1].id = duplicateCriteria[0].id
-    expect(() =>
-      parseMethodologyPack(rehash(duplicate), sourceManifestFor(duplicate)),
-    ).toThrow(/Duplicate criterion stable id/)
+    expect(() => parseMethodologyPack(rehash(duplicate), sourceManifestFor(duplicate))).toThrow(
+      /Duplicate criterion stable id/,
+    )
 
     const danglingConstruct = cloneSbd()
     const danglingCriteria = danglingConstruct.criteria

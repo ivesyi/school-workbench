@@ -136,7 +136,10 @@ export const methodologyPackSchema = z
     title: z.string().trim().min(1),
     status: z.enum(['draft', 'review', 'active', 'retired']),
     sourceType: z.enum(['book', 'framework', 'standard']),
-    sourceRef: z.string().trim().regex(/^references\//),
+    sourceRef: z
+      .string()
+      .trim()
+      .regex(/^references\//),
     sourceFingerprint: sha256Schema,
     constructs: z.array(constructSchema),
     criteria: z.array(criterionSchema),
@@ -156,8 +159,12 @@ export type EvidenceGuidance = DeepReadonly<z.infer<typeof evidenceGuidanceSchem
 export type InferenceGuardrail = DeepReadonly<z.infer<typeof inferenceGuardrailSchema>>
 export type MethodologyPack = DeepReadonly<z.infer<typeof methodologyPackSchema>>
 export type MethodologyPackStatus = MethodologyPack['status']
-export type PersistenceEvidenceGuidance = DeepReadonly<z.infer<typeof persistenceEvidenceGuidanceSchema>>
-export type CriterionGuardrailEnvelope = DeepReadonly<z.infer<typeof criterionGuardrailEnvelopeSchema>>
+export type PersistenceEvidenceGuidance = DeepReadonly<
+  z.infer<typeof persistenceEvidenceGuidanceSchema>
+>
+export type CriterionGuardrailEnvelope = DeepReadonly<
+  z.infer<typeof criterionGuardrailEnvelopeSchema>
+>
 
 export type ResolvedCriterion = DeepReadonly<{
   criterion: Criterion

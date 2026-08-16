@@ -59,7 +59,9 @@ export function validateMethodologyPackStructure(pack: MethodologyPack): void {
 
   for (const criterion of pack.criteria) {
     if (!constructIds.has(criterion.constructId)) {
-      throw new Error(`Criterion ${criterion.id} references unknown construct ${criterion.constructId}`)
+      throw new Error(
+        `Criterion ${criterion.id} references unknown construct ${criterion.constructId}`,
+      )
     }
     if (criterion.parentId && !criterionIds.has(criterion.parentId)) {
       throw new Error(`Criterion ${criterion.id} references unknown parent ${criterion.parentId}`)
@@ -73,7 +75,9 @@ export function validateMethodologyPackStructure(pack: MethodologyPack): void {
 
   for (const anchor of pack.behaviorAnchors) {
     if (!criterionIds.has(anchor.criterionId)) {
-      throw new Error(`Behavior anchor ${anchor.id} references unknown criterion ${anchor.criterionId}`)
+      throw new Error(
+        `Behavior anchor ${anchor.id} references unknown criterion ${anchor.criterionId}`,
+      )
     }
   }
 
