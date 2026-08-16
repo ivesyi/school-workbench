@@ -82,7 +82,9 @@ describe('0004 baseline state schema', () => {
         id: 'stage-1',
         status: 'active',
       })
-      expect(client.prepare('SELECT id FROM accepted_judgments WHERE id = ?').get('judgment-1')).toEqual({
+      expect(
+        client.prepare('SELECT id FROM accepted_judgments WHERE id = ?').get('judgment-1'),
+      ).toEqual({
         id: 'judgment-1',
       })
 
@@ -98,7 +100,9 @@ describe('0004 baseline state schema', () => {
         'state_snapshots',
       ])
 
-      const snapshotColumns = client.pragma('table_info(state_snapshots)') as Array<{ name: string }>
+      const snapshotColumns = client.pragma('table_info(state_snapshots)') as Array<{
+        name: string
+      }>
       expect(snapshotColumns.map((column) => column.name)).toEqual([
         'id',
         'school_id',
