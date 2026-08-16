@@ -50,16 +50,27 @@ describe('judgment epistemic chain', () => {
       dependencies(),
     )
 
-    expect(
-      createReviewOutcome(chain.proposal, { decision: 'rejected' }, dependencies()).acceptedJudgment,
-    ).toBeNull()
+    const rejected = createReviewOutcome(
+      chain.proposal,
+      { decision: 'rejected' },
+      dependencies(),
+    )
+    expect(rejected.review.decision).toBe('rejected')
+    expect(rejected.acceptedJudgment).toBeNull()
 
-    expect(
-      createReviewOutcome(
-        chain.proposal,
-        { decision: 'modified', finalText: '顾问修改后的判断' },
-        dependencies(),
-      ).acceptedJudgment?.statement,
-    ).toBe('顾问修改后的判断')
+    const needsMoreEvidence = createReviewOutcome(
+      chain.proposal,
+      { decision: 'needs_more_evidence' },
+      dependencies(),
+    )
+    expect(needsMoreEvidence.review.decision).toBe('needs_more_evidence')
+    expect(needsMoreEvidence.acceptedJudgment).toBeNull()
+
+    const modified = createReviewOutcome(
+      chain.proposal,
+      { decision: 'modified', finalText: '顾问修改后的判断' },
+      dependencies(),
+    )
+    expect(modified.acceptedJudgment?.statement).toBe('顾问修改后的判断')
   })
 })
