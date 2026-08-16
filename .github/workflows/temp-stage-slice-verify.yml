@@ -21,10 +21,13 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm format
+      - run: pnpm format:write
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
       - run: pnpm exec playwright install-deps chromium
       - run: xvfb-run -a pnpm test:e2e
+      - name: Show Prettier diff
+        if: always()
+        run: git diff -- apps/desktop/src/renderer/features/schools/school-workspace-page.tsx packages/application/src/stage-service.test.ts packages/db/src/sqlite-stage-repository.test.ts packages/db/src/sqlite-stage-repository.ts packages/domain/src/stage.test.ts
