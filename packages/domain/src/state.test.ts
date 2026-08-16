@@ -95,13 +95,22 @@ describe('school state records', () => {
     expect(Object.isFrozen(baseline)).toBe(true)
     expect(baseline.snapshot.sequence).toBe(1)
 
-    expect(() =>
-      createNextState(
-        'school-1',
-        baseline,
-        { ...nextDraft, judgmentIds: ['judgment-3'] },
-        dependencies(40),
+    const missingPreviousProvenance: StateAssessmentDraft = {
+      ...nextDraft,
+      judgmentIds: ['judgment-3'],
+      assessments: nextDraft.assessments.map((item) =>
+        item.dimensionKey === 'leadership'
+          ? { ...item, judgmentIds: ['judgment-3'] }
+          : {
+              ...item,
+              status: 'unverified' as const,
+              summary: '目前没有足够依据。',
+              judgmentIds: [],
+            },
       ),
+    }
+    expect(() =>
+      createNextState('school-1', baseline, missingPreviousProvenance, dependencies(40)),
     ).toThrow('不能丢失上一份状态已经使用的正式判断')
 
     expect(() => createNextState('school-1', baseline, draft, dependencies(60))).toThrow(
@@ -109,7 +118,7 @@ describe('school state records', () => {
     )
   })
 
-  it('refuses incomplete or unsupported assessments instead of inventing a status', () => {
+  it('refuses incomplete, unsupported or duplicate provenance instead of inventing a status', () => {
     expect(() =>
       createBaselineState(
         'school-1',
@@ -135,5 +144,13 @@ describe('school state records', () => {
         dependencies(),
       ),
     ).toThrow('至少需要一条正式判断')
+
+    expect(() =>
+      createBaselineState(
+        'school-1',
+        { ...draft, judgmentIds: ['judgment-1', 'judgment-1', 'judgment-2'] },
+        dependencies(),
+      ),
+    ).toThrow('不能重复引用同一条正式判断')
   })
 })
