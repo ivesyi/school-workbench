@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - ci-stage-slice-20260817
+  pull_request:
+    branches:
+      - main
 
 jobs:
   verify:
