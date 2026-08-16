@@ -52,11 +52,7 @@ describe('stage judgment scope', () => {
         '教师开始稳定教研复盘。',
       )
 
-      const stageService = new StageService(
-        schoolRepository,
-        judgmentRepository,
-        stageRepository,
-      )
+      const stageService = new StageService(schoolRepository, judgmentRepository, stageRepository)
       const workspace = await stageService.getWorkspace(first.school.id)
       if (workspace.state !== 'suggested') throw new Error('expected suggestion')
       const planned = await stageRepository.findById(workspace.stage.id)

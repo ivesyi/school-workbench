@@ -107,15 +107,10 @@ describe('0003 stage schema reconciliation', () => {
           )
       })
 
-      runMigration(
-        client,
-        resolve('packages/db/drizzle/0003_stage_schema_reconciliation.sql'),
-      )
+      runMigration(client, resolve('packages/db/drizzle/0003_stage_schema_reconciliation.sql'))
 
       const stage = client
-        .prepare(
-          'SELECT sequence, status, starts_at, ends_at, updated_at FROM stages WHERE id = ?',
-        )
+        .prepare('SELECT sequence, status, starts_at, ends_at, updated_at FROM stages WHERE id = ?')
         .get('stage-1') as Record<string, unknown>
       expect(stage).toEqual({
         sequence: 1,
