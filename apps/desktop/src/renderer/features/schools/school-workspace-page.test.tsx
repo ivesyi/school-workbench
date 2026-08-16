@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
 import type { WorkbenchApi } from '@school-workbench/shared'
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WorkbenchApiProvider } from '../../lib/workbench-api'
 import { SchoolWorkspacePage } from './school-workspace-page'
 
@@ -66,6 +66,8 @@ async function submitSituation(): Promise<void> {
   expect(await screen.findByText('我发现一个新的情况，想让你确认')).toBeInTheDocument()
 }
 
+afterEach(cleanup)
+
 describe('SchoolWorkspacePage', () => {
   it('submits a situation, reviews the proposed judgment and records acceptance', async () => {
     const acceptedJudgment = {
@@ -90,7 +92,7 @@ describe('SchoolWorkspacePage', () => {
 
     renderWorkspace(api)
     await submitSituation()
-    await userEvent.click(screen.getByRole('button', { name: '认同', exact: true }))
+    await userEvent.click(screen.getByRole('button', { name: /^认同$/ }))
 
     await waitFor(() =>
       expect(api.judgments.review).toHaveBeenCalledWith({
