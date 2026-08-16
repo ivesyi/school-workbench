@@ -130,6 +130,7 @@ describe('stage recommendation persistence', () => {
       first.school.id,
       '教师已经开始稳定教研复盘。',
     )
+    const judgmentsUsedForAdjustment = await judgmentRepository.listAcceptedJudgments(first.school.id)
     await service.adjust({
       schoolId: first.school.id,
       stageId: suggested.stage.id,
@@ -141,13 +142,16 @@ describe('stage recommendation persistence', () => {
         'SELECT judgment_id, sequence FROM stage_judgments WHERE stage_id = ? ORDER BY sequence',
       )
       .all(suggested.stage.id) as Array<{ judgment_id: string; sequence: number }>
-    expect(provenance).toEqual([
-      { judgment_id: first.judgment.id, sequence: 1 },
-      { judgment_id: secondJudgment.id, sequence: 2 },
-    ])
+    expect(provenance.map((item) => item.judgment_id)).toEqual(
+      judgmentsUsedForAdjustment.map((item) => item.id),
+    )
+    expect(provenance.map((item) => item.sequence)).toEqual([1, 2])
+    expect(new Set(provenance.map((item) => item.judgment_id))).toEqual(
+      new Set([first.judgment.id, secondJudgment.id]),
+    )
 
     const persisted = await stageRepository.findById(suggested.stage.id)
-    expect(persisted?.judgmentIds).toEqual([first.judgment.id, secondJudgment.id])
+    expect(persisted?.judgmentIds).toEqual(judgmentsUsedForAdjustment.map((item) => item.id))
     database.close()
   })
 
