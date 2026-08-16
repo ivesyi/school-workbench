@@ -291,11 +291,7 @@ describe('StateService', () => {
     expect(states.records[1]?.snapshot.sequence).toBe(2)
     expect(states.records[1]?.snapshot.previousSnapshotId).toBe(states.records[0]?.snapshot.id)
     expect(states.records[1]?.snapshot.isBaseline).toBe(false)
-    expect(states.records[1]?.judgmentIds).toEqual([
-      'judgment-3',
-      'judgment-2',
-      'judgment-1',
-    ])
+    expect(states.records[1]?.judgmentIds).toEqual(['judgment-3', 'judgment-2', 'judgment-1'])
 
     const repeated = await service.confirm({ schoolId: school.id })
     expect(repeated.state).toBe('current')

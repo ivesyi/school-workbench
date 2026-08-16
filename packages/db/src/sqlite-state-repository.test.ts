@@ -233,10 +233,16 @@ describe('school state persistence', () => {
     }>
     expect(rows).toHaveLength(2)
     expect(rows[0]).toMatchObject({ sequence: 1, is_baseline: 1, previous_snapshot_id: null })
-    expect(rows[1]).toMatchObject({ sequence: 2, is_baseline: 0, previous_snapshot_id: rows[0]?.id })
+    expect(rows[1]).toMatchObject({
+      sequence: 2,
+      is_baseline: 0,
+      previous_snapshot_id: rows[0]?.id,
+    })
 
     const secondProvenance = database.client
-      .prepare('SELECT judgment_id FROM snapshot_judgments WHERE snapshot_id = ? ORDER BY judgment_id')
+      .prepare(
+        'SELECT judgment_id FROM snapshot_judgments WHERE snapshot_id = ? ORDER BY judgment_id',
+      )
       .all(rows[1]?.id) as Array<{ judgment_id: string }>
     expect(secondProvenance.map((item) => item.judgment_id).sort()).toEqual(
       [prepared.first.id, prepared.second.id, third.id].sort(),

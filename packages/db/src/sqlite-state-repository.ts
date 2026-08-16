@@ -91,7 +91,10 @@ function assertRecordShape(record: StateRecord): void {
   }
 }
 
-function sameSchoolTargets(targets: Array<{ schoolId: string; dimensionKey: string; status: string }>, schoolId: string): boolean {
+function sameSchoolTargets(
+  targets: Array<{ schoolId: string; dimensionKey: string; status: string }>,
+  schoolId: string,
+): boolean {
   return (
     targets.length === stageDimensionKeys.length &&
     targets.every(

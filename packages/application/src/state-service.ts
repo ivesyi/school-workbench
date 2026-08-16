@@ -376,7 +376,10 @@ export class StateService {
     return { stage, judgments }
   }
 
-  private async stageForRecord(schoolId: string, record: StateRecord): Promise<StageRecommendation> {
+  private async stageForRecord(
+    schoolId: string,
+    record: StateRecord,
+  ): Promise<StageRecommendation> {
     const stage = await this.stageRepository.findById(record.snapshot.stageId)
     if (!stage || stage.stage.schoolId !== schoolId) throw new Error('学校状态对应的阶段不存在')
     return stage
@@ -532,7 +535,11 @@ export class StateService {
     const cached = this.drafts.get(parsed.schoolId)
 
     if (!latest) {
-      if (!cached || cached.previousSnapshotId !== null || cached.draft.stageId !== stage.stage.id) {
+      if (
+        !cached ||
+        cached.previousSnapshotId !== null ||
+        cached.draft.stageId !== stage.stage.id
+      ) {
         throw new Error('请先看一下刚刚整理出的当前状态，再确认记录')
       }
       if (!sameIds(cached.judgmentIds, currentJudgmentIds)) {
