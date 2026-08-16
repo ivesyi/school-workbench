@@ -40,7 +40,7 @@ test('second confirmed school state compares with baseline and survives restart 
     const firstWindow = await firstApp.firstWindow()
 
     await createBaseline(firstWindow)
-    await firstWindow.getByRole('link', { name: '工作台' }).click()
+    await firstWindow.getByRole('link', { name: '工作台', exact: true }).click()
     await acceptSituation(
       firstWindow,
       '中层已经能够独立完成关键任务拆解，校长开始授权中层承担真实责任。',
