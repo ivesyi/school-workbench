@@ -61,9 +61,7 @@ function assertScope(recommendation: StageRecommendation): void {
   const { stage, targets, judgmentIds } = recommendation
   if (targets.length !== stageDimensionKeys.length) throw new Error('阶段目标数量不完整')
   if (judgmentIds.length === 0) throw new Error('阶段建议必须关联至少一条正式判断')
-  if (
-    targets.some((target) => target.schoolId !== stage.schoolId || target.stageId !== stage.id)
-  ) {
+  if (targets.some((target) => target.schoolId !== stage.schoolId || target.stageId !== stage.id)) {
     throw new Error('阶段和目标不能跨学校保存')
   }
 }
@@ -228,7 +226,12 @@ export class SqliteStageRepository implements StageRepository {
           adjustmentFeedback: recommendation.stage.adjustmentFeedback,
           updatedAt: recommendation.stage.updatedAt,
         })
-        .where(and(eq(stages.id, recommendation.stage.id), eq(stages.schoolId, recommendation.stage.schoolId)))
+        .where(
+          and(
+            eq(stages.id, recommendation.stage.id),
+            eq(stages.schoolId, recommendation.stage.schoolId),
+          ),
+        )
         .run()
 
       for (const target of recommendation.targets) {

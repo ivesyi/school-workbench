@@ -1,4 +1,9 @@
-import type { School, SchoolRepository, StageRecommendation, StageRepository } from '@school-workbench/domain'
+import type {
+  School,
+  SchoolRepository,
+  StageRecommendation,
+  StageRepository,
+} from '@school-workbench/domain'
 import { describe, expect, it, vi } from 'vitest'
 import { SchoolService } from './school-service'
 

@@ -181,9 +181,9 @@ describe('StageService', () => {
     })
     expect(adjusted.state).toBe('suggested')
     expect(stages.recommendation?.stage.status).toBe('planned')
-    expect(stages.recommendation?.targets.every((targetItem) => targetItem.status === 'draft')).toBe(
-      true,
-    )
+    expect(
+      stages.recommendation?.targets.every((targetItem) => targetItem.status === 'draft'),
+    ).toBe(true)
 
     const active = await service.confirm({ schoolId: school.id, stageId: suggested.stage.id })
     expect(active.state).toBe('active')

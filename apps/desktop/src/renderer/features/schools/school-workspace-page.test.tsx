@@ -180,10 +180,7 @@ describe('SchoolWorkspacePage', () => {
     expect(await screen.findByText(suggestedStage.stage.summary)).toBeInTheDocument()
     expect(screen.getByText('这样理解基本对吗？')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '调整一下' }))
-    await userEvent.type(
-      screen.getByLabelText('哪里需要调整？'),
-      '目前更需要稳定教研复盘机制',
-    )
+    await userEvent.type(screen.getByLabelText('哪里需要调整？'), '目前更需要稳定教研复盘机制')
     await userEvent.click(screen.getByRole('button', { name: '重新整理建议' }))
 
     expect(await screen.findByText(adjustedStage.stage.summary)).toBeInTheDocument()

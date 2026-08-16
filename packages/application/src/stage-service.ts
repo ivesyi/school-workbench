@@ -63,23 +63,11 @@ export class BaselineStageRecommendationEngine implements StageRecommendationEng
         summary: '我理解这个学校目前大致处于“验证学生学习变化”的阶段。',
         focus: `${feedbackLead}这个阶段现在最需要看到：成人实践的改变能够稳定对应到学生学习体验和结果的变化。`,
         targets: {
-          leadership: target(
-            '领导力',
-            '领导团队持续追问改进行动是否真正带来学生学习变化。',
-          ),
-          key_tasks: target(
-            '关键任务',
-            '关键改进任务明确连接学生学习证据，并据此调整下一步行动。',
-          ),
-          structure: target(
-            '结构与机制',
-            '形成稳定收集、讨论和使用学生学习证据的工作节奏。',
-          ),
+          leadership: target('领导力', '领导团队持续追问改进行动是否真正带来学生学习变化。'),
+          key_tasks: target('关键任务', '关键改进任务明确连接学生学习证据，并据此调整下一步行动。'),
+          structure: target('结构与机制', '形成稳定收集、讨论和使用学生学习证据的工作节奏。'),
           culture: target('文化', '团队能够基于证据讨论成效，而不是只汇报做了哪些事情。'),
-          capability: target(
-            '能力',
-            '教师与中层能够从学生学习证据中判断实践效果并继续调整。',
-          ),
+          capability: target('能力', '教师与中层能够从学生学习证据中判断实践效果并继续调整。'),
         },
       }
     }
@@ -90,22 +78,13 @@ export class BaselineStageRecommendationEngine implements StageRecommendationEng
         summary: '我理解这个学校目前大致处于“让改进进入教师实践”的阶段。',
         focus: `${feedbackLead}这个阶段现在最需要看到：教师和教研团队开始用真实课堂证据持续调整实践，而不是只停留在理解和要求层面。`,
         targets: {
-          leadership: target(
-            '领导力',
-            '领导团队把关注点从布置要求转向支持教师实践改进和复盘。',
-          ),
-          key_tasks: target(
-            '关键任务',
-            '课堂改进任务能够落到具体教学行为，并持续观察学生反应。',
-          ),
+          leadership: target('领导力', '领导团队把关注点从布置要求转向支持教师实践改进和复盘。'),
+          key_tasks: target('关键任务', '课堂改进任务能够落到具体教学行为，并持续观察学生反应。'),
           structure: target(
             '结构与机制',
             '教研、观察和复盘形成稳定节奏，能够支持教师持续试验和调整。',
           ),
-          culture: target(
-            '文化',
-            '教师能够公开讨论真实课堂问题，并把失败和差异作为共同学习材料。',
-          ),
+          culture: target('文化', '教师能够公开讨论真实课堂问题，并把失败和差异作为共同学习材料。'),
           capability: target('能力', '教师能够基于课堂证据反思、调整教学，并与同伴共同改进。'),
         },
       }
@@ -116,18 +95,9 @@ export class BaselineStageRecommendationEngine implements StageRecommendationEng
       summary: '我理解这个学校目前大致处于“建立共同推动改进的组织基础”的阶段。',
       focus: `${feedbackLead}这个阶段现在最需要看到：关键工作逐步不再只依赖校长，中层开始独立承担、推进和复盘，学校形成可重复的协作方式。`,
       targets: {
-        leadership: target(
-          '领导力',
-          '校长从直接代办转向明确方向、授权和复盘，中层承担真实责任。',
-        ),
-        key_tasks: target(
-          '关键任务',
-          '至少一项关键改进任务由中层独立拆解、推进并根据结果调整。',
-        ),
-        structure: target(
-          '结构与机制',
-          '形成稳定的任务分工、推进节奏和复盘机制，不依赖临时推动。',
-        ),
+        leadership: target('领导力', '校长从直接代办转向明确方向、授权和复盘，中层承担真实责任。'),
+        key_tasks: target('关键任务', '至少一项关键改进任务由中层独立拆解、推进并根据结果调整。'),
+        structure: target('结构与机制', '形成稳定的任务分工、推进节奏和复盘机制，不依赖临时推动。'),
         culture: target('文化', '中层能够公开讨论问题、提出不同判断并对推进结果负责。'),
         capability: target('能力', '中层能够独立分析问题、制定行动、协同推进并完成复盘。'),
       },
