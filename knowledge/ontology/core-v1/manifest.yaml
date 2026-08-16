@@ -1,0 +1,16 @@
+id: swb-core
+version: 1.0.0
+status: active
+title: School Workbench Core Ontology
+namespace: 'urn:school-workbench:ontology:core:v1:'
+releasedAt: '2026-08-17'
+governance:
+  activeVersionsImmutable: true
+  breakingChangesRequireMajorVersion: true
+  compatibleAdditionsRequireMinorVersion: true
+  humanApprovalRequiredForMappings: true
+files:
+  concepts: concepts.yaml
+  relations: relations.yaml
+  constraints: constraints.yaml
+  mappings: framework-mappings.yaml

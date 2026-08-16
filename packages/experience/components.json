@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@school-workbench/experience/components",
+    "ui": "@school-workbench/experience/components/ui",
+    "lib": "@school-workbench/experience/lib",
+    "hooks": "@school-workbench/experience/hooks"
+  }
+}

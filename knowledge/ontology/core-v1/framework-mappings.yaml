@@ -1,0 +1,43 @@
+version: 1.0.0
+mappings:
+  - sourcePack: schooling-by-design-v1
+    sourceVersion: human-review-baseline-v1
+    status: approved
+    entries:
+      - sourceId: SBD.MISSION
+        targetIds: [swb:DesiredResult]
+      - sourceId: SBD.BACKWARD_DESIGN
+        targetIds: [swb:DesiredResult, swb:Criterion, swb:Action]
+      - sourceId: SBD.VISION_REALITY_GAP
+        targetIds: [swb:DiagnosisProposal, swb:StateSnapshot]
+      - sourceId: SBD.ACCEPTABLE_EVIDENCE
+        targetIds: [swb:Evidence, swb:ImpactIndicator]
+      - sourceId: SBD.ALIGNED_ACTION
+        targetIds: [swb:Action]
+      - sourceId: SBD.PLAN_TO_ADJUST
+        targetIds: [swb:Action, swb:ImpactIndicator]
+  - sourcePack: data-wise-v3
+    sourceVersion: human-review-baseline-v1
+    status: approved
+    entries:
+      - sourceId: DW.EVIDENCE
+        targetIds: [swb:Evidence, swb:ObservationFact]
+      - sourceId: DW.LEARNING_PROBLEM
+        targetIds: [swb:DesiredResult, swb:DiagnosisProposal]
+      - sourceId: DW.PRACTICE_EVIDENCE
+        targetIds: [swb:Practice, swb:Evidence, swb:ObservationFact]
+      - sourceId: DW.PROBLEM_OF_PRACTICE
+        targetIds: [swb:PracticeProblem]
+      - sourceId: DW.LADDER_DISCIPLINE
+        targetIds: [swb:ObservationFact, swb:DiagnosisProposal]
+      - sourceId: DW.ACTION_IMPACT
+        targetIds: [swb:Action, swb:ImpactIndicator]
+boundaries:
+  - sourcePack: congruence-framework-v1
+    status: pending-review
+    allowedTargetIds: [swb:Dimension, swb:Stage, swb:DesiredResult]
+    prohibition: 未审核前不得把维度材料转化为正式阶段或分数。
+  - sourcePack: role-standards-v1
+    status: pending-review
+    allowedTargetIds: [swb:Role, swb:Practice, swb:Criterion]
+    prohibition: 未审核前不得形成个人绩效结论。

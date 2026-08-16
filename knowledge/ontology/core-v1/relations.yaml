@@ -1,0 +1,82 @@
+version: 1.0.0
+relations:
+  - id: swb:hasStage
+    label: 具有阶段
+    from: swb:School
+    to: swb:Stage
+    cardinality: one-to-many
+  - id: swb:targetsResult
+    label: 指向预期结果
+    from: swb:Stage
+    to: swb:DesiredResult
+    cardinality: one-to-many
+  - id: swb:assessedAcross
+    label: 按维度评估
+    from: swb:Stage
+    to: swb:Dimension
+    cardinality: many-to-many
+  - id: swb:holdsRole
+    label: 承担角色
+    from: swb:Actor
+    to: swb:Role
+    cardinality: many-to-many
+  - id: swb:performsPractice
+    label: 产生实践
+    from: swb:Actor
+    to: swb:Practice
+    cardinality: one-to-many
+  - id: swb:documents
+    label: 记录事实
+    from: swb:Evidence
+    to: swb:ObservationFact
+    cardinality: one-to-many
+  - id: swb:supports
+    label: 支持候选判断
+    from: swb:ObservationFact
+    to: swb:DiagnosisProposal
+    cardinality: many-to-many
+  - id: swb:counters
+    label: 反驳候选判断
+    from: swb:ObservationFact
+    to: swb:DiagnosisProposal
+    cardinality: many-to-many
+  - id: swb:operationalizedBy
+    label: 由准则操作化
+    from: swb:MethodologyConstruct
+    to: swb:Criterion
+    cardinality: one-to-many
+  - id: swb:appliesCriterion
+    label: 应用准则
+    from: swb:DiagnosisProposal
+    to: swb:Criterion
+    cardinality: many-to-many
+  - id: swb:aboutDimension
+    label: 涉及维度
+    from: swb:DiagnosisProposal
+    to: swb:Dimension
+    cardinality: many-to-many
+  - id: swb:identifiesProblem
+    label: 识别实践问题
+    from: swb:DiagnosisProposal
+    to: swb:PracticeProblem
+    cardinality: many-to-many
+  - id: swb:approvedAs
+    label: 经人工批准为
+    from: swb:DiagnosisProposal
+    to: swb:ApprovedDiagnosis
+    cardinality: one-to-one
+  - id: swb:addresses
+    label: 处理实践问题
+    from: swb:Action
+    to: swb:PracticeProblem
+    cardinality: many-to-many
+  - id: swb:evaluates
+    label: 验证行动影响
+    from: swb:ImpactIndicator
+    to: swb:Action
+    cardinality: many-to-one
+  - id: swb:records
+    label: 记录正式判断
+    from: swb:StateSnapshot
+    to: swb:ApprovedDiagnosis
+    cardinality: many-to-many

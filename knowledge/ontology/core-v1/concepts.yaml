@@ -1,0 +1,70 @@
+version: 1.0.0
+concepts:
+  - id: swb:School
+    label: 学校
+    kind: entity
+    definition: Workbench 中所有正式状态与证据所属的学校边界。
+  - id: swb:Actor
+    label: 行动者
+    kind: entity
+    definition: 在学校变革中承担角色并产生实践的人或团队。
+  - id: swb:Role
+    label: 角色
+    kind: classification
+    definition: 校长、中层、教师或团队等专业责任位置。
+  - id: swb:Stage
+    label: 阶段
+    kind: entity
+    definition: 一所学校在特定时间窗内被确认的变革阶段。
+  - id: swb:DesiredResult
+    label: 预期结果
+    kind: entity
+    definition: 阶段或变革设计希望学习者、成人实践或组织达到的状态。
+  - id: swb:Dimension
+    label: 全等维度
+    kind: classification
+    definition: 五维全等模型中承载正式学校状态判断的维度。
+  - id: swb:MethodologyConstruct
+    label: 方法论构念
+    kind: classification
+    definition: 外部方法论中用于组织评估问题的稳定概念。
+  - id: swb:Criterion
+    label: 判断准则
+    kind: rule
+    definition: 对证据、实践或差距提出明确判断要求的版本化规则。
+  - id: swb:Practice
+    label: 实践
+    kind: entity
+    definition: 行动者在具体情境中实际做出或未做出的可观察行动模式。
+  - id: swb:PracticeProblem
+    label: 实践问题
+    kind: entity
+    definition: 与学习问题相关、在成人可影响范围内且可以采取行动的实践差距。
+  - id: swb:Evidence
+    label: 依据
+    kind: record
+    definition: 被实际用于分析且保留来源与定位的材料或观察。
+  - id: swb:ObservationFact
+    label: 观察事实
+    kind: record
+    definition: 可以回到具体依据定位、不包含评价或因果推断的描述。
+  - id: swb:DiagnosisProposal
+    label: 候选判断
+    kind: record
+    definition: Agent 基于准则和证据提出、等待顾问审核的暂定专业判断。
+  - id: swb:ApprovedDiagnosis
+    label: 正式判断
+    kind: record
+    definition: 经顾问接受或修改后可参与正式学校状态的判断。
+  - id: swb:Action
+    label: 改进行动
+    kind: entity
+    definition: 针对已识别差距或实践问题采取的具体行动。
+  - id: swb:ImpactIndicator
+    label: 影响指标
+    kind: record
+    definition: 用于判断行动是否改变学习者体验、表现或成人实践的证据定义。
+  - id: swb:StateSnapshot
+    label: 学校状态快照
+    kind: record
+    definition: 顾问确认的、不可变的学校正式状态记录。

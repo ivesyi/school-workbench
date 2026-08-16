@@ -1,0 +1,34 @@
+version: 1.0.0
+constraints:
+  - id: swb.constraint.school-scope
+    severity: error
+    appliesTo: instance-relations
+    rule: Evidence、Fact、Diagnosis、Stage、Action 与 Snapshot 的关联实例必须属于同一 School。
+  - id: swb.constraint.fact-separation
+    severity: error
+    appliesTo: swb:ObservationFact
+    rule: ObservationFact 必须可定位且不得包含解释、评价、动机或因果判断。
+  - id: swb.constraint.proposal-grounding
+    severity: error
+    appliesTo: swb:DiagnosisProposal
+    rule: 候选判断必须至少具有一条 supporting Fact、一个 Criterion，并显式完成 counter-evidence search。
+  - id: swb.constraint.human-approval
+    severity: error
+    appliesTo: swb:approvedAs
+    rule: 只有 Human Review Domain Service 可以创建 Proposal 到 ApprovedDiagnosis 的关系。
+  - id: swb.constraint.snapshot-approved-only
+    severity: error
+    appliesTo: swb:records
+    rule: StateSnapshot 只能记录 ApprovedDiagnosis，不能记录 DiagnosisProposal。
+  - id: swb.constraint.temporal-context
+    severity: error
+    appliesTo: swb:DiagnosisProposal
+    rule: 候选判断必须声明学校、时间窗与所评估范围，不能跨范围泛化。
+  - id: swb.constraint.no-automatic-score
+    severity: error
+    appliesTo: ontology
+    rule: Ontology Relation、RAG 相似度和 Methodology Construct 均不能直接生成学校得分或成熟阶段。
+  - id: swb.constraint.active-immutability
+    severity: error
+    appliesTo: ontology-version
+    rule: active 版本的概念 ID、定义、关系方向和约束不得原地改变。

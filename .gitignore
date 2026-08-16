@@ -1,0 +1,19 @@
+node_modules/
+.pnpm-store/
+dist/
+out/
+coverage/
+playwright-report/
+test-results/
+*.log
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.DS_Store
+
+# Local research sources may be copyrighted or sensitive. Keep only the
+# reference index and integrity manifest under version control.
+references/books/*
+references/frameworks/*
+references/standards/*
+references/field-notes/*
