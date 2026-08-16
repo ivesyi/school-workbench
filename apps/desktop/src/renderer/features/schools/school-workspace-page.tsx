@@ -84,15 +84,19 @@ export function SchoolWorkspacePage(): React.JSX.Element {
         ...(decision === 'modified' ? { finalText: editedJudgment } : {}),
       }
       const outcome = await api.judgments.review(input)
+
       if (outcome.acceptedJudgment) {
         const acceptedJudgment = outcome.acceptedJudgment
         setAccepted((items) => [acceptedJudgment, ...items])
         setResultMessage(
           decision === 'modified' ? '已经按你的修改记录这条判断。' : '已经记录这条判断。',
         )
+      } else if (decision === 'needs_more_evidence') {
+        setResultMessage('已记下：先补充更多依据，这条判断暂不进入正式记录。')
       } else {
-        setResultMessage('这条判断没有进入正式记录。')
+        setResultMessage('已记下你的意见，这条判断没有进入正式记录。')
       }
+
       setProposal(null)
       setEditing(false)
     } catch (reason) {
@@ -262,6 +266,14 @@ export function SchoolWorkspacePage(): React.JSX.Element {
                 我想改一下
               </Button>
             )}
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={reviewing}
+              onClick={() => void review('needs_more_evidence')}
+            >
+              先补充更多依据
+            </Button>
             <Button
               type="button"
               variant="ghost"
