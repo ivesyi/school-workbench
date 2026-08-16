@@ -82,6 +82,9 @@ export function validateStateAssessmentDraft(draft: StateAssessmentDraft): void 
   if (!draft.stageId.trim()) throw new Error('状态整理必须对应一个当前阶段')
   if (!draft.summary.trim()) throw new Error('状态整理需要一句总体说明')
   if (draft.judgmentIds.length === 0) throw new Error('没有正式判断时不能确认学校状态')
+  if (unique(draft.judgmentIds).length !== draft.judgmentIds.length) {
+    throw new Error('学校状态不能重复引用同一条正式判断')
+  }
   if (draft.assessments.length !== stageDimensionKeys.length) {
     throw new Error('学校状态必须完整覆盖五个方面')
   }
@@ -92,6 +95,9 @@ export function validateStateAssessmentDraft(draft: StateAssessmentDraft): void 
     if (dimensions.has(item.dimensionKey)) throw new Error('学校状态不能重复同一个方面')
     dimensions.add(item.dimensionKey)
     if (!item.summary.trim()) throw new Error('每个方面都需要一句说明')
+    if (unique(item.judgmentIds).length !== item.judgmentIds.length) {
+      throw new Error('方面判断不能重复引用同一条正式判断')
+    }
     if (item.status !== 'unverified' && item.judgmentIds.length === 0) {
       throw new Error('形成达到情况判断时至少需要一条正式判断')
     }
@@ -145,14 +151,14 @@ function createStateRecord(
     })
     return Object.freeze({
       assessment,
-      judgmentIds: Object.freeze(unique(item.judgmentIds)),
+      judgmentIds: Object.freeze([...item.judgmentIds]),
     })
   })
 
   return Object.freeze({
     snapshot,
     assessments: Object.freeze(assessments),
-    judgmentIds: Object.freeze(unique(draft.judgmentIds)),
+    judgmentIds: Object.freeze([...draft.judgmentIds]),
   })
 }
 
@@ -180,7 +186,7 @@ export function createNextState(
   if (!sameSetContainsAll(draft.judgmentIds, previous.judgmentIds)) {
     throw new Error('新的状态不能丢失上一份状态已经使用的正式判断')
   }
-  if (draft.judgmentIds.length === previous.judgmentIds.length) {
+  if (draft.judgmentIds.length === new Set(previous.judgmentIds).size) {
     throw new Error('没有新的正式判断时不能记录下一次状态')
   }
 
