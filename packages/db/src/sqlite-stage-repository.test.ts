@@ -28,6 +28,21 @@ function countRows(
   return row.count
 }
 
+async function addAcceptedJudgment(
+  judgmentService: JudgmentService,
+  schoolId: string,
+  text: string,
+) {
+  const proposal = await judgmentService.submitSituation({ schoolId, text })
+  const outcome = await judgmentService.review({
+    schoolId,
+    diagnosisId: proposal.proposal.id,
+    decision: 'accepted',
+  })
+  if (!outcome.acceptedJudgment) throw new Error('expected accepted judgment')
+  return outcome.acceptedJudgment
+}
+
 async function createAcceptedJudgment(
   schoolService: SchoolService,
   judgmentService: JudgmentService,
@@ -35,14 +50,8 @@ async function createAcceptedJudgment(
   text = '中层会议里仍由校长完成任务拆解。',
 ) {
   const school = await schoolService.create({ name })
-  const proposal = await judgmentService.submitSituation({ schoolId: school.id, text })
-  const outcome = await judgmentService.review({
-    schoolId: school.id,
-    diagnosisId: proposal.proposal.id,
-    decision: 'accepted',
-  })
-  if (!outcome.acceptedJudgment) throw new Error('expected accepted judgment')
-  return { school, judgment: outcome.acceptedJudgment }
+  const judgment = await addAcceptedJudgment(judgmentService, school.id, text)
+  return { school, judgment }
 }
 
 describe('stage recommendation persistence', () => {
@@ -96,6 +105,50 @@ describe('stage recommendation persistence', () => {
     expect(restored.state).toBe('active')
     if (restored.state === 'active') expect(restored.stage.targets).toHaveLength(5)
     secondDatabase.close()
+  })
+
+  it('atomically refreshes stage_judgments to the latest accepted judgments on adjustment', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'school-workbench-stage-provenance-'))
+    temporaryDirectories.push(directory)
+    const database = openWorkbenchDatabase(
+      join(directory, 'workbench.sqlite'),
+      resolve('packages/db/drizzle'),
+    )
+    const schoolRepository = new SqliteSchoolRepository(database.db)
+    const judgmentRepository = new SqliteJudgmentRepository(database.db)
+    const stageRepository = new SqliteStageRepository(database.db)
+    const schoolService = new SchoolService(schoolRepository)
+    const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
+    const first = await createAcceptedJudgment(schoolService, judgmentService)
+    const service = new StageService(schoolRepository, judgmentRepository, stageRepository)
+
+    const suggested = await service.getWorkspace(first.school.id)
+    if (suggested.state !== 'suggested') throw new Error('expected suggestion')
+
+    const secondJudgment = await addAcceptedJudgment(
+      judgmentService,
+      first.school.id,
+      '教师已经开始稳定教研复盘。',
+    )
+    await service.adjust({
+      schoolId: first.school.id,
+      stageId: suggested.stage.id,
+      feedback: '目前更需要稳定教研复盘机制',
+    })
+
+    const provenance = database.client
+      .prepare(
+        'SELECT judgment_id, sequence FROM stage_judgments WHERE stage_id = ? ORDER BY sequence',
+      )
+      .all(suggested.stage.id) as Array<{ judgment_id: string; sequence: number }>
+    expect(provenance).toEqual([
+      { judgment_id: first.judgment.id, sequence: 1 },
+      { judgment_id: secondJudgment.id, sequence: 2 },
+    ])
+
+    const persisted = await stageRepository.findById(suggested.stage.id)
+    expect(persisted?.judgmentIds).toEqual([first.judgment.id, secondJudgment.id])
+    database.close()
   })
 
   it('enforces at most one active stage per school in repository and database', async () => {

@@ -47,7 +47,7 @@ describe('stage recommendation', () => {
     expect(recommendation.targets.every((target) => target.status === 'draft')).toBe(true)
   })
 
-  it('keeps adjustment planned and atomically activates all targets', () => {
+  it('keeps adjustment planned, refreshes provenance, and atomically activates all targets', () => {
     const recommendation = createStageRecommendation(
       'school-1',
       draft,
@@ -63,12 +63,14 @@ describe('stage recommendation', () => {
         focus: '这个阶段现在最需要看到：教师开始基于真实课堂证据调整实践。',
       },
       '中层已经比较稳定，现在更应该看教师实践。',
+      ['judgment-1', 'judgment-2'],
       new Date('2026-08-17T00:30:00.000Z'),
     )
 
     expect(adjusted.stage.status).toBe('planned')
     expect(adjusted.stage.adjustmentFeedback).toContain('教师实践')
     expect(adjusted.stage.updatedAt).toBe('2026-08-17T00:30:00.000Z')
+    expect(adjusted.judgmentIds).toEqual(['judgment-1', 'judgment-2'])
     expect(adjusted.targets.every((target) => target.status === 'draft')).toBe(true)
 
     const active = activateStageRecommendation(adjusted, new Date('2026-08-17T01:00:00.000Z'))
