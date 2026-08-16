@@ -92,7 +92,7 @@ source_fingerprint, content_hash, status, created_at
 UNIQUE(key, version)
 ```
 
-`source_fingerprint` 保存 `references/SOURCE_MANIFEST.md` 中对应本地原始来源的 SHA-256；`content_hash` 保存结构化 Pack 去除 hash 字段后的 canonical SHA-256。两者语义不同，均用于 fail-closed 追溯。
+`source_fingerprint` 保存 `references/SOURCE_MANIFEST.md` 中对应本地原始来源的 SHA-256；`content_hash` 保存结构化 Pack 去除 `canonicalContentHash` 与生命周期 `status` 后的 canonical SHA-256；状态迁移不改变内容 hash。两者语义不同，均用于 fail-closed 追溯。
 
 V1 规划包含 Schooling by Design、Data Wise、Congruence、Role Standards；当前 Methodology Registry Foundation 只实现已有人审文本基线的 Schooling by Design 与 Data Wise，另外两套不得因“齐全”而提前编造。
 

@@ -259,13 +259,34 @@
     }
   ],
   "inferenceGuardrails": [
-    { "scope": "pack", "statement": "所评估的预期结果与当前阶段必须说明。" },
-    { "scope": "pack", "statement": "观察事实与来源必须说明。" },
-    { "scope": "pack", "statement": "目标—现实差距必须说明。" },
-    { "scope": "pack", "statement": "必须关联 Criterion ID。" },
-    { "scope": "pack", "statement": "必须列出支持证据、相反证据与至少一个替代解释。" },
-    { "scope": "pack", "statement": "建议行动及其预期影响证据必须说明。" },
-    { "scope": "pack", "statement": "证据不足时提出下一步观察，而不是强行定级。" },
+    {
+      "scope": "pack",
+      "statement": "所评估的预期结果与当前阶段必须说明。"
+    },
+    {
+      "scope": "pack",
+      "statement": "观察事实与来源必须说明。"
+    },
+    {
+      "scope": "pack",
+      "statement": "目标—现实差距必须说明。"
+    },
+    {
+      "scope": "pack",
+      "statement": "必须关联 Criterion ID。"
+    },
+    {
+      "scope": "pack",
+      "statement": "必须列出支持证据、相反证据与至少一个替代解释。"
+    },
+    {
+      "scope": "pack",
+      "statement": "建议行动及其预期影响证据必须说明。"
+    },
+    {
+      "scope": "pack",
+      "statement": "证据不足时提出下一步观察，而不是强行定级。"
+    },
     {
       "scope": "criterion",
       "criterionId": "SBD.C4.SYSTEM_ALIGNMENT",
@@ -274,6 +295,6 @@
   ],
   "canonicalContentHash": {
     "algorithm": "sha256",
-    "value": "dc69c577df08b27f1209671352a74b3aa3d3d5213cb726f44c0aa80a33b5f7f0"
+    "value": "6cb344c80e4345bd1daa34ca332636b95a231af930a187299808bcf31c2e154c"
   }
 }

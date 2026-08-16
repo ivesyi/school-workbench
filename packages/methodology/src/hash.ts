@@ -28,7 +28,9 @@ function canonicalContent(
 export function computeCanonicalContentHash(
   pack: Omit<MethodologyPack, 'canonicalContentHash'> | Record<string, unknown>,
 ): string {
-  return createHash('sha256').update(canonicalStringify(canonicalContent(pack))).digest('hex')
+  return createHash('sha256')
+    .update(canonicalStringify(canonicalContent(pack)))
+    .digest('hex')
 }
 
 export function computePackContentHash(pack: MethodologyPack): string {
