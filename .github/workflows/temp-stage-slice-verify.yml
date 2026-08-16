@@ -4,20 +4,12 @@ on:
   push:
     branches:
       - ci-stage-slice-20260817
-  pull_request:
-    branches:
-      - main
-
-permissions:
-  contents: write
 
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ci-stage-slice-20260817
       - uses: pnpm/action-setup@v4
         with:
           version: 11.19.0
@@ -26,16 +18,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm format:write
-      - name: Commit Prettier output on temporary branch
+      - name: Inspect Drizzle generation consistency
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/desktop/src/renderer/features/schools/school-workspace-page.tsx packages/application/src/stage-service.test.ts packages/db/src/sqlite-stage-repository.test.ts packages/db/src/sqlite-stage-repository.ts packages/domain/src/stage.test.ts
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(format): apply prettier to stage slice"
-            git push origin HEAD:ci-stage-slice-20260817
-          fi
+          pnpm db:generate
+          git status --short packages/db/drizzle
+          git diff -- packages/db/drizzle/meta/_journal.json
       - run: pnpm format
       - run: pnpm lint
       - run: pnpm typecheck
