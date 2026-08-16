@@ -158,7 +158,7 @@ describe('methodology pack loader and registry', () => {
     if (!isRecord(fingerprint)) throw new Error('fixture fingerprint missing')
     fingerprint.value = '0'.repeat(64)
     expect(() =>
-      parseMethodologyPack(JSON.stringify(badFingerprint), sourceManifestFor(cloneSbd())),
+      parseMethodologyPack(rehash(badFingerprint), sourceManifestFor(cloneSbd())),
     ).toThrow(/Source fingerprint mismatch/)
   })
 })
