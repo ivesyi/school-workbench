@@ -5,7 +5,7 @@ import {
   StageService,
   StateService,
 } from '@school-workbench/application'
-import { createBaselineState, createNextState } from '@school-workbench/domain'
+import { createNextState } from '@school-workbench/domain'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
