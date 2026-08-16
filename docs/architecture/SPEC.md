@@ -1492,6 +1492,7 @@ targets = confirmed
 ```text
 认同
 修改
+先补充更多依据
 不认同
 ```
 
@@ -1830,7 +1831,7 @@ Data Wise + 教师行为锚点
 
 - 本地文件与音频 Evidence；
 - Methodology Pack；
-- Evidence Claim；
+- ObservationFact / Claim；
 - Practice Diagnosis；
 - 影响验证。
 
