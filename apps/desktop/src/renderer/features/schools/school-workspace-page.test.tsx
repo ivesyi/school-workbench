@@ -52,16 +52,11 @@ const suggestedStage = {
     summary: '我理解这个学校目前大致处于“建立共同推动改进的组织基础”的阶段。',
     focus: '这个阶段现在最需要看到：中层开始独立承担关键任务。',
     targets: [
-      { id: 't1', dimensionKey: 'leadership' as const, label: '领导与责任', text: '目标 1' },
-      { id: 't2', dimensionKey: 'critical_tasks' as const, label: '关键工作', text: '目标 2' },
-      {
-        id: 't3',
-        dimensionKey: 'structure_systems' as const,
-        label: '协作机制',
-        text: '目标 3',
-      },
-      { id: 't4', dimensionKey: 'culture' as const, label: '团队氛围', text: '目标 4' },
-      { id: 't5', dimensionKey: 'capacity' as const, label: '推进能力', text: '目标 5' },
+      { id: 't1', dimensionKey: 'leadership' as const, label: '领导力', text: '目标 1' },
+      { id: 't2', dimensionKey: 'key_tasks' as const, label: '关键任务', text: '目标 2' },
+      { id: 't3', dimensionKey: 'structure' as const, label: '结构与机制', text: '目标 3' },
+      { id: 't4', dimensionKey: 'culture' as const, label: '文化', text: '目标 4' },
+      { id: 't5', dimensionKey: 'capability' as const, label: '能力', text: '目标 5' },
     ],
   },
 }
@@ -185,17 +180,14 @@ describe('SchoolWorkspacePage', () => {
     expect(await screen.findByText(suggestedStage.stage.summary)).toBeInTheDocument()
     expect(screen.getByText('这样理解基本对吗？')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '调整一下' }))
-    await userEvent.type(
-      screen.getByLabelText('哪里需要调整？'),
-      '现在中层已经比较稳定，更应该看教师实践。',
-    )
+    await userEvent.type(screen.getByLabelText('哪里需要调整？'), '目前更需要稳定教研复盘机制')
     await userEvent.click(screen.getByRole('button', { name: '重新整理建议' }))
 
     expect(await screen.findByText(adjustedStage.stage.summary)).toBeInTheDocument()
     expect(api.stages.adjust).toHaveBeenCalledWith({
       schoolId: 'school-1',
       stageId: 'stage-1',
-      feedback: '现在中层已经比较稳定，更应该看教师实践。',
+      feedback: '目前更需要稳定教研复盘机制',
     })
 
     await userEvent.click(screen.getByRole('button', { name: '基本对' }))

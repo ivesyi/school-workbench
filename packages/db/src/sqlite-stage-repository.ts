@@ -5,22 +5,19 @@ import {
   type StageDimensionKey,
   type StageRecommendation,
   type StageRepository,
+  type StageStatus,
   type StageTarget,
+  type StageTargetStatus,
 } from '@school-workbench/domain'
-import { and, eq } from 'drizzle-orm'
+import { acceptedJudgments, stageJudgments, stageTargets, stages } from './schema'
+import { and, eq, sql } from 'drizzle-orm'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
-import { stageTargets, stages } from './schema'
 
-function parseJudgmentIds(value: string): string[] {
-  const parsed: unknown = JSON.parse(value)
-  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) {
-    throw new Error('Invalid persisted stage judgment ids')
-  }
-  return parsed
-}
+const stageStatuses: StageStatus[] = ['planned', 'active', 'completed', 'cancelled']
+const targetStatuses: StageTargetStatus[] = ['draft', 'confirmed', 'retired']
 
 function toStage(row: typeof stages.$inferSelect): Stage {
-  if (row.status !== 'planned' && row.status !== 'active') {
+  if (!stageStatuses.includes(row.status as StageStatus)) {
     throw new Error(`Unsupported stage status: ${row.status}`)
   }
   return {
@@ -29,11 +26,13 @@ function toStage(row: typeof stages.$inferSelect): Stage {
     title: row.title,
     summary: row.summary,
     focus: row.focus,
-    status: row.status,
-    sourceJudgmentIds: parseJudgmentIds(row.sourceJudgmentIdsJson),
+    sequence: row.sequence,
+    status: row.status as StageStatus,
+    startsAt: row.startsAt,
+    endsAt: row.endsAt,
     adjustmentFeedback: row.adjustmentFeedback,
     createdAt: row.createdAt,
-    activatedAt: row.activatedAt,
+    updatedAt: row.updatedAt,
   }
 }
 
@@ -41,7 +40,7 @@ function toTarget(row: typeof stageTargets.$inferSelect): StageTarget {
   if (!stageDimensionKeys.includes(row.dimensionKey as StageDimensionKey)) {
     throw new Error(`Unsupported stage dimension: ${row.dimensionKey}`)
   }
-  if (row.status !== 'draft' && row.status !== 'confirmed') {
+  if (!targetStatuses.includes(row.status as StageTargetStatus)) {
     throw new Error(`Unsupported stage target status: ${row.status}`)
   }
   return {
@@ -49,21 +48,20 @@ function toTarget(row: typeof stageTargets.$inferSelect): StageTarget {
     stageId: row.stageId,
     schoolId: row.schoolId,
     dimensionKey: row.dimensionKey as StageDimensionKey,
-    text: row.text,
-    status: row.status,
+    title: row.title,
+    description: row.description,
+    status: row.status as StageTargetStatus,
+    sequence: row.sequence,
     createdAt: row.createdAt,
-    confirmedAt: row.confirmedAt,
+    updatedAt: row.updatedAt,
   }
 }
 
 function assertScope(recommendation: StageRecommendation): void {
-  const { stage, targets } = recommendation
+  const { stage, targets, judgmentIds } = recommendation
   if (targets.length !== stageDimensionKeys.length) throw new Error('阶段目标数量不完整')
-  if (
-    targets.some(
-      (target) => target.schoolId !== stage.schoolId || target.stageId !== recommendation.stage.id,
-    )
-  ) {
+  if (judgmentIds.length === 0) throw new Error('阶段建议必须关联至少一条正式判断')
+  if (targets.some((target) => target.schoolId !== stage.schoolId || target.stageId !== stage.id)) {
     throw new Error('阶段和目标不能跨学校保存')
   }
 }
@@ -77,11 +75,39 @@ export class SqliteStageRepository implements StageRepository {
       .select()
       .from(stageTargets)
       .where(eq(stageTargets.stageId, row.id))
+      .orderBy(stageTargets.sequence)
       .all()
       .map(toTarget)
-    const recommendation = { stage: toStage(row), targets }
+    const judgments = this.database
+      .select({ judgmentId: stageJudgments.judgmentId })
+      .from(stageJudgments)
+      .where(eq(stageJudgments.stageId, row.id))
+      .orderBy(stageJudgments.sequence)
+      .all()
+    const recommendation = {
+      stage: toStage(row),
+      targets,
+      judgmentIds: judgments.map((item) => item.judgmentId),
+    }
     assertScope(recommendation)
     return recommendation
+  }
+
+  private assertJudgmentScope(
+    tx: Parameters<Parameters<BetterSQLite3Database['transaction']>[0]>[0],
+    schoolId: string,
+    judgmentIds: string[],
+  ): void {
+    for (const judgmentId of judgmentIds) {
+      const judgment = tx
+        .select({ schoolId: acceptedJudgments.schoolId })
+        .from(acceptedJudgments)
+        .where(eq(acceptedJudgments.id, judgmentId))
+        .get()
+      if (!judgment || judgment.schoolId !== schoolId) {
+        throw new Error('阶段不能引用其他学校的正式判断')
+      }
+    }
   }
 
   async findActive(schoolId: string): Promise<StageRecommendation | null> {
@@ -108,6 +134,15 @@ export class SqliteStageRepository implements StageRepository {
     return this.load(this.database.select().from(stages).where(eq(stages.id, stageId)).get())
   }
 
+  async nextSequence(schoolId: string): Promise<number> {
+    const row = this.database
+      .select({ maxSequence: sql<number>`coalesce(max(${stages.sequence}), 0)` })
+      .from(stages)
+      .where(eq(stages.schoolId, schoolId))
+      .get()
+    return Number(row?.maxSequence ?? 0) + 1
+  }
+
   async savePlanned(recommendation: StageRecommendation): Promise<void> {
     assertScope(recommendation)
     if (recommendation.stage.status !== 'planned') throw new Error('只能保存待确认阶段建议')
@@ -116,12 +151,15 @@ export class SqliteStageRepository implements StageRepository {
     }
 
     this.database.transaction((tx) => {
-      const existing = tx
-        .select({ id: stages.id })
+      const blockingStage = tx
+        .select({ status: stages.status })
         .from(stages)
         .where(eq(stages.schoolId, recommendation.stage.schoolId))
-        .get()
-      if (existing) throw new Error('这所学校已经有阶段记录')
+        .all()
+        .some((item) => item.status === 'planned' || item.status === 'active')
+      if (blockingStage) throw new Error('这所学校已经有待确认或当前阶段')
+
+      this.assertJudgmentScope(tx, recommendation.stage.schoolId, recommendation.judgmentIds)
 
       tx.insert(stages)
         .values({
@@ -130,15 +168,22 @@ export class SqliteStageRepository implements StageRepository {
           title: recommendation.stage.title,
           summary: recommendation.stage.summary,
           focus: recommendation.stage.focus,
+          sequence: recommendation.stage.sequence,
           status: recommendation.stage.status,
-          sourceJudgmentIdsJson: JSON.stringify(recommendation.stage.sourceJudgmentIds),
+          startsAt: recommendation.stage.startsAt,
+          endsAt: recommendation.stage.endsAt,
           adjustmentFeedback: recommendation.stage.adjustmentFeedback,
           createdAt: recommendation.stage.createdAt,
-          activatedAt: recommendation.stage.activatedAt,
+          updatedAt: recommendation.stage.updatedAt,
         })
         .run()
 
       for (const target of recommendation.targets) tx.insert(stageTargets).values(target).run()
+      recommendation.judgmentIds.forEach((judgmentId, index) => {
+        tx.insert(stageJudgments)
+          .values({ stageId: recommendation.stage.id, judgmentId, sequence: index + 1 })
+          .run()
+      })
     })
   }
 
@@ -155,6 +200,8 @@ export class SqliteStageRepository implements StageRepository {
         throw new Error('没有找到这个阶段建议')
       }
       if (current.status !== 'planned') throw new Error('已经确认的阶段不能再调整')
+
+      this.assertJudgmentScope(tx, recommendation.stage.schoolId, recommendation.judgmentIds)
 
       const persistedTargets = tx
         .select()
@@ -177,14 +224,23 @@ export class SqliteStageRepository implements StageRepository {
           summary: recommendation.stage.summary,
           focus: recommendation.stage.focus,
           adjustmentFeedback: recommendation.stage.adjustmentFeedback,
-          sourceJudgmentIdsJson: JSON.stringify(recommendation.stage.sourceJudgmentIds),
+          updatedAt: recommendation.stage.updatedAt,
         })
-        .where(eq(stages.id, recommendation.stage.id))
+        .where(
+          and(
+            eq(stages.id, recommendation.stage.id),
+            eq(stages.schoolId, recommendation.stage.schoolId),
+          ),
+        )
         .run()
 
       for (const target of recommendation.targets) {
         tx.update(stageTargets)
-          .set({ text: target.text })
+          .set({
+            title: target.title,
+            description: target.description,
+            updatedAt: target.updatedAt,
+          })
           .where(and(eq(stageTargets.id, target.id), eq(stageTargets.schoolId, target.schoolId)))
           .run()
       }
@@ -213,10 +269,18 @@ export class SqliteStageRepository implements StageRepository {
         .select()
         .from(stageTargets)
         .where(eq(stageTargets.stageId, stageId))
+        .orderBy(stageTargets.sequence)
+        .all()
+      const judgmentRows = tx
+        .select({ judgmentId: stageJudgments.judgmentId })
+        .from(stageJudgments)
+        .where(eq(stageJudgments.stageId, stageId))
+        .orderBy(stageJudgments.sequence)
         .all()
       const recommendation: StageRecommendation = {
         stage: toStage(stageRow),
         targets: targetRows.map(toTarget),
+        judgmentIds: judgmentRows.map((item) => item.judgmentId),
       }
       assertScope(recommendation)
 
@@ -224,12 +288,16 @@ export class SqliteStageRepository implements StageRepository {
       const active = activateStageRecommendation(recommendation, activatedAt)
 
       tx.update(stages)
-        .set({ status: 'active', activatedAt: active.stage.activatedAt })
+        .set({
+          status: 'active',
+          startsAt: active.stage.startsAt,
+          updatedAt: active.stage.updatedAt,
+        })
         .where(and(eq(stages.id, stageId), eq(stages.schoolId, schoolId)))
         .run()
       for (const target of active.targets) {
         tx.update(stageTargets)
-          .set({ status: 'confirmed', confirmedAt: target.confirmedAt })
+          .set({ status: 'confirmed', updatedAt: target.updatedAt })
           .where(and(eq(stageTargets.id, target.id), eq(stageTargets.schoolId, schoolId)))
           .run()
       }

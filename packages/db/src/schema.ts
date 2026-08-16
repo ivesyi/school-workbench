@@ -162,13 +162,16 @@ export const stages = sqliteTable(
     title: text('title').notNull(),
     summary: text('summary').notNull(),
     focus: text('focus').notNull(),
+    sequence: integer('sequence').notNull(),
     status: text('status').notNull(),
-    sourceJudgmentIdsJson: text('source_judgment_ids_json').notNull(),
+    startsAt: text('starts_at'),
+    endsAt: text('ends_at'),
     adjustmentFeedback: text('adjustment_feedback'),
     createdAt: text('created_at').notNull(),
-    activatedAt: text('activated_at'),
+    updatedAt: text('updated_at').notNull(),
   },
   (table) => [
+    uniqueIndex('stages_school_sequence_unique').on(table.schoolId, table.sequence),
     uniqueIndex('stages_one_active_per_school')
       .on(table.schoolId)
       .where(sql`${table.status} = 'active'`),
@@ -189,13 +192,33 @@ export const stageTargets = sqliteTable(
       .notNull()
       .references(() => schools.id, { onDelete: 'cascade' }),
     dimensionKey: text('dimension_key').notNull(),
-    text: text('text').notNull(),
+    title: text('title').notNull(),
+    description: text('description').notNull(),
     status: text('status').notNull(),
+    sequence: integer('sequence').notNull(),
     createdAt: text('created_at').notNull(),
-    confirmedAt: text('confirmed_at'),
+    updatedAt: text('updated_at').notNull(),
   },
   (table) => [
     uniqueIndex('stage_targets_stage_dimension_unique').on(table.stageId, table.dimensionKey),
+    uniqueIndex('stage_targets_stage_sequence_unique').on(table.stageId, table.sequence),
+  ],
+)
+
+export const stageJudgments = sqliteTable(
+  'stage_judgments',
+  {
+    stageId: text('stage_id')
+      .notNull()
+      .references(() => stages.id, { onDelete: 'cascade' }),
+    judgmentId: text('judgment_id')
+      .notNull()
+      .references(() => acceptedJudgments.id, { onDelete: 'cascade' }),
+    sequence: integer('sequence').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.stageId, table.judgmentId] }),
+    uniqueIndex('stage_judgments_stage_sequence_unique').on(table.stageId, table.sequence),
   ],
 )
 

@@ -41,25 +41,45 @@ current_snapshot_id
 
 ```text
 stages
-id, school_id, title, summary, sequence,
+id, school_id, title, summary,
+focus,                         # 当前纵切的人话“这个阶段最需要看到什么”
+sequence,
 status(planned|active|completed|cancelled),
-starts_at, ends_at, created_at, updated_at
+starts_at, ends_at,
+adjustment_feedback NULL,      # 最近一次自然语言调整；辅助重放当前建议
+created_at, updated_at
 ```
 
-每所学校最多一个 active Stage。
+每所学校最多一个 active Stage；同一学校的 `sequence` 唯一。`savePlanned` 只阻止已有 `planned` / `active`，已有 `completed` / `cancelled` 历史不阻止形成下一阶段。
 
 ```text
 dimensions
 key PK: leadership | key_tasks | structure | culture | capability
 ```
 
-Dimension 属于五维全等诊断框架，用于描述匹配/失配，不自带成熟等级。
+Dimension 属于五维全等诊断框架，用于描述匹配/失配，不自带成熟等级。应用层、Domain、Shared、DB 只使用这一套 canonical key。
 
 ```text
 stage_targets
-id, stage_id, dimension_key, title, description,
-status(draft|confirmed|retired), sequence, created_at, updated_at
+id, stage_id, school_id,
+dimension_key, title, description,
+status(draft|confirmed|retired), sequence,
+created_at, updated_at
 ```
+
+`school_id` 是当前本地纵切保留的冗余作用域字段，用于跨实体写入校验；它必须与所属 Stage 的 `school_id` 一致。
+
+阶段依据通过关系表保存，不在 Stage 内保存 JSON id 列表：
+
+```text
+stage_judgments
+stage_id FK -> stages.id
+judgment_id FK -> accepted_judgments.id
+sequence
+PRIMARY KEY(stage_id, judgment_id)
+```
+
+写入 `stage_judgments` 前必须验证 Judgment 与 Stage 属于同一 School。
 
 “明显低于 / 部分达到 / 基本达到 / 达到且稳定”等状态必须相对于 StageTarget 判断。
 
@@ -271,6 +291,8 @@ agent_runs.status = queued|running|needs_input|completed|failed|cancelled
 提交前必须验证：
 
 - Evidence、Fact、Claim、Proposal、Review、Judgment、StageTarget、Snapshot 属于同一 School；
+- Stage 与 StageTarget 使用同一 canonical 五维 key；Stage 与其 Judgment 关系必须同校；
+- 每校最多一个 active Stage；planned/active 阻止新的 planned，但 completed/cancelled 历史不阻止；
 - ObservationFact 有 Evidence + locator，且不包含评价/因果推断；
 - Claim 至少有 supporting Fact；counter search 必须显式完成；
 - Proposal 至少有一个 Claim 和一个 Criterion；
@@ -283,6 +305,6 @@ agent_runs.status = queued|running|needs_input|completed|failed|cancelled
 
 ## 13. Implementation baseline
 
-当前仓库尚无生产用户数据库。Foundation migration 只保留最小 `schools` 表；后续按纵切增加 Stage、Evidence/Fact/Claim、Proposal/Review/Judgment、Snapshot/Assessment、Runtime。
+当前仓库已经实现 School、Epistemic Judgment 和“阶段提议与确认”纵切。Stage 纵切使用 forward migration 对齐本 v1.2：旧 `critical_tasks / structure_systems / capacity` 数据迁移为 `key_tasks / structure / capability`；旧 `source_judgment_ids_json` 迁移为 `stage_judgments` 关系表；旧 Stage/Target 字段迁移到 sequence、完整 status/time 字段和 title/description/sequence。
 
-在下一纵切开始前，先完成本 v1.2 与 Ontology draft 的测试校准；不为尚未实现的表制造兼容迁移包袱。
+尚未实现 StateSnapshot、学校状态页、教师实践或真实 Agent Runtime；这些能力继续按真实纵切增加，不为未实现能力制造额外基础设施。
