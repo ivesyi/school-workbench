@@ -11,8 +11,7 @@ function canonicalStringify(value: unknown): string {
       .join(',')}}`
   }
   const serialized = JSON.stringify(value)
-  if (serialized === undefined)
-    throw new Error('Unsupported value in canonical methodology content')
+  if (serialized === undefined) throw new Error('Unsupported value in canonical methodology content')
   return serialized
 }
 
@@ -23,6 +22,7 @@ export function computeCanonicalContentHash(
 }
 
 export function computePackContentHash(pack: MethodologyPack): string {
-  const { canonicalContentHash: _canonicalContentHash, ...content } = pack
+  const content: Record<string, unknown> = { ...pack }
+  delete content.canonicalContentHash
   return computeCanonicalContentHash(content)
 }
