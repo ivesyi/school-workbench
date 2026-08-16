@@ -140,12 +140,14 @@ export function adjustStageRecommendation(
   recommendation: StageRecommendation,
   draft: StageRecommendationDraft,
   feedback: string,
+  judgmentIds: string[],
   adjustedAt: Date = new Date(),
 ): StageRecommendation {
   if (recommendation.stage.status !== 'planned') throw new Error('已经确认的阶段不能再调整')
   if (recommendation.targets.some((target) => target.status !== 'draft')) {
     throw new Error('已经确认的阶段目标不能再调整')
   }
+  if (judgmentIds.length === 0) throw new Error('没有正式判断时不能调整阶段建议')
 
   const updatedAt = adjustedAt.toISOString()
   const stage: Stage = {
@@ -164,7 +166,7 @@ export function adjustStageRecommendation(
   }))
 
   assertTargetSet(targets, stage)
-  return { stage, targets, judgmentIds: [...recommendation.judgmentIds] }
+  return { stage, targets, judgmentIds: [...judgmentIds] }
 }
 
 export function activateStageRecommendation(

@@ -172,7 +172,12 @@ export class StageService {
 
     const judgments = await this.judgmentRepository.listAcceptedJudgments(parsed.schoolId)
     const draft = await this.engine.recommend(judgments, parsed.feedback)
-    const adjusted = adjustStageRecommendation(recommendation, draft, parsed.feedback)
+    const adjusted = adjustStageRecommendation(
+      recommendation,
+      draft,
+      parsed.feedback,
+      judgments.map((item) => item.id),
+    )
     await this.stageRepository.replacePlanned(adjusted)
     return { state: 'suggested', stage: toStageSummary(adjusted) }
   }

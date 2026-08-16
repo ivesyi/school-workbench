@@ -24,12 +24,12 @@ const school: School = {
   archivedAt: null,
 }
 
-function acceptedJudgment(statement: string): AcceptedJudgment {
+function acceptedJudgment(statement: string, id = 'judgment-1'): AcceptedJudgment {
   return {
-    id: 'judgment-1',
+    id,
     schoolId: school.id,
-    proposalId: 'proposal-1',
-    reviewId: 'review-1',
+    proposalId: `proposal-${id}`,
+    reviewId: `review-${id}`,
     statement,
     scopeJson: JSON.stringify({ kind: 'school', schoolId: school.id }),
     validFrom: '2026-08-17T00:00:00.000Z',
@@ -96,12 +96,15 @@ function schoolRepository(): SchoolRepository {
   }
 }
 
-function judgmentRepository(judgments: AcceptedJudgment[]): JudgmentRepository {
+function judgmentRepository(
+  judgments: AcceptedJudgment[] | (() => AcceptedJudgment[]),
+): JudgmentRepository {
+  const current = typeof judgments === 'function' ? judgments : () => judgments
   return {
     saveProposalChain: vi.fn<(chain: ProposalChain) => Promise<void>>(),
     findProposal: vi.fn<(id: string) => Promise<DiagnosisProposal | null>>(),
     saveReviewOutcome: vi.fn<(outcome: ReviewOutcome) => Promise<void>>(),
-    listAcceptedJudgments: vi.fn().mockResolvedValue(judgments),
+    listAcceptedJudgments: vi.fn().mockImplementation(async () => [...current()]),
   }
 }
 
@@ -191,5 +194,38 @@ describe('StageService', () => {
     expect(
       stages.recommendation?.targets.every((targetItem) => targetItem.status === 'confirmed'),
     ).toBe(true)
+  })
+
+  it('uses and records the same latest accepted judgments when adjusting a planned stage', async () => {
+    const first = acceptedJudgment('中层仍然依赖校长完成任务拆解。', 'judgment-1')
+    const second = acceptedJudgment('教师已经开始稳定教研复盘。', 'judgment-2')
+    const currentJudgments = [first]
+    const stages = new MemoryStageRepository()
+    const trackingEngine: StageRecommendationEngine = {
+      recommend: vi.fn(engine.recommend),
+    }
+    const service = new StageService(
+      schoolRepository(),
+      judgmentRepository(() => currentJudgments),
+      stages,
+      trackingEngine,
+    )
+
+    const suggested = await service.getWorkspace(school.id)
+    if (suggested.state !== 'suggested') throw new Error('expected suggestion')
+    expect(stages.recommendation?.judgmentIds).toEqual(['judgment-1'])
+
+    currentJudgments.push(second)
+    await service.adjust({
+      schoolId: school.id,
+      stageId: suggested.stage.id,
+      feedback: '目前更需要稳定教研复盘机制',
+    })
+
+    expect(trackingEngine.recommend).toHaveBeenLastCalledWith(
+      [first, second],
+      '目前更需要稳定教研复盘机制',
+    )
+    expect(stages.recommendation?.judgmentIds).toEqual(['judgment-1', 'judgment-2'])
   })
 })

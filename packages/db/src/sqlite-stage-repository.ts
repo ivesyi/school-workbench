@@ -244,6 +244,13 @@ export class SqliteStageRepository implements StageRepository {
           .where(and(eq(stageTargets.id, target.id), eq(stageTargets.schoolId, target.schoolId)))
           .run()
       }
+
+      tx.delete(stageJudgments).where(eq(stageJudgments.stageId, recommendation.stage.id)).run()
+      recommendation.judgmentIds.forEach((judgmentId, index) => {
+        tx.insert(stageJudgments)
+          .values({ stageId: recommendation.stage.id, judgmentId, sequence: index + 1 })
+          .run()
+      })
     })
   }
 
