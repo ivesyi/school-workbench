@@ -22,7 +22,7 @@ test('an accepted judgment remains after the desktop app restarts', async () => 
     await firstWindow.getByPlaceholder(/例如：今天的中层会议里/).fill(situation)
     await firstWindow.getByRole('button', { name: '提交情况' }).click()
     await expect(firstWindow.getByText('我发现一个新的情况，想让你确认')).toBeVisible()
-    await firstWindow.getByRole('button', { name: '认同' }).click()
+    await firstWindow.getByRole('button', { name: '认同', exact: true }).click()
     await expect(firstWindow.getByText('已经记录这条判断。')).toBeVisible()
     await expect(firstWindow.getByText(situation)).toBeVisible()
     await firstApp.close()
