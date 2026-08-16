@@ -1,0 +1,209 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "6f8b3627-5dbb-42ba-a406-8399937ed59a",
+  "prevId": "a77bf93e-9ce4-4f9b-88e5-7c39a76e7cd7",
+  "tables": {
+    "schools": {
+      "name": "schools",
+      "columns": {
+        "id": { "name": "id", "type": "text", "primaryKey": true, "notNull": true, "autoincrement": false },
+        "name": { "name": "name", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "created_at": { "name": "created_at", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "archived_at": { "name": "archived_at", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false }
+      },
+      "indexes": {}, "foreignKeys": {}, "compositePrimaryKeys": {}, "uniqueConstraints": {}, "checkConstraints": {}
+    },
+    "evidence": {
+      "name": "evidence",
+      "columns": {
+        "id": { "name": "id", "type": "text", "primaryKey": true, "notNull": true, "autoincrement": false },
+        "school_id": { "name": "school_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "source_type": { "name": "source_type", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "uri": { "name": "uri", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "inline_text": { "name": "inline_text", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "title": { "name": "title", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "locator_json": { "name": "locator_json", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "content_hash": { "name": "content_hash", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "captured_at": { "name": "captured_at", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "registered_by": { "name": "registered_by", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "agent_run_id": { "name": "agent_run_id", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "created_at": { "name": "created_at", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "evidence_school_id_schools_id_fk": { "name": "evidence_school_id_schools_id_fk", "tableFrom": "evidence", "tableTo": "schools", "columnsFrom": ["school_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" }
+      },
+      "compositePrimaryKeys": {}, "uniqueConstraints": {}, "checkConstraints": {}
+    },
+    "observation_facts": {
+      "name": "observation_facts",
+      "columns": {
+        "id": { "name": "id", "type": "text", "primaryKey": true, "notNull": true, "autoincrement": false },
+        "school_id": { "name": "school_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "evidence_id": { "name": "evidence_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "fact_type": { "name": "fact_type", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "text": { "name": "text", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "locator_json": { "name": "locator_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "directness": { "name": "directness", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "extracted_by": { "name": "extracted_by", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "agent_run_id": { "name": "agent_run_id", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "created_at": { "name": "created_at", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "observation_facts_school_id_schools_id_fk": { "name": "observation_facts_school_id_schools_id_fk", "tableFrom": "observation_facts", "tableTo": "schools", "columnsFrom": ["school_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" },
+        "observation_facts_evidence_id_evidence_id_fk": { "name": "observation_facts_evidence_id_evidence_id_fk", "tableFrom": "observation_facts", "tableTo": "evidence", "columnsFrom": ["evidence_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" }
+      },
+      "compositePrimaryKeys": {}, "uniqueConstraints": {}, "checkConstraints": {}
+    },
+    "claims": {
+      "name": "claims",
+      "columns": {
+        "id": { "name": "id", "type": "text", "primaryKey": true, "notNull": true, "autoincrement": false },
+        "school_id": { "name": "school_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "subject_ref_json": { "name": "subject_ref_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "predicate_key": { "name": "predicate_key", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "object_ref_json": { "name": "object_ref_json", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "statement": { "name": "statement", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "valid_from": { "name": "valid_from", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "valid_to": { "name": "valid_to", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "scope_json": { "name": "scope_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "created_by": { "name": "created_by", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "agent_run_id": { "name": "agent_run_id", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "created_at": { "name": "created_at", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "claims_school_id_schools_id_fk": { "name": "claims_school_id_schools_id_fk", "tableFrom": "claims", "tableTo": "schools", "columnsFrom": ["school_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" }
+      },
+      "compositePrimaryKeys": {}, "uniqueConstraints": {}, "checkConstraints": {}
+    },
+    "claim_facts": {
+      "name": "claim_facts",
+      "columns": {
+        "claim_id": { "name": "claim_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "fact_id": { "name": "fact_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "stance": { "name": "stance", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "sequence": { "name": "sequence", "type": "integer", "primaryKey": false, "notNull": true, "autoincrement": false }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "claim_facts_claim_id_claims_id_fk": { "name": "claim_facts_claim_id_claims_id_fk", "tableFrom": "claim_facts", "tableTo": "claims", "columnsFrom": ["claim_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" },
+        "claim_facts_fact_id_observation_facts_id_fk": { "name": "claim_facts_fact_id_observation_facts_id_fk", "tableFrom": "claim_facts", "tableTo": "observation_facts", "columnsFrom": ["fact_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" }
+      },
+      "compositePrimaryKeys": {
+        "claim_facts_claim_id_fact_id_stance_pk": { "columns": ["claim_id", "fact_id", "stance"], "name": "claim_facts_claim_id_fact_id_stance_pk" }
+      },
+      "uniqueConstraints": {}, "checkConstraints": {}
+    },
+    "diagnosis_proposals": {
+      "name": "diagnosis_proposals",
+      "columns": {
+        "id": { "name": "id", "type": "text", "primaryKey": true, "notNull": true, "autoincrement": false },
+        "school_id": { "name": "school_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "agent_run_id": { "name": "agent_run_id", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "type": { "name": "type", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "title": { "name": "title", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "scope_json": { "name": "scope_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "interpretations_json": { "name": "interpretations_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "provisional_judgment": { "name": "provisional_judgment", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "mechanism": { "name": "mechanism", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "alternative_hypotheses_json": { "name": "alternative_hypotheses_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "unresolved_questions_json": { "name": "unresolved_questions_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "recommended_actions_json": { "name": "recommended_actions_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "next_observations_json": { "name": "next_observations_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "impact_evidence_plan_json": { "name": "impact_evidence_plan_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "evidence_quality_json": { "name": "evidence_quality_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "confidence": { "name": "confidence", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "status": { "name": "status", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "created_at": { "name": "created_at", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "diagnosis_proposals_school_id_schools_id_fk": { "name": "diagnosis_proposals_school_id_schools_id_fk", "tableFrom": "diagnosis_proposals", "tableTo": "schools", "columnsFrom": ["school_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" }
+      },
+      "compositePrimaryKeys": {}, "uniqueConstraints": {}, "checkConstraints": {}
+    },
+    "diagnosis_claims": {
+      "name": "diagnosis_claims",
+      "columns": {
+        "proposal_id": { "name": "proposal_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "claim_id": { "name": "claim_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "diagnosis_claims_proposal_id_diagnosis_proposals_id_fk": { "name": "diagnosis_claims_proposal_id_diagnosis_proposals_id_fk", "tableFrom": "diagnosis_claims", "tableTo": "diagnosis_proposals", "columnsFrom": ["proposal_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" },
+        "diagnosis_claims_claim_id_claims_id_fk": { "name": "diagnosis_claims_claim_id_claims_id_fk", "tableFrom": "diagnosis_claims", "tableTo": "claims", "columnsFrom": ["claim_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" }
+      },
+      "compositePrimaryKeys": {
+        "diagnosis_claims_proposal_id_claim_id_pk": { "columns": ["proposal_id", "claim_id"], "name": "diagnosis_claims_proposal_id_claim_id_pk" }
+      },
+      "uniqueConstraints": {}, "checkConstraints": {}
+    },
+    "human_reviews": {
+      "name": "human_reviews",
+      "columns": {
+        "id": { "name": "id", "type": "text", "primaryKey": true, "notNull": true, "autoincrement": false },
+        "proposal_id": { "name": "proposal_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "decision": { "name": "decision", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "feedback": { "name": "feedback", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "final_text": { "name": "final_text", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "reason": { "name": "reason", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "reviewed_at": { "name": "reviewed_at", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "human_reviews_proposal_id_diagnosis_proposals_id_fk": { "name": "human_reviews_proposal_id_diagnosis_proposals_id_fk", "tableFrom": "human_reviews", "tableTo": "diagnosis_proposals", "columnsFrom": ["proposal_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "human_reviews_proposal_id_unique": { "name": "human_reviews_proposal_id_unique", "columns": ["proposal_id"] }
+      },
+      "checkConstraints": {}
+    },
+    "accepted_judgments": {
+      "name": "accepted_judgments",
+      "columns": {
+        "id": { "name": "id", "type": "text", "primaryKey": true, "notNull": true, "autoincrement": false },
+        "school_id": { "name": "school_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "review_id": { "name": "review_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "statement": { "name": "statement", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "scope_json": { "name": "scope_json", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "valid_from": { "name": "valid_from", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "valid_to": { "name": "valid_to", "type": "text", "primaryKey": false, "notNull": false, "autoincrement": false },
+        "created_at": { "name": "created_at", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "accepted_judgments_school_id_schools_id_fk": { "name": "accepted_judgments_school_id_schools_id_fk", "tableFrom": "accepted_judgments", "tableTo": "schools", "columnsFrom": ["school_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" },
+        "accepted_judgments_review_id_human_reviews_id_fk": { "name": "accepted_judgments_review_id_human_reviews_id_fk", "tableFrom": "accepted_judgments", "tableTo": "human_reviews", "columnsFrom": ["review_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "accepted_judgments_review_id_unique": { "name": "accepted_judgments_review_id_unique", "columns": ["review_id"] }
+      },
+      "checkConstraints": {}
+    },
+    "judgment_claims": {
+      "name": "judgment_claims",
+      "columns": {
+        "judgment_id": { "name": "judgment_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false },
+        "claim_id": { "name": "claim_id", "type": "text", "primaryKey": false, "notNull": true, "autoincrement": false }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "judgment_claims_judgment_id_accepted_judgments_id_fk": { "name": "judgment_claims_judgment_id_accepted_judgments_id_fk", "tableFrom": "judgment_claims", "tableTo": "accepted_judgments", "columnsFrom": ["judgment_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" },
+        "judgment_claims_claim_id_claims_id_fk": { "name": "judgment_claims_claim_id_claims_id_fk", "tableFrom": "judgment_claims", "tableTo": "claims", "columnsFrom": ["claim_id"], "columnsTo": ["id"], "onDelete": "cascade", "onUpdate": "no action" }
+      },
+      "compositePrimaryKeys": {
+        "judgment_claims_judgment_id_claim_id_pk": { "columns": ["judgment_id", "claim_id"], "name": "judgment_claims_judgment_id_claim_id_pk" }
+      },
+      "uniqueConstraints": {}, "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": { "schemas": {}, "tables": {}, "columns": {} },
+  "internal": { "indexes": {} }
+}

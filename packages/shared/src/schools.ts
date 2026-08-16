@@ -30,11 +30,3 @@ export const schoolIpcChannels = {
   create: 'schools:create',
   get: 'schools:get',
 } as const
-
-export type WorkbenchApi = {
-  schools: {
-    list(): Promise<SchoolView[]>
-    create(input: CreateSchoolInput): Promise<SchoolView>
-    get(id: string): Promise<SchoolView | null>
-  }
-}

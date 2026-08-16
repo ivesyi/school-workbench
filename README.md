@@ -1,6 +1,6 @@
 # School Workbench
 
-学校变革陪跑工作台是一个 Local-first 的 Electron 桌面客户端。当前已完成 Foundation 阶段：可创建学校、进入本地工作台，并通过 SQLite 在应用重启后保留学校数据。
+学校变革陪跑工作台是一个 Local-first 的 Electron 桌面客户端。当前已完成 Foundation 与首个认识链路纵切：可创建学校、直接说一条新情况，并完成 `Evidence → ObservationFact → Claim → DiagnosisProposal → HumanReview → AcceptedJudgment` 的本地持久化闭环。
 
 ## Repository Map
 
@@ -23,6 +23,7 @@ AGENTS.md      贡献与 Agent 工作规则
 - 认识模型：`knowledge/epistemic/EPISTEMIC_MODEL.md`
 - UI 系统：`docs/architecture/ADR-003-ui-system.md`
 - Foundation 状态：`docs/development/FOUNDATION_STATUS.md`
+- Evidence→Judgment 纵切：`docs/development/EPISTEMIC_VERTICAL_SLICE_STATUS.md`
 - 方法论基线：`knowledge/methodology/README.md`
 - 原始资料目录：`references/README.md`
 
@@ -37,4 +38,4 @@ pnpm test
 pnpm test:e2e
 ```
 
-目标工具链为 Node.js 24 与 pnpm 11。Ontology v1 当前保持 draft，待 Reality / Normative / Epistemic / Methodology 四层语义与首个 Evidence→Judgment 纵切校准后首次激活。原始参考资料不进入应用安装包；Agent 运行时只使用经过审核、版本化的知识派生物。
+目标工具链为 Node.js 24 与 pnpm 11。Ontology v1 当前保持 draft；首个 Evidence→Judgment 纵切已经开始用真实 Domain 和 SQLite 验证其语义边界。原始参考资料不进入应用安装包；Agent 运行时只使用经过审核、版本化的知识派生物。

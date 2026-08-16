@@ -23,6 +23,11 @@ describe('SchoolListPage', () => {
         create: vi.fn().mockResolvedValue(school),
         get: vi.fn(),
       },
+      judgments: {
+        submitSituation: vi.fn(),
+        review: vi.fn(),
+        listAccepted: vi.fn().mockResolvedValue([]),
+      },
     }
 
     render(

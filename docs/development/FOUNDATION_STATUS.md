@@ -1,9 +1,9 @@
 # Foundation Implementation Status
 
 **状态：Complete**  
-**验收日期：2026-08-17**
+**Foundation 验收日期：2026-08-17**
 
-## Implemented Vertical Slice
+## Implemented Foundation Slice
 
 ```text
 Electron Main
@@ -23,36 +23,56 @@ SchoolService → SchoolRepository → Drizzle / SQLite
 
 - `apps/desktop`：Electron Main、Preload、React Renderer；
 - `packages/shared`：IPC DTO 与 Zod Contract；
-- `packages/domain`：School Entity 与 Repository Port；
-- `packages/application`：School 用例；
+- `packages/domain`：Domain Entity 与 Repository Port；
+- `packages/application`：Application Service；
 - `packages/db`：Drizzle Schema、Migration 与 SQLite Adapter；
-- `packages/ontology`：Ontology v1 加载和引用完整性校验；
+- `packages/ontology`：Ontology 加载和引用完整性校验；
 - `packages/experience`：Quiet Workbench Token 与受控 shadcn/Radix 组件。
 
-## Verification
+## Foundation Verification
 
-以下命令均已通过：
+Foundation 验收时以下命令通过：
 
 ```text
 pnpm install
 pnpm format
 pnpm lint
 pnpm typecheck
-pnpm test       5 files / 7 tests
+pnpm test
 pnpm build
-pnpm test:e2e  1 Electron restart persistence test
+pnpm test:e2e
 ```
 
-`pnpm dev` 已实际启动 Electron Main、Preload、Vite Renderer 与桌面窗口；验收后通过 SIGINT 人工结束开发进程。
+## Subsequent Vertical Slice
 
-## Deliberately Deferred
+Foundation 之后已经进入真实业务链开发。首个认识链路纵切实现：
 
-- 当前 Migration 只实现首个纵切需要的 `schools` 表；Canonical Schema 的 Stage、Evidence、Diagnosis、Snapshot 与 Runtime 表在对应纵切实现；
-- 工作台文本输入只验证页面体验，不保存或调用模型；
-- 文件、DeepSeek Harness、Codex ACP、Workbench MCP、飞书、RAG 与 Assessment Pipeline 均未进入本阶段；
-- 未实现打包、签名、自动更新和暗色主题；
-- 目标 Node 版本仍为 24；当前工作站使用 Node 26.7.0 完成兼容性验证。
+```text
+Evidence
+↓
+ObservationFact
+↓
+Claim
+↓
+DiagnosisProposal
+↓
+HumanReview
+↓
+AcceptedJudgment
+```
 
-## Next Vertical Slice
+实现与人工验收说明见：
 
-下一阶段应实现本地 Evidence 注册、Observation Fact、Diagnosis Proposal 与 Human Review，并继续使用测试 Runtime；外部 Agent Runtime 集成仍作为其后的独立兼容性纵切。
+> `docs/development/EPISTEMIC_VERTICAL_SLICE_STATUS.md`
+
+## Still Deferred
+
+- Stage / StageTarget / StateSnapshot 状态纵切；
+- 本地文件、音频与飞书 Evidence；
+- DeepSeek Harness / Codex ACP；
+- Workbench MCP；
+- Methodology Criterion / StageTarget runtime mapping；
+- 飞书授权协调；
+- 打包、签名、自动更新和暗色主题。
+
+目标工具链仍为 Node 24 + pnpm 11。

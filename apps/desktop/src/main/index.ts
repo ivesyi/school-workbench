@@ -1,8 +1,13 @@
-import { SchoolService } from '@school-workbench/application'
-import { openWorkbenchDatabase, SqliteSchoolRepository } from '@school-workbench/db'
+import { JudgmentService, SchoolService } from '@school-workbench/application'
+import {
+  openWorkbenchDatabase,
+  SqliteJudgmentRepository,
+  SqliteSchoolRepository,
+} from '@school-workbench/db'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createJudgmentIpcHandlers, registerJudgmentIpc } from './judgment-ipc'
 import { createSchoolIpcHandlers, registerSchoolIpc } from './school-ipc'
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url))
@@ -53,9 +58,13 @@ app.whenReady().then(() => {
   )
   closeDatabase = database.close
 
-  const repository = new SqliteSchoolRepository(database.db)
-  const schoolService = new SchoolService(repository)
+  const schoolRepository = new SqliteSchoolRepository(database.db)
+  const judgmentRepository = new SqliteJudgmentRepository(database.db)
+  const schoolService = new SchoolService(schoolRepository)
+  const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
+
   registerSchoolIpc(ipcMain, createSchoolIpcHandlers(schoolService))
+  registerJudgmentIpc(ipcMain, createJudgmentIpcHandlers(judgmentService))
 
   createMainWindow()
 

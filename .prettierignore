@@ -6,3 +6,4 @@ playwright-report
 test-results
 references
 pnpm-lock.yaml
+packages/db/drizzle/meta/*_snapshot.json

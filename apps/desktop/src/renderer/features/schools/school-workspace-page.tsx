@@ -6,8 +6,13 @@ import {
   Skeleton,
   Textarea,
 } from '@school-workbench/experience'
-import type { SchoolView } from '@school-workbench/shared'
-import { ArrowLeft } from 'lucide-react'
+import type {
+  AcceptedJudgmentView,
+  JudgmentReviewView,
+  ReviewDiagnosisInput,
+  SchoolView,
+} from '@school-workbench/shared'
+import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useWorkbenchApi } from '../../lib/workbench-api'
@@ -18,14 +23,28 @@ export function SchoolWorkspacePage(): React.JSX.Element {
   const [school, setSchool] = useState<SchoolView | null>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
-  const [noticeVisible, setNoticeVisible] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [reviewing, setReviewing] = useState(false)
+  const [proposal, setProposal] = useState<JudgmentReviewView | null>(null)
+  const [accepted, setAccepted] = useState<AcceptedJudgmentView[]>([])
+  const [editing, setEditing] = useState(false)
+  const [editedJudgment, setEditedJudgment] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [resultMessage, setResultMessage] = useState<string | null>(null)
 
   useEffect(() => {
     let current = true
-    void api.schools
-      .get(schoolId)
-      .then((result) => {
-        if (current) setSchool(result)
+    void Promise.all([
+      api.schools.get(schoolId),
+      api.judgments.listAccepted(schoolId).catch(() => []),
+    ])
+      .then(([schoolResult, acceptedResult]) => {
+        if (!current) return
+        setSchool(schoolResult)
+        setAccepted(acceptedResult)
+      })
+      .catch((reason: unknown) => {
+        if (current) setError(reason instanceof Error ? reason.message : '读取学校时遇到问题')
       })
       .finally(() => {
         if (current) setLoading(false)
@@ -34,6 +53,54 @@ export function SchoolWorkspacePage(): React.JSX.Element {
       current = false
     }
   }, [api, schoolId])
+
+  async function submitSituation(): Promise<void> {
+    if (!message.trim()) return
+    setSubmitting(true)
+    setError(null)
+    setResultMessage(null)
+    try {
+      const result = await api.judgments.submitSituation({ schoolId, text: message })
+      setProposal(result)
+      setEditedJudgment(result.proposal.provisionalJudgment)
+      setEditing(false)
+      setMessage('')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '暂时没能整理这条情况')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function review(decision: ReviewDiagnosisInput['decision']): Promise<void> {
+    if (!proposal) return
+    setReviewing(true)
+    setError(null)
+    try {
+      const input: ReviewDiagnosisInput = {
+        schoolId,
+        diagnosisId: proposal.proposal.id,
+        decision,
+        ...(decision === 'modified' ? { finalText: editedJudgment } : {}),
+      }
+      const outcome = await api.judgments.review(input)
+      if (outcome.acceptedJudgment) {
+        const acceptedJudgment = outcome.acceptedJudgment
+        setAccepted((items) => [acceptedJudgment, ...items])
+        setResultMessage(
+          decision === 'modified' ? '已经按你的修改记录这条判断。' : '已经记录这条判断。',
+        )
+      } else {
+        setResultMessage('这条判断没有进入正式记录。')
+      }
+      setProposal(null)
+      setEditing(false)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '确认判断时遇到问题')
+    } finally {
+      setReviewing(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -74,39 +141,156 @@ export function SchoolWorkspacePage(): React.JSX.Element {
       </header>
 
       <section className="mt-10 rounded-xl border border-border bg-surface p-7">
-        <h2 className="text-lg font-semibold">把你已经知道的情况告诉我</h2>
+        <h2 className="text-lg font-semibold">今天有什么新的情况？</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          也可以直接把已有材料交给我。AI 分析将在下一阶段接入，这里先验证本地学校空间。
+          直接说发生了什么。系统会先整理成一条待确认判断，只有你确认后才进入正式记录。
         </p>
         <Textarea
           className="mt-5"
           value={message}
-          onChange={(event) => {
-            setMessage(event.target.value)
-            setNoticeVisible(false)
-          }}
-          placeholder="说说这个学校现在的情况……"
+          onChange={(event) => setMessage(event.target.value)}
+          placeholder="例如：今天的中层会议里，任务拆解还是主要由校长完成……"
         />
         <div className="mt-4 flex justify-end">
           <Button
             type="button"
-            disabled={message.trim().length === 0}
-            onClick={() => setNoticeVisible(true)}
+            disabled={submitting || message.trim().length === 0}
+            onClick={() => void submitSituation()}
           >
-            开始
+            {submitting ? '正在整理…' : '提交情况'}
           </Button>
         </div>
       </section>
 
-      {noticeVisible ? (
-        <Alert variant="quiet" className="mt-5">
-          <AlertTitle>学校空间已经准备好</AlertTitle>
-          <AlertDescription>
-            当前阶段不调用 AI，也不会保存这段输入。下一阶段接入 Evidence 和 Diagnosis
-            后再正式开始分析。
-          </AlertDescription>
+      {error ? (
+        <Alert variant="destructive" className="mt-5">
+          <AlertTitle>这一步没有完成</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
+
+      {resultMessage ? (
+        <Alert variant="quiet" className="mt-5">
+          <CheckCircle2 className="size-4" />
+          <AlertTitle>已处理</AlertTitle>
+          <AlertDescription>{resultMessage}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {proposal ? (
+        <section className="mt-6 rounded-xl border border-border bg-surface p-7">
+          <p className="text-sm font-medium text-primary">我发现一个新的情况，想让你确认</p>
+          <h2 className="mt-2 text-xl font-semibold">
+            {proposal.proposal.provisionalJudgment}
+          </h2>
+          <p className="mt-4 text-sm text-muted-foreground">
+            依据 {proposal.proposal.evidenceCount} 条 · 当前还需要更多观察
+          </p>
+
+          <details className="mt-5 rounded-lg border border-border px-4 py-3 text-sm">
+            <summary className="cursor-pointer font-medium">为什么这样判断？</summary>
+            <div className="mt-4 space-y-4 leading-6 text-muted-foreground">
+              <div>
+                <p className="font-medium text-foreground">看到的事实</p>
+                {proposal.facts.map((fact) => (
+                  <p key={fact.id}>{fact.text}</p>
+                ))}
+              </div>
+              <div>
+                <p className="font-medium text-foreground">暂时的解释</p>
+                {proposal.proposal.interpretations.map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+              </div>
+              {proposal.proposal.alternativeHypotheses.length > 0 ? (
+                <div>
+                  <p className="font-medium text-foreground">也可能是</p>
+                  {proposal.proposal.alternativeHypotheses.map((item) => (
+                    <p key={item}>{item}</p>
+                  ))}
+                </div>
+              ) : null}
+              {proposal.proposal.unresolvedQuestions.length > 0 ? (
+                <div>
+                  <p className="font-medium text-foreground">还不知道</p>
+                  {proposal.proposal.unresolvedQuestions.map((item) => (
+                    <p key={item}>{item}</p>
+                  ))}
+                </div>
+              ) : null}
+              {proposal.proposal.recommendedObservations.length > 0 ? (
+                <div>
+                  <p className="font-medium text-foreground">下一步值得看</p>
+                  {proposal.proposal.recommendedObservations.map((item) => (
+                    <p key={item}>{item}</p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </details>
+
+          {editing ? (
+            <div className="mt-5">
+              <p className="mb-2 text-sm font-medium">改成你的判断</p>
+              <Textarea
+                value={editedJudgment}
+                onChange={(event) => setEditedJudgment(event.target.value)}
+              />
+            </div>
+          ) : null}
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button type="button" disabled={reviewing} onClick={() => void review('accepted')}>
+              认同
+            </Button>
+            {editing ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={reviewing || editedJudgment.trim().length === 0}
+                onClick={() => void review('modified')}
+              >
+                确认修改
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={reviewing}
+                onClick={() => setEditing(true)}
+              >
+                我想改一下
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={reviewing}
+              onClick={() => void review('rejected')}
+            >
+              不认同
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="mt-10">
+        <h2 className="text-lg font-semibold">已经确认的判断</h2>
+        {accepted.length === 0 ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            还没有正式判断。先从上面说一条最近发生的情况开始。
+          </p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {accepted.map((item) => (
+              <div key={item.id} className="rounded-xl border border-border bg-surface px-5 py-4">
+                <p className="leading-7">{item.text}</p>
+                <p className="mt-2 text-xs text-muted-foreground">已由你确认</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   )
 }
