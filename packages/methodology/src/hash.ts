@@ -16,14 +16,21 @@ function canonicalStringify(value: unknown): string {
   return serialized
 }
 
+function canonicalContent(
+  pack: Omit<MethodologyPack, 'canonicalContentHash'> | Record<string, unknown>,
+): Record<string, unknown> {
+  const content: Record<string, unknown> = { ...pack }
+  delete content.canonicalContentHash
+  delete content.status
+  return content
+}
+
 export function computeCanonicalContentHash(
   pack: Omit<MethodologyPack, 'canonicalContentHash'> | Record<string, unknown>,
 ): string {
-  return createHash('sha256').update(canonicalStringify(pack)).digest('hex')
+  return createHash('sha256').update(canonicalStringify(canonicalContent(pack))).digest('hex')
 }
 
 export function computePackContentHash(pack: MethodologyPack): string {
-  const content: Record<string, unknown> = { ...pack }
-  delete content.canonicalContentHash
-  return computeCanonicalContentHash(content)
+  return computeCanonicalContentHash(pack)
 }
