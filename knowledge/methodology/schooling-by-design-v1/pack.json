@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "id": "schooling-by-design-v1",
+  "key": "schooling-by-design",
+  "version": "1",
+  "title": "Schooling by Design Methodology Pack v1",
+  "status": "review",
+  "sourceType": "book",
+  "sourceRef": "references/books/schooling-by-design-2007.pdf",
+  "sourceFingerprint": {
+    "algorithm": "sha256",
+    "value": "bbce97c9299018483846a574eec8fb62dc4b19a9fc96efd656086fbd51313ae4"
+  },
+  "constructs": [
+    {
+      "id": "SBD.MISSION",
+      "title": "长期使命与学习结果",
+      "assessmentQuestion": "变革要让学习者最终获得什么，而不只是完成哪些活动？",
+      "sourceLocator": { "label": "六项全校设计支柱", "chapter": "Introduction", "printedPages": "6–9" }
+    },
+    {
+      "id": "SBD.BACKWARD_DESIGN",
+      "title": "从结果逆向设计",
+      "assessmentQuestion": "证据与行动是否由预期结果倒推，而非由现有项目拼接？",
+      "sourceLocator": { "label": "从使命和项目目标逆向规划", "chapter": "Chapter 8", "printedPages": "199–203" }
+    },
+    {
+      "id": "SBD.VISION_REALITY_GAP",
+      "title": "愿景—现实差距",
+      "assessmentQuestion": "当前基线与目标状态的差距是否被可信证据描述？",
+      "sourceLocator": { "label": "愿景—现实差距与可信基线", "chapter": "Chapter 8", "printedPages": "202–209" }
+    },
+    {
+      "id": "SBD.ACCEPTABLE_EVIDENCE",
+      "title": "可接受证据",
+      "assessmentQuestion": "达成目标将出现哪些直接表现与间接指标？",
+      "sourceLocator": { "label": "三阶段全校改革模板", "chapter": "Chapter 8", "printedPages": "204–206", "figure": "Figure 8.1" }
+    },
+    {
+      "id": "SBD.ALIGNED_ACTION",
+      "title": "行动与条件对齐",
+      "assessmentQuestion": "策略、责任、资源、政策与时间安排是否共同指向目标？",
+      "sourceLocator": { "label": "六项全校设计支柱", "chapter": "Introduction", "printedPages": "6–9" }
+    },
+    {
+      "id": "SBD.PLAN_TO_ADJUST",
+      "title": "计划性调整",
+      "assessmentQuestion": "是否预先安排反馈、复盘和改变方案的机制？",
+      "sourceLocator": { "label": "从一开始设计反馈和调整", "chapter": "Chapter 8", "printedPages": "203–209" }
+    },
+    {
+      "id": "SBD.HABITS",
+      "title": "组织习惯",
+      "assessmentQuestion": "逆向设计、证据使用和持续调整是否成为日常习惯？",
+      "sourceLocator": { "label": "预期结果、证据、行动与习惯", "chapter": "Chapters 9–12", "printedPages": "210–264" }
+    }
+  ],
+  "criteria": [
+    {
+      "id": "SBD.C1.RESULT_CLARITY",
+      "constructId": "SBD.MISSION",
+      "dimensionKey": null,
+      "practiceType": "school_design",
+      "title": "结果清晰度",
+      "description": "结果清晰度",
+      "applicability": {
+        "appliesTo": ["学校使命", "阶段目标", "课程与评价", "组织行动", "资源配置", "影响证据之间的连贯性分析"],
+        "doesNotApplyTo": ["单次课堂评价", "个人教师绩效评定", "仅凭文本表述判断学校成熟度"]
+      },
+      "sourceLocator": { "label": "从使命和项目目标逆向规划", "chapter": "Chapter 8", "printedPages": "199–203" }
+    },
+    {
+      "id": "SBD.C2.EVIDENCE_BEFORE_ACTION",
+      "constructId": "SBD.BACKWARD_DESIGN",
+      "dimensionKey": null,
+      "practiceType": "school_design",
+      "title": "证据先于行动",
+      "description": "证据先于行动",
+      "applicability": {
+        "appliesTo": ["学校使命", "阶段目标", "课程与评价", "组织行动", "资源配置", "影响证据之间的连贯性分析"],
+        "doesNotApplyTo": ["单次课堂评价", "个人教师绩效评定", "仅凭文本表述判断学校成熟度"]
+      },
+      "sourceLocator": { "label": "三阶段全校改革模板", "chapter": "Chapter 8", "printedPages": "204–206", "figure": "Figure 8.1" }
+    },
+    {
+      "id": "SBD.C3.GAP_GROUNDED",
+      "constructId": "SBD.VISION_REALITY_GAP",
+      "dimensionKey": null,
+      "practiceType": "school_design",
+      "title": "差距有证据支撑",
+      "description": "差距有证据支撑",
+      "applicability": {
+        "appliesTo": ["学校使命", "阶段目标", "课程与评价", "组织行动", "资源配置", "影响证据之间的连贯性分析"],
+        "doesNotApplyTo": ["单次课堂评价", "个人教师绩效评定", "仅凭文本表述判断学校成熟度"]
+      },
+      "sourceLocator": { "label": "愿景—现实差距与可信基线", "chapter": "Chapter 8", "printedPages": "202–209" }
+    },
+    {
+      "id": "SBD.C4.SYSTEM_ALIGNMENT",
+      "constructId": "SBD.ALIGNED_ACTION",
+      "dimensionKey": null,
+      "practiceType": "school_design",
+      "title": "系统对齐",
+      "description": "系统对齐",
+      "applicability": {
+        "appliesTo": ["学校使命", "阶段目标", "课程与评价", "组织行动", "资源配置", "影响证据之间的连贯性分析"],
+        "doesNotApplyTo": ["单次课堂评价", "个人教师绩效评定", "仅凭文本表述判断学校成熟度"],
+        "notes": ["正式成熟度仍由“五维全等模型”的维度与阶段锚点裁定。"]
+      },
+      "sourceLocator": { "label": "六项全校设计支柱", "chapter": "Introduction", "printedPages": "6–9" }
+    },
+    {
+      "id": "SBD.C5.FEEDBACK_ADJUSTMENT",
+      "constructId": "SBD.PLAN_TO_ADJUST",
+      "dimensionKey": null,
+      "practiceType": "school_design",
+      "title": "反馈与调整",
+      "description": "反馈与调整",
+      "applicability": {
+        "appliesTo": ["学校使命", "阶段目标", "课程与评价", "组织行动", "资源配置", "影响证据之间的连贯性分析"],
+        "doesNotApplyTo": ["单次课堂评价", "个人教师绩效评定", "仅凭文本表述判断学校成熟度"]
+      },
+      "sourceLocator": { "label": "从一开始设计反馈和调整", "chapter": "Chapter 8", "printedPages": "203–209" }
+    }
+  ],
+  "behaviorAnchors": [],
+  "evidenceGuidance": [
+    {
+      "criterionId": "SBD.C1.RESULT_CLARITY",
+      "supportingIndicators": ["使命被转译为具体的学习者理解、能力、态度或长期表现；阶段目标可辨认。"],
+      "counterIndicators": ["目标只写活动、口号、覆盖率或投入量；不同团队对成功含义不一致。"],
+      "insufficientEvidence": ["只有一份愿景文件，没有会议、课堂、课程或决策证据。"],
+      "counterexampleChecks": [],
+      "collectionPrinciples": [],
+      "adjustmentConditions": []
+    },
+    {
+      "criterionId": "SBD.C2.EVIDENCE_BEFORE_ACTION",
+      "supportingIndicators": ["行动前已定义成功表现、基线、进展指标与取证方式。"],
+      "counterIndicators": ["先确定培训、课程或制度，再事后寻找能证明其有效的数据。"],
+      "insufficientEvidence": ["仅列 KPI，但无法说明它们与预期学习结果的关系。"],
+      "counterexampleChecks": [],
+      "collectionPrinciples": [],
+      "adjustmentConditions": []
+    },
+    {
+      "criterionId": "SBD.C3.GAP_GROUNDED",
+      "supportingIndicators": ["目标与现实使用可比证据描述，并承认数据限制或人群差异。"],
+      "counterIndicators": ["以个别印象推断全校；只描述缺陷，不识别已有优势。"],
+      "insufficientEvidence": [],
+      "counterexampleChecks": ["是否存在相同资料可以支持的另一种差距解释？"],
+      "collectionPrinciples": [],
+      "adjustmentConditions": []
+    },
+    {
+      "criterionId": "SBD.C4.SYSTEM_ALIGNMENT",
+      "supportingIndicators": ["课程、评价、专业学习、领导行为、资源和政策相互强化。"],
+      "counterIndicators": ["目标要求一种实践，但时间、考核、资源或领导信号奖励另一种实践。"],
+      "insufficientEvidence": [],
+      "counterexampleChecks": [],
+      "collectionPrinciples": [],
+      "adjustmentConditions": []
+    },
+    {
+      "criterionId": "SBD.C5.FEEDBACK_ADJUSTMENT",
+      "supportingIndicators": ["明确何时看什么证据、由谁解释、什么条件触发调整，并留有调整记录。"],
+      "counterIndicators": ["只有期末验收；把偏差解释为执行不力而不检验原计划。"],
+      "insufficientEvidence": ["存在复盘会议，但没有证据表明决策因此改变。"],
+      "counterexampleChecks": [],
+      "collectionPrinciples": [],
+      "adjustmentConditions": []
+    }
+  ],
+  "inferenceGuardrails": [
+    { "scope": "pack", "statement": "所评估的预期结果与当前阶段必须说明。" },
+    { "scope": "pack", "statement": "观察事实与来源必须说明。" },
+    { "scope": "pack", "statement": "目标—现实差距必须说明。" },
+    { "scope": "pack", "statement": "必须关联 Criterion ID。" },
+    { "scope": "pack", "statement": "必须列出支持证据、相反证据与至少一个替代解释。" },
+    { "scope": "pack", "statement": "建议行动及其预期影响证据必须说明。" },
+    { "scope": "pack", "statement": "证据不足时提出下一步观察，而不是强行定级。" },
+    { "scope": "criterion", "criterionId": "SBD.C4.SYSTEM_ALIGNMENT", "statement": "正式成熟度仍由“五维全等模型”的维度与阶段锚点裁定。" }
+  ],
+  "canonicalContentHash": {
+    "algorithm": "sha256",
+    "value": "dc69c577df08b27f1209671352a74b3aa3d3d5213cb726f44c0aa80a33b5f7f0"
+  }
+}
