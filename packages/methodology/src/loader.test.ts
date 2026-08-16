@@ -66,7 +66,7 @@ describe('methodology pack loader and registry', () => {
   it('keeps canonical content hash stable when only lifecycle status changes', () => {
     const review = cloneSbd()
     const contentHash = computeCanonicalContentHash(review)
-    const active = { ...review, status: 'active' }
+    const active: Record<string, unknown> = { ...review, status: 'active' }
 
     expect(computeCanonicalContentHash(active)).toBe(contentHash)
     active.canonicalContentHash = { algorithm: 'sha256', value: contentHash }
