@@ -21,6 +21,8 @@ import {
   stateSnapshots,
 } from './schema'
 
+type Transaction = Parameters<Parameters<BetterSQLite3Database['transaction']>[0]>[0]
+
 function toSnapshot(row: typeof stateSnapshots.$inferSelect): StateSnapshot {
   if (!row.stageId) throw new Error('当前版本的学校状态必须对应一个阶段')
   return {
@@ -54,13 +56,18 @@ function toAssessment(row: typeof dimensionAssessments.$inferSelect): DimensionA
 }
 
 function assertRecordShape(record: StateRecord): void {
-  if (!record.snapshot.isBaseline || record.snapshot.sequence !== 1) {
-    throw new Error('当前纵切只能保存第一份起点状态')
+  if (record.snapshot.isBaseline) {
+    if (record.snapshot.sequence !== 1 || record.snapshot.previousSnapshotId !== null) {
+      throw new Error('起点状态必须是第一份正式状态')
+    }
+  } else {
+    if (record.snapshot.sequence < 2 || !record.snapshot.previousSnapshotId) {
+      throw new Error('后续状态必须连接上一份正式状态')
+    }
   }
-  if (record.snapshot.previousSnapshotId !== null) throw new Error('起点状态不能有上一份状态')
-  if (record.judgmentIds.length === 0) throw new Error('起点状态至少需要一条正式判断')
+  if (record.judgmentIds.length === 0) throw new Error('学校状态至少需要一条正式判断')
   if (record.assessments.length !== stageDimensionKeys.length) {
-    throw new Error('起点状态必须完整覆盖五个方面')
+    throw new Error('学校状态必须完整覆盖五个方面')
   }
 
   const dimensions = new Set<StageDimensionKey>()
@@ -80,8 +87,20 @@ function assertRecordShape(record: StateRecord): void {
   }
 
   if (stageDimensionKeys.some((dimensionKey) => !dimensions.has(dimensionKey))) {
-    throw new Error('起点状态缺少必要的方面')
+    throw new Error('学校状态缺少必要的方面')
   }
+}
+
+function sameSchoolTargets(targets: Array<{ schoolId: string; dimensionKey: string; status: string }>, schoolId: string): boolean {
+  return (
+    targets.length === stageDimensionKeys.length &&
+    targets.every(
+      (target) =>
+        target.schoolId === schoolId &&
+        target.status === 'confirmed' &&
+        stageDimensionKeys.includes(target.dimensionKey as StageDimensionKey),
+    )
+  )
 }
 
 export class SqliteStateRepository implements StateRepository {
@@ -131,7 +150,7 @@ export class SqliteStateRepository implements StateRepository {
   }
 
   private assertJudgmentScope(
-    tx: Parameters<Parameters<BetterSQLite3Database['transaction']>[0]>[0],
+    tx: Transaction,
     schoolId: string,
     judgmentIds: readonly string[],
   ): void {
@@ -147,6 +166,61 @@ export class SqliteStateRepository implements StateRepository {
     }
   }
 
+  private assertStageContext(tx: Transaction, record: StateRecord): void {
+    const stage = tx.select().from(stages).where(eq(stages.id, record.snapshot.stageId)).get()
+    if (!stage || stage.schoolId !== record.snapshot.schoolId || stage.status !== 'active') {
+      throw new Error('学校状态必须对应这所学校的当前阶段')
+    }
+
+    const targets = tx
+      .select({
+        schoolId: stageTargets.schoolId,
+        dimensionKey: stageTargets.dimensionKey,
+        status: stageTargets.status,
+      })
+      .from(stageTargets)
+      .where(eq(stageTargets.stageId, record.snapshot.stageId))
+      .all()
+    if (!sameSchoolTargets(targets, record.snapshot.schoolId)) {
+      throw new Error('学校状态只能使用当前阶段已经确认的五个目标')
+    }
+  }
+
+  private assertProvenance(tx: Transaction, record: StateRecord): void {
+    this.assertJudgmentScope(tx, record.snapshot.schoolId, record.judgmentIds)
+    for (const item of record.assessments) {
+      this.assertJudgmentScope(tx, record.snapshot.schoolId, item.judgmentIds)
+    }
+  }
+
+  private insertRecord(tx: Transaction, record: StateRecord): void {
+    tx.insert(stateSnapshots)
+      .values({
+        id: record.snapshot.id,
+        schoolId: record.snapshot.schoolId,
+        stageId: record.snapshot.stageId,
+        previousSnapshotId: record.snapshot.previousSnapshotId,
+        sequence: record.snapshot.sequence,
+        summary: record.snapshot.summary,
+        isBaseline: record.snapshot.isBaseline,
+        confirmedAt: record.snapshot.confirmedAt,
+        createdAt: record.snapshot.createdAt,
+      })
+      .run()
+
+    for (const item of record.assessments) {
+      tx.insert(dimensionAssessments).values(item.assessment).run()
+      for (const judgmentId of item.judgmentIds) {
+        tx.insert(assessmentJudgments)
+          .values({ assessmentId: item.assessment.id, judgmentId })
+          .run()
+      }
+    }
+    for (const judgmentId of record.judgmentIds) {
+      tx.insert(snapshotJudgments).values({ snapshotId: record.snapshot.id, judgmentId }).run()
+    }
+  }
+
   async findLatest(schoolId: string): Promise<StateRecord | null> {
     return this.load(
       this.database
@@ -158,8 +232,15 @@ export class SqliteStateRepository implements StateRepository {
     )
   }
 
+  async findById(id: string): Promise<StateRecord | null> {
+    return this.load(
+      this.database.select().from(stateSnapshots).where(eq(stateSnapshots.id, id)).get(),
+    )
+  }
+
   async saveBaseline(record: StateRecord): Promise<void> {
     assertRecordShape(record)
+    if (!record.snapshot.isBaseline) throw new Error('这里只能保存第一份起点状态')
 
     this.database.transaction((tx) => {
       const existing = tx
@@ -169,62 +250,63 @@ export class SqliteStateRepository implements StateRepository {
         .get()
       if (existing) throw new Error('这所学校已经记录了起点状态')
 
-      const stage = tx.select().from(stages).where(eq(stages.id, record.snapshot.stageId)).get()
-      if (!stage || stage.schoolId !== record.snapshot.schoolId || stage.status !== 'active') {
-        throw new Error('起点状态必须对应这所学校的当前阶段')
+      this.assertStageContext(tx, record)
+      this.assertProvenance(tx, record)
+      this.insertRecord(tx, record)
+    })
+  }
+
+  async saveNext(record: StateRecord, expectedPreviousSnapshotId: string): Promise<void> {
+    assertRecordShape(record)
+    if (record.snapshot.isBaseline) throw new Error('后续状态不能再次标记为起点状态')
+    if (record.snapshot.previousSnapshotId !== expectedPreviousSnapshotId) {
+      throw new Error('这次状态整理对应的上一份状态已经变化')
+    }
+
+    this.database.transaction((tx) => {
+      const latest = tx
+        .select({ id: stateSnapshots.id, sequence: stateSnapshots.sequence })
+        .from(stateSnapshots)
+        .where(eq(stateSnapshots.schoolId, record.snapshot.schoolId))
+        .orderBy(desc(stateSnapshots.sequence))
+        .get()
+      if (!latest || latest.id !== expectedPreviousSnapshotId) {
+        throw new Error('学校状态已经有更新，请重新查看后再确认')
       }
 
-      const targets = tx
+      const previous = tx
         .select({
-          schoolId: stageTargets.schoolId,
-          dimensionKey: stageTargets.dimensionKey,
-          status: stageTargets.status,
+          id: stateSnapshots.id,
+          schoolId: stateSnapshots.schoolId,
+          sequence: stateSnapshots.sequence,
         })
-        .from(stageTargets)
-        .where(eq(stageTargets.stageId, record.snapshot.stageId))
+        .from(stateSnapshots)
+        .where(eq(stateSnapshots.id, expectedPreviousSnapshotId))
+        .get()
+      if (!previous || previous.schoolId !== record.snapshot.schoolId) {
+        throw new Error('上一份状态不属于这所学校')
+      }
+      if (record.snapshot.sequence !== previous.sequence + 1) {
+        throw new Error('学校状态顺序必须连续')
+      }
+
+      const previousJudgmentIds = tx
+        .select({ judgmentId: snapshotJudgments.judgmentId })
+        .from(snapshotJudgments)
+        .where(eq(snapshotJudgments.snapshotId, expectedPreviousSnapshotId))
         .all()
-      if (
-        targets.length !== stageDimensionKeys.length ||
-        targets.some(
-          (target) =>
-            target.schoolId !== record.snapshot.schoolId ||
-            target.status !== 'confirmed' ||
-            !stageDimensionKeys.includes(target.dimensionKey as StageDimensionKey),
-        )
-      ) {
-        throw new Error('起点状态只能使用当前阶段已经确认的五个目标')
+        .map((item) => item.judgmentId)
+      const currentJudgmentIds = new Set(record.judgmentIds)
+      if (previousJudgmentIds.some((judgmentId) => !currentJudgmentIds.has(judgmentId))) {
+        throw new Error('新的状态不能丢失上一份状态已经使用的正式判断')
+      }
+      if (record.judgmentIds.length === previousJudgmentIds.length) {
+        throw new Error('没有新的正式判断时不能记录下一次状态')
       }
 
-      this.assertJudgmentScope(tx, record.snapshot.schoolId, record.judgmentIds)
-      for (const item of record.assessments) {
-        this.assertJudgmentScope(tx, record.snapshot.schoolId, item.judgmentIds)
-      }
-
-      tx.insert(stateSnapshots)
-        .values({
-          id: record.snapshot.id,
-          schoolId: record.snapshot.schoolId,
-          stageId: record.snapshot.stageId,
-          previousSnapshotId: record.snapshot.previousSnapshotId,
-          sequence: record.snapshot.sequence,
-          summary: record.snapshot.summary,
-          isBaseline: record.snapshot.isBaseline,
-          confirmedAt: record.snapshot.confirmedAt,
-          createdAt: record.snapshot.createdAt,
-        })
-        .run()
-
-      for (const item of record.assessments) {
-        tx.insert(dimensionAssessments).values(item.assessment).run()
-        for (const judgmentId of item.judgmentIds) {
-          tx.insert(assessmentJudgments)
-            .values({ assessmentId: item.assessment.id, judgmentId })
-            .run()
-        }
-      }
-      for (const judgmentId of record.judgmentIds) {
-        tx.insert(snapshotJudgments).values({ snapshotId: record.snapshot.id, judgmentId }).run()
-      }
+      this.assertStageContext(tx, record)
+      this.assertProvenance(tx, record)
+      this.insertRecord(tx, record)
     })
   }
 }
