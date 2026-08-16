@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -13,9 +14,18 @@ function findPdfFiles(directory: string): string[] {
   return results
 }
 
+function trackedReferencePdfFiles(): string[] {
+  return execFileSync('git', ['ls-files', '-z', '--', 'references'], { encoding: 'utf8' })
+    .split('\0')
+    .filter((path) => path.toLowerCase().endsWith('.pdf'))
+}
+
 describe('methodology source packaging boundary', () => {
-  it('keeps original PDFs out of the repository runtime inputs', () => {
-    expect(findPdfFiles(resolve('references'))).toEqual([])
+  it('allows ignored consultant-local PDFs while keeping runtime and build outputs clean', () => {
+    expect(trackedReferencePdfFiles()).toEqual([])
     expect(findPdfFiles(resolve('knowledge/methodology'))).toEqual([])
+
+    const desktopOutput = resolve('apps/desktop/out')
+    if (existsSync(desktopOutput)) expect(findPdfFiles(desktopOutput)).toEqual([])
   })
 })
