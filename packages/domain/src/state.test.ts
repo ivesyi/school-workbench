@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createBaselineState, type StateAssessmentDraft } from './state'
+import { createBaselineState, createNextState, type StateAssessmentDraft } from './state'
 
 const draft: StateAssessmentDraft = {
   stageId: 'stage-1',
@@ -41,15 +41,15 @@ const draft: StateAssessmentDraft = {
   ],
 }
 
-function dependencies() {
-  let index = 0
+function dependencies(start = 0) {
+  let index = start
   return {
     createId: () => `id-${++index}`,
     now: () => new Date('2026-08-17T05:00:00.000Z'),
   }
 }
 
-describe('baseline state', () => {
+describe('school state records', () => {
   it('creates immutable baseline snapshot #1 with five canonical assessments', () => {
     const record = createBaselineState('school-1', draft, dependencies())
 
@@ -67,6 +67,46 @@ describe('baseline state', () => {
     expect(Object.isFrozen(record)).toBe(true)
     expect(Object.isFrozen(record.snapshot)).toBe(true)
     expect(Object.isFrozen(record.assessments)).toBe(true)
+  })
+
+  it('creates immutable snapshot #2 linked to #1 and refuses to drop provenance or advance without new judgments', () => {
+    const baseline = createBaselineState('school-1', draft, dependencies())
+    const nextDraft: StateAssessmentDraft = {
+      ...draft,
+      summary: '学校现在的状态已经根据新判断重新整理。',
+      judgmentIds: ['judgment-3', ...draft.judgmentIds],
+      assessments: draft.assessments.map((item) =>
+        item.dimensionKey === 'leadership'
+          ? {
+              ...item,
+              status: 'partial' as const,
+              summary: '中层开始承担真实责任。',
+              judgmentIds: ['judgment-3', 'judgment-1'],
+            }
+          : item,
+      ),
+    }
+
+    const next = createNextState('school-1', baseline, nextDraft, dependencies(20))
+    expect(next.snapshot.sequence).toBe(2)
+    expect(next.snapshot.previousSnapshotId).toBe(baseline.snapshot.id)
+    expect(next.snapshot.isBaseline).toBe(false)
+    expect(Object.isFrozen(next)).toBe(true)
+    expect(Object.isFrozen(baseline)).toBe(true)
+    expect(baseline.snapshot.sequence).toBe(1)
+
+    expect(() =>
+      createNextState(
+        'school-1',
+        baseline,
+        { ...nextDraft, judgmentIds: ['judgment-3'] },
+        dependencies(40),
+      ),
+    ).toThrow('不能丢失上一份状态已经使用的正式判断')
+
+    expect(() => createNextState('school-1', baseline, draft, dependencies(60))).toThrow(
+      '没有新的正式判断',
+    )
   })
 
   it('refuses incomplete or unsupported assessments instead of inventing a status', () => {
