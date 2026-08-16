@@ -145,7 +145,9 @@ describe('SchoolStatePage', () => {
     expect(await screen.findByText('南山实验学校')).toBeInTheDocument()
     expect(screen.getAllByText(/阶段目标|还需要更多观察/).length).toBeGreaterThan(0)
     expect(screen.getByText('文化')).toBeInTheDocument()
-    expect(screen.getByText('这还只是待你确认的整理。你确认之前，不会成为这所学校的正式状态记录。')).toBeInTheDocument()
+    expect(
+      screen.getByText('这还只是待你确认的整理。你确认之前，不会成为这所学校的正式状态记录。'),
+    ).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '我想调整' }))
     await userEvent.type(

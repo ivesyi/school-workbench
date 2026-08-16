@@ -98,7 +98,8 @@ export class SqliteStateRepository implements StateRepository {
       .map(toAssessment)
       .sort(
         (left, right) =>
-          stageDimensionKeys.indexOf(left.dimensionKey) - stageDimensionKeys.indexOf(right.dimensionKey),
+          stageDimensionKeys.indexOf(left.dimensionKey) -
+          stageDimensionKeys.indexOf(right.dimensionKey),
       )
 
     const assessments: PersistedDimensionAssessment[] = assessmentRows.map((assessment) => {
@@ -222,9 +223,7 @@ export class SqliteStateRepository implements StateRepository {
         }
       }
       for (const judgmentId of record.judgmentIds) {
-        tx.insert(snapshotJudgments)
-          .values({ snapshotId: record.snapshot.id, judgmentId })
-          .run()
+        tx.insert(snapshotJudgments).values({ snapshotId: record.snapshot.id, judgmentId }).run()
       }
     })
   }

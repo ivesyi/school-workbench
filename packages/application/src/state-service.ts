@@ -93,7 +93,10 @@ function assessmentSummary(
   if (status === 'unverified') {
     return `关于“${targetTitle}”，目前还没有足够的正式判断来确认达到情况。下一步可以重点看：${targetDescription}`
   }
-  const basis = judgments.map((item) => item.statement).slice(0, 2).join('；')
+  const basis = judgments
+    .map((item) => item.statement)
+    .slice(0, 2)
+    .join('；')
   if (status === 'far_below') {
     return `相对“${targetDescription}”的阶段期待，目前已确认的情况显示仍有明显差距：${basis}`
   }
@@ -140,12 +143,7 @@ export class BaselineStateAssessmentEngine implements StateAssessmentEngine {
         feedbackForDimension = trimmedFeedback
       }
 
-      const usableJudgments =
-        status === 'unverified'
-          ? related
-          : related.length > 0
-            ? related
-            : []
+      const usableJudgments = status === 'unverified' ? related : related.length > 0 ? related : []
       if (status !== 'unverified' && usableJudgments.length === 0) status = 'unverified'
 
       return {
@@ -164,7 +162,9 @@ export class BaselineStateAssessmentEngine implements StateAssessmentEngine {
 
     const unverifiedCount = assessments.filter((item) => item.status === 'unverified').length
     const assessedCount = assessments.length - unverifiedCount
-    const summaryLead = trimmedFeedback ? `结合你的补充“${trimmedFeedback}”，我重新整理了当前状态。` : ''
+    const summaryLead = trimmedFeedback
+      ? `结合你的补充“${trimmedFeedback}”，我重新整理了当前状态。`
+      : ''
     const limitations = [
       ...(unverifiedCount > 0
         ? [`还有 ${unverifiedCount} 个方面依据不足，先不判断达到程度。`]
@@ -199,9 +199,7 @@ function limitationsFromRecord(record: StateRecord): string[] {
     (item) => item.assessment.status === 'unverified',
   ).length
   return [
-    ...(unverifiedCount > 0
-      ? [`还有 ${unverifiedCount} 个方面依据不足，先不判断达到程度。`]
-      : []),
+    ...(unverifiedCount > 0 ? [`还有 ${unverifiedCount} 个方面依据不足，先不判断达到程度。`] : []),
     '这是当时基于已确认情况形成的起点状态，不等于学校的客观全貌。',
   ]
 }
@@ -289,7 +287,8 @@ export class StateService {
     const latest = await this.stateRepository.findLatest(parsedSchoolId)
     if (latest) {
       const stage = await this.stageRepository.findById(latest.snapshot.stageId)
-      if (!stage || stage.stage.schoolId !== parsedSchoolId) throw new Error('起点状态对应的阶段不存在')
+      if (!stage || stage.stage.schoolId !== parsedSchoolId)
+        throw new Error('起点状态对应的阶段不存在')
       const judgments = await this.judgmentRepository.listAcceptedJudgments(parsedSchoolId)
       return { state: 'baseline', overview: toOverview(stage, recordAsDraft(latest), judgments) }
     }
@@ -300,7 +299,11 @@ export class StateService {
 
     const judgmentIds = judgments.map((item) => item.id)
     const cached = this.drafts.get(parsedSchoolId)
-    if (cached && cached.draft.stageId === stage.stage.id && sameIds(cached.judgmentIds, judgmentIds)) {
+    if (
+      cached &&
+      cached.draft.stageId === stage.stage.id &&
+      sameIds(cached.judgmentIds, judgmentIds)
+    ) {
       return { state: 'draft', overview: toOverview(stage, cached.draft, judgments) }
     }
 

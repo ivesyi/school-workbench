@@ -76,7 +76,11 @@ function judgment(id: string, statement: string, createdAt: string): AcceptedJud
 }
 
 const judgments = [
-  judgment('judgment-2', '教师已经开始稳定教研复盘，能够根据课堂情况调整。', '2026-08-17T02:00:00.000Z'),
+  judgment(
+    'judgment-2',
+    '教师已经开始稳定教研复盘，能够根据课堂情况调整。',
+    '2026-08-17T02:00:00.000Z',
+  ),
   judgment('judgment-1', '中层仍然依赖校长完成关键任务拆解。', '2026-08-17T01:30:00.000Z'),
 ]
 
@@ -180,7 +184,9 @@ describe('StateService', () => {
   it('keeps the draft transient, persists only on confirmation and makes repeated confirmation idempotent', async () => {
     const states = new MemoryStateRepository()
     const engine: StateAssessmentEngine = {
-      assess: vi.fn(new BaselineStateAssessmentEngine().assess.bind(new BaselineStateAssessmentEngine())),
+      assess: vi.fn(
+        new BaselineStateAssessmentEngine().assess.bind(new BaselineStateAssessmentEngine()),
+      ),
     }
     const service = new StateService(
       schoolRepository(),

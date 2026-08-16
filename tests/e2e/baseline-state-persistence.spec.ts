@@ -43,9 +43,7 @@ test('baseline school state is confirmed once and survives restart with five ass
     await expect(firstWindow.getByText('起点状态')).toHaveCount(0)
 
     await firstWindow.getByRole('button', { name: '我想调整' }).click()
-    await firstWindow
-      .getByLabel('哪里需要调整？')
-      .fill('领导力这部分先别判断，还需要更多观察')
+    await firstWindow.getByLabel('哪里需要调整？').fill('领导力这部分先别判断，还需要更多观察')
     await firstWindow.getByRole('button', { name: '重新整理当前状态' }).click()
 
     const leadership = firstWindow.locator('article').filter({ hasText: '领导力' })
@@ -71,9 +69,7 @@ test('baseline school state is confirmed once and survives restart with five ass
     }
     const restoredLeadership = secondWindow.locator('article').filter({ hasText: '领导力' })
     await expect(restoredLeadership.getByText('还需要更多观察')).toBeVisible()
-    await expect(
-      restoredLeadership.getByText(/领导力这部分先别判断，还需要更多观察/),
-    ).toBeVisible()
+    await expect(restoredLeadership.getByText(/领导力这部分先别判断，还需要更多观察/)).toBeVisible()
     await secondApp.close()
   } finally {
     await rm(userDataDirectory, { recursive: true, force: true })

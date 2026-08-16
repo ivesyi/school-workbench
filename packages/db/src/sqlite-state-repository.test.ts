@@ -146,12 +146,9 @@ describe('baseline school state persistence', () => {
       .all() as Array<{ id: string }>
     for (const row of nonUnverified) {
       expect(
-        countRows(
-          firstDatabase.client,
-          'assessment_judgments',
-          'WHERE assessment_id = ?',
-          [row.id],
-        ),
+        countRows(firstDatabase.client, 'assessment_judgments', 'WHERE assessment_id = ?', [
+          row.id,
+        ]),
       ).toBeGreaterThan(0)
     }
 
@@ -234,17 +231,13 @@ describe('baseline school state persistence', () => {
       ...draft,
       judgmentIds: [...draft.judgmentIds, otherJudgment.id],
       assessments: draft.assessments.map((item, index) =>
-        index === 0
-          ? { ...item, judgmentIds: [...item.judgmentIds, otherJudgment.id] }
-          : item,
+        index === 0 ? { ...item, judgmentIds: [...item.judgmentIds, otherJudgment.id] } : item,
       ),
     }
     const record = createBaselineState(prepared.school.id, poisoned)
     const stateRepository = new SqliteStateRepository(database.db)
 
-    await expect(stateRepository.saveBaseline(record)).rejects.toThrow(
-      '不能引用其他学校的正式判断',
-    )
+    await expect(stateRepository.saveBaseline(record)).rejects.toThrow('不能引用其他学校的正式判断')
     expect(countRows(database.client, 'state_snapshots')).toBe(0)
     database.close()
   })
