@@ -25,6 +25,16 @@ const school: School = {
   archivedAt: null,
 }
 
+const activeStageTargets: Array<
+  [StageRecommendation['targets'][number]['dimensionKey'], string, string]
+> = [
+  ['leadership', '领导力', '校长从代办转向授权，中层承担真实责任。'],
+  ['key_tasks', '关键任务', '关键任务由中层独立拆解、推进和调整。'],
+  ['structure', '结构与机制', '形成稳定的分工、推进和复盘机制。'],
+  ['culture', '文化', '团队能够公开讨论问题并对结果负责。'],
+  ['capability', '能力', '中层能够独立分析、协同推进并复盘。'],
+]
+
 const activeStage: StageRecommendation = {
   stage: {
     id: 'stage-1',
@@ -40,17 +50,11 @@ const activeStage: StageRecommendation = {
     createdAt: '2026-08-17T00:30:00.000Z',
     updatedAt: '2026-08-17T01:00:00.000Z',
   },
-  targets: [
-    ['leadership', '领导力', '校长从代办转向授权，中层承担真实责任。'],
-    ['key_tasks', '关键任务', '关键任务由中层独立拆解、推进和调整。'],
-    ['structure', '结构与机制', '形成稳定的分工、推进和复盘机制。'],
-    ['culture', '文化', '团队能够公开讨论问题并对结果负责。'],
-    ['capability', '能力', '中层能够独立分析、协同推进并复盘。'],
-  ].map(([dimensionKey, title, description], index) => ({
+  targets: activeStageTargets.map(([dimensionKey, title, description], index) => ({
     id: `target-${index + 1}`,
     stageId: 'stage-1',
     schoolId: school.id,
-    dimensionKey: dimensionKey as StageRecommendation['targets'][number]['dimensionKey'],
+    dimensionKey,
     title,
     description,
     status: 'confirmed' as const,
@@ -183,11 +187,12 @@ describe('BaselineStateAssessmentEngine', () => {
 describe('StateService', () => {
   it('keeps the draft transient, persists only on confirmation and makes repeated confirmation idempotent', async () => {
     const states = new MemoryStateRepository()
-    const engine: StateAssessmentEngine = {
-      assess: vi.fn(
-        new BaselineStateAssessmentEngine().assess.bind(new BaselineStateAssessmentEngine()),
-      ),
-    }
+    const baselineEngine = new BaselineStateAssessmentEngine()
+    const assess = vi.fn(
+      (stage: StageRecommendation, items: AcceptedJudgment[], feedback?: string) =>
+        baselineEngine.assess(stage, items, feedback),
+    )
+    const engine: StateAssessmentEngine = { assess }
     const service = new StateService(
       schoolRepository(),
       judgmentRepository(),
@@ -206,7 +211,7 @@ describe('StateService', () => {
     })
     expect(adjusted.state).toBe('draft')
     expect(states.record).toBeNull()
-    expect(engine.assess).toHaveBeenLastCalledWith(
+    expect(assess).toHaveBeenLastCalledWith(
       activeStage,
       judgments,
       '领导力这部分先别判断，还需要更多观察',
