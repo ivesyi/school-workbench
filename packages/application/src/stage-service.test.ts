@@ -11,7 +11,11 @@ import type {
 } from '@school-workbench/domain'
 import { activateStageRecommendation } from '@school-workbench/domain'
 import { describe, expect, it, vi } from 'vitest'
-import { StageService, type StageRecommendationEngine } from './stage-service'
+import {
+  BaselineStageRecommendationEngine,
+  StageService,
+  type StageRecommendationEngine,
+} from './stage-service'
 
 const school: School = {
   id: 'school-1',
@@ -20,16 +24,18 @@ const school: School = {
   archivedAt: null,
 }
 
-const judgment: AcceptedJudgment = {
-  id: 'judgment-1',
-  schoolId: school.id,
-  proposalId: 'proposal-1',
-  reviewId: 'review-1',
-  statement: '中层仍然依赖校长完成任务拆解。',
-  scopeJson: JSON.stringify({ kind: 'school', schoolId: school.id }),
-  validFrom: '2026-08-17T00:00:00.000Z',
-  validTo: null,
-  createdAt: '2026-08-17T00:00:00.000Z',
+function acceptedJudgment(statement: string): AcceptedJudgment {
+  return {
+    id: 'judgment-1',
+    schoolId: school.id,
+    proposalId: 'proposal-1',
+    reviewId: 'review-1',
+    statement,
+    scopeJson: JSON.stringify({ kind: 'school', schoolId: school.id }),
+    validFrom: '2026-08-17T00:00:00.000Z',
+    validTo: null,
+    createdAt: '2026-08-17T00:00:00.000Z',
+  }
 }
 
 class MemoryStageRepository implements StageRepository {
@@ -51,6 +57,10 @@ class MemoryStageRepository implements StageRepository {
 
   async findById(stageId: string): Promise<StageRecommendation | null> {
     return this.recommendation?.stage.id === stageId ? this.recommendation : null
+  }
+
+  async nextSequence(): Promise<number> {
+    return this.recommendation ? this.recommendation.stage.sequence + 1 : 1
   }
 
   async savePlanned(recommendation: StageRecommendation): Promise<void> {
@@ -101,14 +111,40 @@ const engine: StageRecommendationEngine = {
     summary: feedback ? '我根据你的补充重新理解了这个阶段。' : '我理解学校正在建立组织基础。',
     focus: feedback ? `现在最需要看到：${feedback}` : '现在最需要看到：中层开始独立承担关键任务。',
     targets: {
-      leadership: '领导目标',
-      critical_tasks: '关键工作目标',
-      structure_systems: '机制目标',
-      culture: '文化目标',
-      capacity: '能力目标',
+      leadership: { title: '领导力', description: '领导目标' },
+      key_tasks: { title: '关键任务', description: '关键工作目标' },
+      structure: { title: '结构与机制', description: '机制目标' },
+      culture: { title: '文化', description: '文化目标' },
+      capability: { title: '能力', description: '能力目标' },
     },
   })),
 }
+
+describe('BaselineStageRecommendationEngine', () => {
+  it('lets explicit teacher-practice feedback override student-focused prior judgments', async () => {
+    const baseline = new BaselineStageRecommendationEngine()
+    const judgments = [acceptedJudgment('学生学习结果已经出现变化，需要继续观察。')]
+
+    const initial = await baseline.recommend(judgments)
+    expect(initial.title).toBe('验证学生学习变化')
+
+    const adjusted = await baseline.recommend(judgments, '目前更需要稳定教研复盘机制')
+    expect(adjusted.title).toBe('让改进进入教师实践')
+    expect(adjusted.targets.structure.description).toContain('教研、观察和复盘')
+  })
+
+  it('supports explicit turns toward organization and student learning', async () => {
+    const baseline = new BaselineStageRecommendationEngine()
+    const judgments = [acceptedJudgment('教师已经开始共同备课。')]
+
+    await expect(baseline.recommend(judgments, '先稳定中层授权和协作机制')).resolves.toMatchObject({
+      title: '建立共同推动改进的组织基础',
+    })
+    await expect(baseline.recommend(judgments, '现在要验证学生学习变化')).resolves.toMatchObject({
+      title: '验证学生学习变化',
+    })
+  })
+})
 
 describe('StageService', () => {
   it('does not propose a stage before there is an accepted judgment', async () => {
@@ -129,7 +165,7 @@ describe('StageService', () => {
     }
     const service = new StageService(
       schoolRepository(),
-      judgmentRepository([judgment]),
+      judgmentRepository([acceptedJudgment('中层仍然依赖校长完成任务拆解。')]),
       stages,
       replaceableEngine,
     )
@@ -145,13 +181,15 @@ describe('StageService', () => {
     })
     expect(adjusted.state).toBe('suggested')
     expect(stages.recommendation?.stage.status).toBe('planned')
-    expect(stages.recommendation?.targets.every((target) => target.status === 'draft')).toBe(true)
+    expect(stages.recommendation?.targets.every((targetItem) => targetItem.status === 'draft')).toBe(
+      true,
+    )
 
     const active = await service.confirm({ schoolId: school.id, stageId: suggested.stage.id })
     expect(active.state).toBe('active')
     expect(stages.recommendation?.stage.status).toBe('active')
-    expect(stages.recommendation?.targets.every((target) => target.status === 'confirmed')).toBe(
-      true,
-    )
+    expect(
+      stages.recommendation?.targets.every((targetItem) => targetItem.status === 'confirmed'),
+    ).toBe(true)
   })
 })

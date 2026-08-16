@@ -3,10 +3,10 @@ import { schoolIdSchema } from './schools'
 
 export const stageDimensionKeySchema = z.enum([
   'leadership',
-  'critical_tasks',
-  'structure_systems',
+  'key_tasks',
+  'structure',
   'culture',
-  'capacity',
+  'capability',
 ])
 
 export const stageTargetViewSchema = z.object({

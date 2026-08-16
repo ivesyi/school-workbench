@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { openWorkbenchDatabase } from './database'
-import { stages } from './schema'
+import { stageTargets, stages } from './schema'
 import { SqliteJudgmentRepository } from './sqlite-judgment-repository'
 import { SqliteSchoolRepository } from './sqlite-school-repository'
 import { SqliteStageRepository } from './sqlite-stage-repository'
@@ -28,8 +28,25 @@ function countRows(
   return row.count
 }
 
+async function createAcceptedJudgment(
+  schoolService: SchoolService,
+  judgmentService: JudgmentService,
+  name = '南山实验学校',
+  text = '中层会议里仍由校长完成任务拆解。',
+) {
+  const school = await schoolService.create({ name })
+  const proposal = await judgmentService.submitSituation({ schoolId: school.id, text })
+  const outcome = await judgmentService.review({
+    schoolId: school.id,
+    diagnosisId: proposal.proposal.id,
+    decision: 'accepted',
+  })
+  if (!outcome.acceptedJudgment) throw new Error('expected accepted judgment')
+  return { school, judgment: outcome.acceptedJudgment }
+}
+
 describe('stage recommendation persistence', () => {
-  it('persists planned/draft, atomically activates one stage, and survives reopen', async () => {
+  it('persists canonical planned/draft data, join relations, atomic activation, and reopen', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'school-workbench-stage-'))
     temporaryDirectories.push(directory)
     const databasePath = join(directory, 'workbench.sqlite')
@@ -39,18 +56,9 @@ describe('stage recommendation persistence', () => {
     const schoolRepository = new SqliteSchoolRepository(firstDatabase.db)
     const judgmentRepository = new SqliteJudgmentRepository(firstDatabase.db)
     const stageRepository = new SqliteStageRepository(firstDatabase.db)
-    const school = await new SchoolService(schoolRepository).create({ name: '南山实验学校' })
+    const schoolService = new SchoolService(schoolRepository)
     const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
-
-    const proposal = await judgmentService.submitSituation({
-      schoolId: school.id,
-      text: '中层会议里仍由校长完成任务拆解。',
-    })
-    await judgmentService.review({
-      schoolId: school.id,
-      diagnosisId: proposal.proposal.id,
-      decision: 'accepted',
-    })
+    const { school } = await createAcceptedJudgment(schoolService, judgmentService)
 
     const stageService = new StageService(schoolRepository, judgmentRepository, stageRepository)
     const suggested = await stageService.getWorkspace(school.id)
@@ -58,6 +66,18 @@ describe('stage recommendation persistence', () => {
     if (suggested.state !== 'suggested') throw new Error('expected stage suggestion')
     expect(countRows(firstDatabase.client, 'stages', "WHERE status = 'planned'")).toBe(1)
     expect(countRows(firstDatabase.client, 'stage_targets', "WHERE status = 'draft'")).toBe(5)
+    expect(countRows(firstDatabase.client, 'stage_judgments')).toBe(1)
+
+    const dimensions = firstDatabase.client
+      .prepare('SELECT dimension_key FROM stage_targets ORDER BY sequence')
+      .all() as Array<{ dimension_key: string }>
+    expect(dimensions.map((item) => item.dimension_key)).toEqual([
+      'leadership',
+      'key_tasks',
+      'structure',
+      'culture',
+      'capability',
+    ])
 
     const active = await stageService.confirm({ schoolId: school.id, stageId: suggested.stage.id })
     expect(active.state).toBe('active')
@@ -81,23 +101,16 @@ describe('stage recommendation persistence', () => {
   it('enforces at most one active stage per school in repository and database', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'school-workbench-stage-unique-'))
     temporaryDirectories.push(directory)
-    const databasePath = join(directory, 'workbench.sqlite')
-    const migrationsFolder = resolve('packages/db/drizzle')
-    const database = openWorkbenchDatabase(databasePath, migrationsFolder)
+    const database = openWorkbenchDatabase(
+      join(directory, 'workbench.sqlite'),
+      resolve('packages/db/drizzle'),
+    )
     const schoolRepository = new SqliteSchoolRepository(database.db)
     const judgmentRepository = new SqliteJudgmentRepository(database.db)
     const stageRepository = new SqliteStageRepository(database.db)
-    const school = await new SchoolService(schoolRepository).create({ name: '南山实验学校' })
+    const schoolService = new SchoolService(schoolRepository)
     const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
-    const proposal = await judgmentService.submitSituation({
-      schoolId: school.id,
-      text: '中层依赖校长。',
-    })
-    await judgmentService.review({
-      schoolId: school.id,
-      diagnosisId: proposal.proposal.id,
-      decision: 'accepted',
-    })
+    const { school } = await createAcceptedJudgment(schoolService, judgmentService)
     const service = new StageService(schoolRepository, judgmentRepository, stageRepository)
     const suggested = await service.getWorkspace(school.id)
     if (suggested.state !== 'suggested') throw new Error('expected suggestion')
@@ -112,11 +125,13 @@ describe('stage recommendation persistence', () => {
           title: '另一个当前阶段',
           summary: '不应保存',
           focus: '不应保存',
+          sequence: 2,
           status: 'active',
-          sourceJudgmentIdsJson: JSON.stringify(['judgment-1']),
+          startsAt: '2026-08-17T02:00:00.000Z',
+          endsAt: null,
           adjustmentFeedback: null,
           createdAt: '2026-08-17T02:00:00.000Z',
-          activatedAt: '2026-08-17T02:00:00.000Z',
+          updatedAt: '2026-08-17T02:00:00.000Z',
         })
         .run(),
     ).toThrow()
@@ -129,17 +144,56 @@ describe('stage recommendation persistence', () => {
         title: '另一个建议',
         summary: '用于验证 repository guard',
         focus: '用于验证 repository guard',
+        sequence: 2,
         status: 'planned',
-        sourceJudgmentIdsJson: JSON.stringify(['judgment-1']),
+        startsAt: null,
+        endsAt: null,
         adjustmentFeedback: null,
         createdAt: '2026-08-17T03:00:00.000Z',
-        activatedAt: null,
+        updatedAt: '2026-08-17T03:00:00.000Z',
       })
       .run()
 
     await expect(
       stageRepository.activate(school.id, 'second-planned', new Date('2026-08-17T03:10:00.000Z')),
     ).rejects.toThrow('已经有当前阶段')
+    database.close()
+  })
+
+  it('allows a new planned stage after completed history', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'school-workbench-stage-history-'))
+    temporaryDirectories.push(directory)
+    const database = openWorkbenchDatabase(
+      join(directory, 'workbench.sqlite'),
+      resolve('packages/db/drizzle'),
+    )
+    const schoolRepository = new SqliteSchoolRepository(database.db)
+    const judgmentRepository = new SqliteJudgmentRepository(database.db)
+    const stageRepository = new SqliteStageRepository(database.db)
+    const schoolService = new SchoolService(schoolRepository)
+    const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
+    const { school } = await createAcceptedJudgment(schoolService, judgmentService)
+    const service = new StageService(schoolRepository, judgmentRepository, stageRepository)
+    const first = await service.getWorkspace(school.id)
+    if (first.state !== 'suggested') throw new Error('expected suggestion')
+    await service.confirm({ schoolId: school.id, stageId: first.stage.id })
+
+    const completedAt = '2026-08-17T04:00:00.000Z'
+    database.db
+      .update(stages)
+      .set({ status: 'completed', endsAt: completedAt, updatedAt: completedAt })
+      .run()
+    database.db.update(stageTargets).set({ status: 'retired', updatedAt: completedAt }).run()
+
+    const next = await service.getWorkspace(school.id)
+    expect(next.state).toBe('suggested')
+    const rows = database.client
+      .prepare('SELECT sequence, status FROM stages ORDER BY sequence')
+      .all() as Array<{ sequence: number; status: string }>
+    expect(rows).toEqual([
+      { sequence: 1, status: 'completed' },
+      { sequence: 2, status: 'planned' },
+    ])
     database.close()
   })
 })

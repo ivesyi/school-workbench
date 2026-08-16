@@ -2,13 +2,15 @@ import { ulid } from 'ulid'
 
 export const stageDimensionKeys = [
   'leadership',
-  'critical_tasks',
-  'structure_systems',
+  'key_tasks',
+  'structure',
   'culture',
-  'capacity',
+  'capability',
 ] as const
 
 export type StageDimensionKey = (typeof stageDimensionKeys)[number]
+export type StageStatus = 'planned' | 'active' | 'completed' | 'cancelled'
+export type StageTargetStatus = 'draft' | 'confirmed' | 'retired'
 
 export type Stage = {
   id: string
@@ -16,11 +18,13 @@ export type Stage = {
   title: string
   summary: string
   focus: string
-  status: 'planned' | 'active'
-  sourceJudgmentIds: string[]
+  sequence: number
+  status: StageStatus
+  startsAt: string | null
+  endsAt: string | null
   adjustmentFeedback: string | null
   createdAt: string
-  activatedAt: string | null
+  updatedAt: string
 }
 
 export type StageTarget = {
@@ -28,22 +32,30 @@ export type StageTarget = {
   stageId: string
   schoolId: string
   dimensionKey: StageDimensionKey
-  text: string
-  status: 'draft' | 'confirmed'
+  title: string
+  description: string
+  status: StageTargetStatus
+  sequence: number
   createdAt: string
-  confirmedAt: string | null
+  updatedAt: string
 }
 
 export type StageRecommendation = {
   stage: Stage
   targets: StageTarget[]
+  judgmentIds: string[]
+}
+
+export type StageTargetDraft = {
+  title: string
+  description: string
 }
 
 export type StageRecommendationDraft = {
   title: string
   summary: string
   focus: string
-  targets: Record<StageDimensionKey, string>
+  targets: Record<StageDimensionKey, StageTargetDraft>
 }
 
 export type StageFactoryDependencies = {
@@ -62,6 +74,7 @@ function assertTargetSet(targets: StageTarget[], stage: Stage): void {
   }
 
   const dimensions = new Set<StageDimensionKey>()
+  const sequences = new Set<number>()
   for (const target of targets) {
     if (target.stageId !== stage.id || target.schoolId !== stage.schoolId) {
       throw new Error('阶段目标不能跨学校或跨阶段')
@@ -69,7 +82,9 @@ function assertTargetSet(targets: StageTarget[], stage: Stage): void {
     if (dimensions.has(target.dimensionKey)) {
       throw new Error('阶段建议不能重复同一观察目标')
     }
+    if (sequences.has(target.sequence)) throw new Error('阶段目标顺序不能重复')
     dimensions.add(target.dimensionKey)
+    sequences.add(target.sequence)
   }
 
   if (stageDimensionKeys.some((dimension) => !dimensions.has(dimension))) {
@@ -80,10 +95,12 @@ function assertTargetSet(targets: StageTarget[], stage: Stage): void {
 export function createStageRecommendation(
   schoolId: string,
   draft: StageRecommendationDraft,
-  sourceJudgmentIds: string[],
+  judgmentIds: string[],
+  sequence: number,
   dependencies: StageFactoryDependencies = defaultDependencies,
 ): StageRecommendation {
-  if (sourceJudgmentIds.length === 0) throw new Error('没有正式判断时不能形成阶段建议')
+  if (judgmentIds.length === 0) throw new Error('没有正式判断时不能形成阶段建议')
+  if (!Number.isInteger(sequence) || sequence < 1) throw new Error('阶段顺序必须从 1 开始')
 
   const createdAt = dependencies.now().toISOString()
   const stageId = dependencies.createId()
@@ -93,52 +110,61 @@ export function createStageRecommendation(
     title: draft.title.trim(),
     summary: draft.summary.trim(),
     focus: draft.focus.trim(),
+    sequence,
     status: 'planned',
-    sourceJudgmentIds: [...sourceJudgmentIds],
+    startsAt: null,
+    endsAt: null,
     adjustmentFeedback: null,
     createdAt,
-    activatedAt: null,
+    updatedAt: createdAt,
   }
 
-  const targets = stageDimensionKeys.map((dimensionKey) => ({
+  const targets = stageDimensionKeys.map((dimensionKey, index) => ({
     id: dependencies.createId(),
     stageId,
     schoolId,
     dimensionKey,
-    text: draft.targets[dimensionKey].trim(),
+    title: draft.targets[dimensionKey].title.trim(),
+    description: draft.targets[dimensionKey].description.trim(),
     status: 'draft' as const,
+    sequence: index + 1,
     createdAt,
-    confirmedAt: null,
+    updatedAt: createdAt,
   }))
 
   assertTargetSet(targets, stage)
-  return { stage, targets }
+  return { stage, targets, judgmentIds: [...judgmentIds] }
 }
 
 export function adjustStageRecommendation(
   recommendation: StageRecommendation,
   draft: StageRecommendationDraft,
   feedback: string,
+  adjustedAt: Date = new Date(),
 ): StageRecommendation {
   if (recommendation.stage.status !== 'planned') throw new Error('已经确认的阶段不能再调整')
   if (recommendation.targets.some((target) => target.status !== 'draft')) {
     throw new Error('已经确认的阶段目标不能再调整')
   }
 
+  const updatedAt = adjustedAt.toISOString()
   const stage: Stage = {
     ...recommendation.stage,
     title: draft.title.trim(),
     summary: draft.summary.trim(),
     focus: draft.focus.trim(),
     adjustmentFeedback: feedback.trim(),
+    updatedAt,
   }
   const targets = recommendation.targets.map((target) => ({
     ...target,
-    text: draft.targets[target.dimensionKey].trim(),
+    title: draft.targets[target.dimensionKey].title.trim(),
+    description: draft.targets[target.dimensionKey].description.trim(),
+    updatedAt,
   }))
 
   assertTargetSet(targets, stage)
-  return { stage, targets }
+  return { stage, targets, judgmentIds: [...recommendation.judgmentIds] }
 }
 
 export function activateStageRecommendation(
@@ -151,18 +177,20 @@ export function activateStageRecommendation(
   }
   assertTargetSet(recommendation.targets, recommendation.stage)
 
-  const confirmedAt = activatedAt.toISOString()
+  const timestamp = activatedAt.toISOString()
   return {
     stage: {
       ...recommendation.stage,
       status: 'active',
-      activatedAt: confirmedAt,
+      startsAt: timestamp,
+      updatedAt: timestamp,
     },
     targets: recommendation.targets.map((target) => ({
       ...target,
       status: 'confirmed',
-      confirmedAt,
+      updatedAt: timestamp,
     })),
+    judgmentIds: [...recommendation.judgmentIds],
   }
 }
 
@@ -170,6 +198,7 @@ export interface StageRepository {
   findActive(schoolId: string): Promise<StageRecommendation | null>
   findPlanned(schoolId: string): Promise<StageRecommendation | null>
   findById(stageId: string): Promise<StageRecommendation | null>
+  nextSequence(schoolId: string): Promise<number>
   savePlanned(recommendation: StageRecommendation): Promise<void>
   replacePlanned(recommendation: StageRecommendation): Promise<void>
   activate(schoolId: string, stageId: string, activatedAt: Date): Promise<StageRecommendation>
