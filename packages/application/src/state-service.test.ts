@@ -2,8 +2,6 @@ import type {
   AcceptedJudgment,
   DiagnosisProposal,
   JudgmentRepository,
-  ProposalChain,
-  ReviewOutcome,
   School,
   SchoolRepository,
   StageRecommendation,
@@ -98,11 +96,11 @@ function schoolRepository(): SchoolRepository {
 
 class MemoryJudgmentRepository implements JudgmentRepository {
   constructor(public items: AcceptedJudgment[] = [...initialJudgments]) {}
-  async saveProposalChain(_chain: ProposalChain): Promise<void> {}
-  async findProposal(_id: string): Promise<DiagnosisProposal | null> {
+  async saveProposalChain(): Promise<void> {}
+  async findProposal(): Promise<DiagnosisProposal | null> {
     return null
   }
-  async saveReviewOutcome(_outcome: ReviewOutcome): Promise<void> {}
+  async saveReviewOutcome(): Promise<void> {}
   async listAcceptedJudgments(schoolId: string): Promise<AcceptedJudgment[]> {
     return this.items.filter((item) => item.schoolId === schoolId)
   }
