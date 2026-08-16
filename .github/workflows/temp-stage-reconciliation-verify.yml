@@ -1,0 +1,80 @@
+name: Temporary stage reconciliation verification
+
+on:
+  push:
+    branches:
+      - fix-stage-reconciliation-20260817
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-stage-reconciliation-20260817
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate reconciled Drizzle snapshot
+        run: |
+          cat > packages/db/drizzle.snapshot.config.ts <<'EOF'
+          import { defineConfig } from 'drizzle-kit'
+          export default defineConfig({
+            dialect: 'sqlite',
+            schema: './src/schema.ts',
+            out: './drizzle-target',
+          })
+          EOF
+          cd packages/db
+          pnpm exec drizzle-kit generate --config drizzle.snapshot.config.ts
+          cd ../..
+          node <<'NODE'
+          const fs = require('node:fs')
+          const prev = JSON.parse(fs.readFileSync('packages/db/drizzle/meta/0002_snapshot.json', 'utf8'))
+          const target = JSON.parse(fs.readFileSync('packages/db/drizzle-target/meta/0000_snapshot.json', 'utf8'))
+          target.prevId = prev.id
+          fs.writeFileSync('packages/db/drizzle/meta/0003_snapshot.json', JSON.stringify(target, null, 2) + '\n')
+          const journalPath = 'packages/db/drizzle/meta/_journal.json'
+          const journal = JSON.parse(fs.readFileSync(journalPath, 'utf8'))
+          journal.entries = journal.entries.filter((entry) => entry.idx !== 3)
+          journal.entries.push({
+            idx: 3,
+            version: '6',
+            when: 1786915800000,
+            tag: '0003_stage_schema_reconciliation',
+            breakpoints: true,
+          })
+          fs.writeFileSync(journalPath, JSON.stringify(journal, null, 2) + '\n')
+          NODE
+          rm -rf packages/db/drizzle-target packages/db/drizzle.snapshot.config.ts
+      - run: pnpm format:write
+      - name: Persist generated metadata and formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(stage): persist reconciliation metadata [skip ci]"
+            git push origin HEAD:fix-stage-reconciliation-20260817
+          fi
+      - name: Reject legacy dimension keys in runtime source
+        run: |
+          if grep -R -nE 'critical_tasks|structure_systems|capacity' packages/domain packages/shared packages/application packages/db/src apps/desktop/src tests; then
+            echo "Legacy dimension key remains in runtime source"
+            exit 1
+          fi
+      - run: pnpm format
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm exec playwright install-deps chromium
+      - run: xvfb-run -a pnpm test:e2e
