@@ -133,6 +133,68 @@ function StateChange({ change }: { change: StateChangeView }) {
   )
 }
 
+type StateConfirmationPanelProps = {
+  feedbackOpen: boolean
+  feedback: string
+  submitting: boolean
+  onFeedbackChange(value: string): void
+  onToggleFeedback(): void
+  onAdjust(): void
+  onConfirm(): void
+}
+
+function StateConfirmationPanel({
+  feedbackOpen,
+  feedback,
+  submitting,
+  onFeedbackChange,
+  onToggleFeedback,
+  onAdjust,
+  onConfirm,
+}: StateConfirmationPanelProps) {
+  return (
+    <section className="mt-6 rounded-xl border border-border bg-surface p-6">
+      <p className="text-sm leading-6 text-muted-foreground">
+        这还只是待你确认的整理。你确认之前，不会成为这所学校的正式状态记录。
+      </p>
+
+      {feedbackOpen ? (
+        <div className="mt-5 rounded-lg bg-muted/40 p-4">
+          <label className="text-sm font-medium" htmlFor="state-feedback">
+            哪里需要调整？
+          </label>
+          <Textarea
+            id="state-feedback"
+            className="mt-2"
+            value={feedback}
+            onChange={(event) => onFeedbackChange(event.target.value)}
+            placeholder="例如：领导力这部分先别判断，还需要更多观察……"
+          />
+          <div className="mt-3 flex justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={submitting || feedback.trim().length === 0}
+              onClick={onAdjust}
+            >
+              {submitting ? '正在重新整理…' : '重新整理当前状态'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Button type="button" disabled={submitting} onClick={onConfirm}>
+          确认现在的状态
+        </Button>
+        <Button type="button" variant="secondary" disabled={submitting} onClick={onToggleFeedback}>
+          我想调整
+        </Button>
+      </div>
+    </section>
+  )
+}
+
 export function SchoolStatePage(): React.JSX.Element {
   const { schoolId = '' } = useParams()
   const api = useWorkbenchApi()
@@ -203,54 +265,17 @@ export function SchoolStatePage(): React.JSX.Element {
     }
   }
 
-  function ConfirmationPanel() {
-    return (
-      <section className="mt-6 rounded-xl border border-border bg-surface p-6">
-        <p className="text-sm leading-6 text-muted-foreground">
-          这还只是待你确认的整理。你确认之前，不会成为这所学校的正式状态记录。
-        </p>
-
-        {feedbackOpen ? (
-          <div className="mt-5 rounded-lg bg-muted/40 p-4">
-            <label className="text-sm font-medium" htmlFor="state-feedback">
-              哪里需要调整？
-            </label>
-            <Textarea
-              id="state-feedback"
-              className="mt-2"
-              value={feedback}
-              onChange={(event) => setFeedback(event.target.value)}
-              placeholder="例如：领导力这部分先别判断，还需要更多观察……"
-            />
-            <div className="mt-3 flex justify-end">
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={submitting || feedback.trim().length === 0}
-                onClick={() => void adjustState()}
-              >
-                {submitting ? '正在重新整理…' : '重新整理当前状态'}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button type="button" disabled={submitting} onClick={() => void confirmState()}>
-            确认现在的状态
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={submitting}
-            onClick={() => setFeedbackOpen((value) => !value)}
-          >
-            我想调整
-          </Button>
-        </div>
-      </section>
-    )
-  }
+  const confirmationPanel = (
+    <StateConfirmationPanel
+      feedbackOpen={feedbackOpen}
+      feedback={feedback}
+      submitting={submitting}
+      onFeedbackChange={setFeedback}
+      onToggleFeedback={() => setFeedbackOpen((value) => !value)}
+      onAdjust={() => void adjustState()}
+      onConfirm={() => void confirmState()}
+    />
+  )
 
   if (loading) {
     return (
@@ -338,7 +363,7 @@ export function SchoolStatePage(): React.JSX.Element {
       {workspace?.state === 'draft' ? (
         <>
           <StateOverview overview={workspace.overview} baseline={false} />
-          <ConfirmationPanel />
+          {confirmationPanel}
         </>
       ) : null}
 
@@ -364,7 +389,7 @@ export function SchoolStatePage(): React.JSX.Element {
           </section>
           <StateOverview overview={workspace.overview} baseline={false} />
           <StateChange change={workspace.change} />
-          <ConfirmationPanel />
+          {confirmationPanel}
         </>
       ) : null}
 
