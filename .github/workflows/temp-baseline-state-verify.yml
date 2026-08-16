@@ -28,11 +28,14 @@ jobs:
         run: |
           pnpm --filter @school-workbench/db db:generate
           pnpm exec prettier --write packages/db/drizzle
-          if ! git diff --quiet -- packages/db/drizzle; then
+      - name: Apply repository Prettier and commit generated formatting
+        run: |
+          pnpm exec prettier --write .
+          if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add packages/db/drizzle
-            git commit -m "chore(db): generate baseline state migration"
+            git add .
+            git commit -m "style: format baseline state slice"
             git push origin HEAD:feat-baseline-state-20260817
           fi
       - run: pnpm format
