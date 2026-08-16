@@ -184,9 +184,7 @@ export function SchoolWorkspacePage(): React.JSX.Element {
       {proposal ? (
         <section className="mt-6 rounded-xl border border-border bg-surface p-7">
           <p className="text-sm font-medium text-primary">我发现一个新的情况，想让你确认</p>
-          <h2 className="mt-2 text-xl font-semibold">
-            {proposal.proposal.provisionalJudgment}
-          </h2>
+          <h2 className="mt-2 text-xl font-semibold">{proposal.proposal.provisionalJudgment}</h2>
           <p className="mt-4 text-sm text-muted-foreground">
             依据 {proposal.proposal.evidenceCount} 条 · 当前还需要更多观察
           </p>
