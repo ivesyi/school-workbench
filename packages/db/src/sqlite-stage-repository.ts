@@ -150,11 +150,7 @@ export class SqliteStageRepository implements StageRepository {
     }
 
     this.database.transaction((tx) => {
-      const current = tx
-        .select()
-        .from(stages)
-        .where(eq(stages.id, recommendation.stage.id))
-        .get()
+      const current = tx.select().from(stages).where(eq(stages.id, recommendation.stage.id)).get()
       if (!current || current.schoolId !== recommendation.stage.schoolId) {
         throw new Error('没有找到这个阶段建议')
       }
@@ -168,7 +164,8 @@ export class SqliteStageRepository implements StageRepository {
       if (
         persistedTargets.length !== recommendation.targets.length ||
         persistedTargets.some(
-          (target) => target.schoolId !== recommendation.stage.schoolId || target.status !== 'draft',
+          (target) =>
+            target.schoolId !== recommendation.stage.schoolId || target.status !== 'draft',
         )
       ) {
         throw new Error('阶段目标状态不一致')

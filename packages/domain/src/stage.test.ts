@@ -67,6 +67,8 @@ describe('stage recommendation', () => {
     const active = activateStageRecommendation(adjusted, new Date('2026-08-17T01:00:00.000Z'))
     expect(active.stage.status).toBe('active')
     expect(active.targets.every((target) => target.status === 'confirmed')).toBe(true)
-    expect(active.targets.every((target) => target.confirmedAt === active.stage.activatedAt)).toBe(true)
+    expect(active.targets.every((target) => target.confirmedAt === active.stage.activatedAt)).toBe(
+      true,
+    )
   })
 })

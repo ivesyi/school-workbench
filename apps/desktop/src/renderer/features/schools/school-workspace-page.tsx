@@ -419,7 +419,9 @@ export function SchoolWorkspacePage(): React.JSX.Element {
         <section className="mt-6 rounded-xl border border-border bg-surface px-6 py-5">
           <p className="text-xs font-medium text-muted-foreground">当前阶段</p>
           <h2 className="mt-2 text-lg font-semibold">{stageWorkspace.stage.title}</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{stageWorkspace.stage.focus}</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {stageWorkspace.stage.focus}
+          </p>
           <details className="mt-4 text-sm">
             <summary className="cursor-pointer font-medium">这个阶段重点看什么</summary>
             <div className="mt-3 space-y-2 text-muted-foreground">

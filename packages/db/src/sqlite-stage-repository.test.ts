@@ -89,7 +89,10 @@ describe('stage recommendation persistence', () => {
     const stageRepository = new SqliteStageRepository(database.db)
     const school = await new SchoolService(schoolRepository).create({ name: '南山实验学校' })
     const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
-    const proposal = await judgmentService.submitSituation({ schoolId: school.id, text: '中层依赖校长。' })
+    const proposal = await judgmentService.submitSituation({
+      schoolId: school.id,
+      text: '中层依赖校长。',
+    })
     await judgmentService.review({
       schoolId: school.id,
       diagnosisId: proposal.proposal.id,

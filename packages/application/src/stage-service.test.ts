@@ -67,7 +67,10 @@ class MemoryStageRepository implements StageRepository {
     activatedAt: Date,
   ): Promise<StageRecommendation> {
     if (!this.recommendation) throw new Error('missing recommendation')
-    if (this.recommendation.stage.schoolId !== schoolId || this.recommendation.stage.id !== stageId) {
+    if (
+      this.recommendation.stage.schoolId !== schoolId ||
+      this.recommendation.stage.id !== stageId
+    ) {
       throw new Error('wrong stage')
     }
     this.recommendation = activateStageRecommendation(this.recommendation, activatedAt)
@@ -147,6 +150,8 @@ describe('StageService', () => {
     const active = await service.confirm({ schoolId: school.id, stageId: suggested.stage.id })
     expect(active.state).toBe('active')
     expect(stages.recommendation?.stage.status).toBe('active')
-    expect(stages.recommendation?.targets.every((target) => target.status === 'confirmed')).toBe(true)
+    expect(stages.recommendation?.targets.every((target) => target.status === 'confirmed')).toBe(
+      true,
+    )
   })
 })
