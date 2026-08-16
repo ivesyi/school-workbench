@@ -50,11 +50,7 @@ describe('judgment epistemic chain', () => {
       dependencies(),
     )
 
-    const rejected = createReviewOutcome(
-      chain.proposal,
-      { decision: 'rejected' },
-      dependencies(),
-    )
+    const rejected = createReviewOutcome(chain.proposal, { decision: 'rejected' }, dependencies())
     expect(rejected.review.decision).toBe('rejected')
     expect(rejected.acceptedJudgment).toBeNull()
 
