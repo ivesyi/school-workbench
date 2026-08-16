@@ -81,7 +81,9 @@ test('second confirmed school state compares with baseline and survives restart 
     await expect(restoredLeadership.getByText('改善', { exact: true })).toBeVisible()
     await restoredLeadership.getByText('看看这项变化', { exact: true }).click()
     await expect(restoredLeadership.getByText('上一次', { exact: true })).toBeVisible()
-    await expect(restoredLeadership.getByText(/中层仍然依赖校长完成关键任务拆解/)).toBeVisible()
+    await expect(
+      restoredLeadership.getByText(/中层仍然依赖校长完成关键任务拆解/).first(),
+    ).toBeVisible()
     await expect(secondWindow.getByRole('button', { name: '确认现在的状态' })).toHaveCount(0)
 
     const repeated = await secondWindow.evaluate(async () => {
