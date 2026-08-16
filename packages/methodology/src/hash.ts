@@ -11,7 +11,8 @@ function canonicalStringify(value: unknown): string {
       .join(',')}}`
   }
   const serialized = JSON.stringify(value)
-  if (serialized === undefined) throw new Error('Unsupported value in canonical methodology content')
+  if (serialized === undefined)
+    throw new Error('Unsupported value in canonical methodology content')
   return serialized
 }
 
