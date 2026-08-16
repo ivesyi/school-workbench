@@ -5,11 +5,17 @@ on:
     branches:
       - ci-stage-slice-20260817
 
+permissions:
+  contents: write
+
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ci-stage-slice-20260817
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.19.0
@@ -18,11 +24,18 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Inspect Drizzle generation consistency
+      - name: Regenerate stage migration from baseline metadata
         run: |
+          git fetch origin main
+          rm -f packages/db/drizzle/0002_stage_recommendation.sql
+          git show origin/main:packages/db/drizzle/meta/_journal.json > packages/db/drizzle/meta/_journal.json
           pnpm db:generate
-          git status --short packages/db/drizzle
-          git diff -- packages/db/drizzle/meta/_journal.json
+          pnpm exec prettier --write packages/db/drizzle/meta/_journal.json packages/db/drizzle/meta/0002_snapshot.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A packages/db/drizzle
+          git commit -m "chore(db): generate stage migration metadata [skip ci]"
+          git push origin HEAD:ci-stage-slice-20260817
       - run: pnpm format
       - run: pnpm lint
       - run: pnpm typecheck
