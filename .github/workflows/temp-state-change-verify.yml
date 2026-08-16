@@ -1,0 +1,47 @@
+name: Temporary state change verification
+
+on:
+  push:
+    branches:
+      - feat-state-change-20260817
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat-state-change-20260817
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify schema stays stable
+        run: |
+          pnpm --filter @school-workbench/db db:generate
+          pnpm exec prettier --write packages/db/drizzle
+      - name: Apply repository Prettier and commit generated formatting
+        run: |
+          pnpm exec prettier --write .
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "style: format state change slice"
+            git push origin HEAD:feat-state-change-20260817
+          fi
+      - run: pnpm format
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm exec playwright install-deps chromium
+      - run: xvfb-run -a pnpm test:e2e
