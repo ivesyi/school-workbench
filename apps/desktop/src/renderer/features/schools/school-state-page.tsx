@@ -24,19 +24,14 @@ function StateOverview({ overview, baseline }: { overview: StateOverviewView; ba
       <section className="mt-6">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-primary">
-              {baseline ? '起点状态' : '现在的状态'}
-            </p>
+            <p className="text-sm font-medium text-primary">{baseline ? '起点状态' : '现在的状态'}</p>
             <h2 className="mt-2 text-xl font-semibold">{overview.summary}</h2>
           </div>
         </div>
 
         <div className="mt-5 space-y-3">
           {overview.dimensions.map((dimension) => (
-            <article
-              key={dimension.dimensionKey}
-              className="rounded-xl border border-border bg-surface p-5"
-            >
+            <article key={dimension.dimensionKey} className="rounded-xl border border-border bg-surface p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="font-semibold">{dimension.label}</h3>
                 <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -281,7 +276,7 @@ export function SchoolStatePage(): React.JSX.Element {
         <>
           <StateOverview overview={workspace.overview} baseline />
           <p className="mt-5 text-sm text-muted-foreground">
-            这是你确认过的起点状态。后续变化会在下一轮状态能力中继续补充。
+            这是你确认过的起点状态。后面有新的变化时，再继续补充。
           </p>
         </>
       ) : null}
