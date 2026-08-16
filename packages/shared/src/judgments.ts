@@ -57,12 +57,9 @@ export const judgmentReviewViewSchema = z.object({
   proposal: diagnosisProposalViewSchema,
 })
 
-export const reviewDecisionSchema = z.enum([
-  'accepted',
-  'modified',
-  'rejected',
-  'needs_more_evidence',
-])
+const reviewDecisions = ['accepted', 'modified', 'rejected', 'needs_more_evidence'] as const
+
+export const reviewDecisionSchema = z.enum(reviewDecisions)
 
 export const reviewDiagnosisInputSchema = z
   .object({
