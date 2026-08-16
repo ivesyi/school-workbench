@@ -236,7 +236,7 @@ created_at
 UNIQUE(school_id, sequence)
 ```
 
-历史 Snapshot immutable。当前首个状态纵切要求 Snapshot #1 必须关联该校当前 active Stage；后续是否允许没有 Stage 的历史状态，不在本轮扩展。
+历史 Snapshot immutable。当前状态确认纵切要求每次新确认的正式状态都关联确认时该校 current active Stage 的 confirmed Targets；阶段迁移不在本轮扩展。
 
 ```text
 dimension_assessments
@@ -256,6 +256,10 @@ snapshot_judgments(snapshot_id, judgment_id)
 ```
 
 当前 Snapshot 由同校最高 `sequence` 推导，不在 `schools` 缓存指针。首个确认状态固定 `sequence = 1`、`previous_snapshot_id = NULL`、`is_baseline = 1`；重复确认不得产生第二个 baseline。
+
+后续确认固定 `previous_snapshot_id = current_latest.id`、`sequence = current_latest.sequence + 1`、`is_baseline = 0`。`saveNext` 必须在同一事务内验证调用方预期的 previous Snapshot 仍是该校当前 latest，避免 stale draft、并发确认或重复动作写出错误链。
+
+下一份正式状态的 `snapshot_judgments` 保存 StateAssessmentEngine 实际使用的完整当前 AcceptedJudgment 集；“上次状态未包含的新判断”只用于触发更新草稿和解释变化，不能替代完整当前状态依据。没有新 AcceptedJudgment 时不形成更新草稿，也不创建新的正式状态。
 
 “当前团队特点”不再维护自由文本事实表；UI View 由当前 Snapshot 的 AcceptedJudgment 投影生成。
 
@@ -302,17 +306,22 @@ agent_runs.status = queued|running|needs_input|completed|failed|cancelled
 - Proposal 至少有一个 Claim 和一个 Criterion；
 - Proposal immutable；
 - 只有 HumanReview 可产生 AcceptedJudgment；
-- Snapshot 只能记录 AcceptedJudgment / Assessment；首个 baseline 必须来自该校 active Stage 的 confirmed Targets；
+- Snapshot 只能记录 AcceptedJudgment / Assessment；新确认状态必须来自该校 active Stage 的 confirmed Targets；
 - 每个正式 Snapshot 恰好五个 canonical DimensionAssessment；非 `unverified` Assessment 至少一条同校 AcceptedJudgment；
-- Snapshot / Assessment / Judgment / Stage 的 FK 写入必须同校；Snapshot immutable；
+- 后续 Snapshot 必须链接同校当前 latest，`sequence = previous.sequence + 1`，且 `is_baseline = 0`；
+- 后续 Snapshot 的完整 Judgment provenance 必须包含上一份状态已经使用的 Judgment，并至少包含一条新的 AcceptedJudgment；
+- stale draft 确认必须失败，不能静默接到已经变化的历史链上；
+- Snapshot / Assessment / Judgment / Stage 的 FK 写入必须同校；Snapshot 与历史 Assessment immutable；
 - Agent Token 只能访问当前 school_id / agent_run_id；
 - Renderer、Agent、MCP Server 均不能直接写 SQLite；
 - Pack 更新产生新版本，不覆盖历史 Criterion。
 
 ## 13. Implementation baseline
 
-当前仓库已经实现 School、Epistemic Judgment、“阶段提议与确认”以及“首个学校状态确认 / baseline”纵切。Stage 纵切使用 forward migration 对齐本 v1.2：旧 `critical_tasks / structure_systems / capacity` 数据迁移为 `key_tasks / structure / capability`；旧 `source_judgment_ids_json` 迁移为 `stage_judgments` 关系表；旧 Stage/Target 字段迁移到 sequence、完整 status/time 字段和 title/description/sequence。
+当前仓库已经实现 School、Epistemic Judgment、“阶段提议与确认”、“首个学校状态确认 / baseline”以及“第二次状态确认与变化对比”纵切。Stage 纵切使用 forward migration 对齐本 v1.2：旧 `critical_tasks / structure_systems / capacity` 数据迁移为 `key_tasks / structure / capability`；旧 `source_judgment_ids_json` 迁移为 `stage_judgments` 关系表；旧 Stage/Target 字段迁移到 sequence、完整 status/time 字段和 title/description/sequence。
 
-Baseline State 纵切继续使用 forward migration 新增 `state_snapshots`、`dimension_assessments`、`assessment_judgments`、`snapshot_judgments`。未确认 State Draft 只存在于 Application 内存，不写 SQLite；只有顾问确认才在一个事务内写入 immutable Snapshot #1、五维 Assessment 与 FK provenance。`schools` 仍然不保存 snapshot pointer。
+Baseline State 纵切使用 forward migration 新增 `state_snapshots`、`dimension_assessments`、`assessment_judgments`、`snapshot_judgments`。第二次状态确认直接复用这组表，不新增 current pointer、JSON ID 列或新的 diff 持久化表。未确认 State Draft / Update Draft 只存在于 Application 内存，不写 SQLite。
 
-尚未实现 Snapshot #2/diff、学校状态历史比较、教师实践或真实 Agent Runtime；这些能力继续按真实纵切增加，不为未实现能力制造额外基础设施。
+有新的 AcceptedJudgment 时，StateAssessmentEngine 使用 active Stage 的 confirmed Targets 与当前全部 AcceptedJudgment 形成更新草稿；确认时在一个事务内验证 expected previous 仍为 latest，并原子写入下一份 immutable Snapshot、五维 Assessment 与完整 FK provenance。重启后“和上一次相比”由 latest 与其 `previous_snapshot_id` 指向的上一份正式状态重新计算，不修改历史状态。
+
+尚未实现阶段迁移、任意历史版本浏览/比较、教师实践或真实 Agent Runtime、MCP、飞书、RAG、Methodology Pack runtime；这些能力继续按真实纵切增加，不为未实现能力制造额外基础设施。

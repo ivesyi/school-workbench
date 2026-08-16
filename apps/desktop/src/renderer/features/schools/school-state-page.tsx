@@ -6,7 +6,12 @@ import {
   Skeleton,
   Textarea,
 } from '@school-workbench/experience'
-import type { SchoolView, StateOverviewView, StateWorkspaceView } from '@school-workbench/shared'
+import type {
+  SchoolView,
+  StateChangeView,
+  StateOverviewView,
+  StateWorkspaceView,
+} from '@school-workbench/shared'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -80,6 +85,116 @@ function StateOverview({ overview, baseline }: { overview: StateOverviewView; ba
   )
 }
 
+function StateChange({ change }: { change: StateChangeView }) {
+  return (
+    <section className="mt-6 rounded-xl border border-border bg-surface p-6">
+      <p className="text-sm font-medium text-primary">和上一次相比</p>
+      <h2 className="mt-2 text-lg font-semibold">{change.summary}</h2>
+      <div className="mt-5 space-y-3">
+        {change.dimensions.map((item) => (
+          <article key={item.dimensionKey} className="rounded-lg bg-muted/35 px-4 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-base font-semibold" aria-hidden="true">
+                  {item.symbol}
+                </span>
+                <h3 className="font-medium">{item.label}</h3>
+              </div>
+              <span className="text-sm text-muted-foreground">{item.kindLabel}</span>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {item.previousStatusLabel} → {item.currentStatusLabel}
+            </p>
+            <details className="mt-3 text-sm">
+              <summary className="cursor-pointer font-medium">看看这项变化</summary>
+              <div className="mt-3 space-y-4 leading-6 text-muted-foreground">
+                <div>
+                  <p className="font-medium text-foreground">上一次</p>
+                  <p>{item.previousSummary}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">这一次</p>
+                  <p>{item.currentSummary}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">本次正式判断依据</p>
+                  {item.basis.length > 0 ? (
+                    item.basis.map((basis) => <p key={basis}>· {basis}</p>)
+                  ) : (
+                    <p>这一项目前仍需要更多观察。</p>
+                  )}
+                </div>
+              </div>
+            </details>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+type StateConfirmationPanelProps = {
+  feedbackOpen: boolean
+  feedback: string
+  submitting: boolean
+  onFeedbackChange(value: string): void
+  onToggleFeedback(): void
+  onAdjust(): void
+  onConfirm(): void
+}
+
+function StateConfirmationPanel({
+  feedbackOpen,
+  feedback,
+  submitting,
+  onFeedbackChange,
+  onToggleFeedback,
+  onAdjust,
+  onConfirm,
+}: StateConfirmationPanelProps) {
+  return (
+    <section className="mt-6 rounded-xl border border-border bg-surface p-6">
+      <p className="text-sm leading-6 text-muted-foreground">
+        这还只是待你确认的整理。你确认之前，不会成为这所学校的正式状态记录。
+      </p>
+
+      {feedbackOpen ? (
+        <div className="mt-5 rounded-lg bg-muted/40 p-4">
+          <label className="text-sm font-medium" htmlFor="state-feedback">
+            哪里需要调整？
+          </label>
+          <Textarea
+            id="state-feedback"
+            className="mt-2"
+            value={feedback}
+            onChange={(event) => onFeedbackChange(event.target.value)}
+            placeholder="例如：领导力这部分先别判断，还需要更多观察……"
+          />
+          <div className="mt-3 flex justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={submitting || feedback.trim().length === 0}
+              onClick={onAdjust}
+            >
+              {submitting ? '正在重新整理…' : '重新整理当前状态'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Button type="button" disabled={submitting} onClick={onConfirm}>
+          确认现在的状态
+        </Button>
+        <Button type="button" variant="secondary" disabled={submitting} onClick={onToggleFeedback}>
+          我想调整
+        </Button>
+      </div>
+    </section>
+  )
+}
+
 export function SchoolStatePage(): React.JSX.Element {
   const { schoolId = '' } = useParams()
   const api = useWorkbenchApi()
@@ -112,7 +227,9 @@ export function SchoolStatePage(): React.JSX.Element {
   }, [api, schoolId])
 
   async function adjustState(): Promise<void> {
-    if (workspace?.state !== 'draft' || !feedback.trim()) return
+    if ((workspace?.state !== 'draft' && workspace?.state !== 'update_draft') || !feedback.trim()) {
+      return
+    }
     setSubmitting(true)
     setError(null)
     setConfirmedMessage(null)
@@ -129,20 +246,36 @@ export function SchoolStatePage(): React.JSX.Element {
   }
 
   async function confirmState(): Promise<void> {
-    if (workspace?.state !== 'draft') return
+    if (workspace?.state !== 'draft' && workspace?.state !== 'update_draft') return
     setSubmitting(true)
     setError(null)
     try {
       const result = await api.states.confirm({ schoolId })
       setWorkspace(result)
       setFeedbackOpen(false)
-      setConfirmedMessage('已经记录这所学校当前的起点状态。')
+      setConfirmedMessage(
+        result.state === 'baseline'
+          ? '已经记录这所学校当前的起点状态。'
+          : '已经记录这所学校现在的状态。',
+      )
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '确认当前状态时遇到问题')
     } finally {
       setSubmitting(false)
     }
   }
+
+  const confirmationPanel = (
+    <StateConfirmationPanel
+      feedbackOpen={feedbackOpen}
+      feedback={feedback}
+      submitting={submitting}
+      onFeedbackChange={setFeedback}
+      onToggleFeedback={() => setFeedbackOpen((value) => !value)}
+      onAdjust={() => void adjustState()}
+      onConfirm={() => void confirmState()}
+    />
+  )
 
   if (loading) {
     return (
@@ -230,59 +363,46 @@ export function SchoolStatePage(): React.JSX.Element {
       {workspace?.state === 'draft' ? (
         <>
           <StateOverview overview={workspace.overview} baseline={false} />
-          <section className="mt-6 rounded-xl border border-border bg-surface p-6">
-            <p className="text-sm leading-6 text-muted-foreground">
-              这还只是待你确认的整理。你确认之前，不会成为这所学校的正式状态记录。
-            </p>
-
-            {feedbackOpen ? (
-              <div className="mt-5 rounded-lg bg-muted/40 p-4">
-                <label className="text-sm font-medium" htmlFor="state-feedback">
-                  哪里需要调整？
-                </label>
-                <Textarea
-                  id="state-feedback"
-                  className="mt-2"
-                  value={feedback}
-                  onChange={(event) => setFeedback(event.target.value)}
-                  placeholder="例如：领导力这部分先别判断，还需要更多观察……"
-                />
-                <div className="mt-3 flex justify-end">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={submitting || feedback.trim().length === 0}
-                    onClick={() => void adjustState()}
-                  >
-                    {submitting ? '正在重新整理…' : '重新整理当前状态'}
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button type="button" disabled={submitting} onClick={() => void confirmState()}>
-                确认现在的状态
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={submitting}
-                onClick={() => setFeedbackOpen((value) => !value)}
-              >
-                我想调整
-              </Button>
-            </div>
-          </section>
+          {confirmationPanel}
         </>
       ) : null}
 
       {workspace?.state === 'baseline' ? (
         <>
           <StateOverview overview={workspace.overview} baseline />
-          <p className="mt-5 text-sm text-muted-foreground">
-            这是你确认过的起点状态。后面有新的变化时，再继续补充。
-          </p>
+          <section className="mt-6 rounded-xl bg-muted/35 px-5 py-4 text-sm leading-6 text-muted-foreground">
+            <p>目前还没有新的正式判断需要重新整理。</p>
+            <Button asChild variant="secondary" className="mt-4">
+              <Link to={`/schools/${schoolId}`}>回工作台继续补充</Link>
+            </Button>
+          </section>
+        </>
+      ) : null}
+
+      {workspace?.state === 'update_draft' ? (
+        <>
+          <section className="mt-7 rounded-xl bg-primary/5 px-6 py-5">
+            <p className="text-sm leading-6 text-foreground">
+              这轮你已经确认了 {workspace.change.newJudgmentCount}{' '}
+              个新的变化，我重新整理了一下学校现在的状态。
+            </p>
+          </section>
+          <StateOverview overview={workspace.overview} baseline={false} />
+          <StateChange change={workspace.change} />
+          {confirmationPanel}
+        </>
+      ) : null}
+
+      {workspace?.state === 'current' ? (
+        <>
+          <StateOverview overview={workspace.overview} baseline={false} />
+          <StateChange change={workspace.change} />
+          <section className="mt-6 rounded-xl bg-muted/35 px-5 py-4 text-sm leading-6 text-muted-foreground">
+            <p>这是你刚刚确认过的学校现在状态。后面有新的变化时，再回工作台继续补充。</p>
+            <Button asChild variant="secondary" className="mt-4">
+              <Link to={`/schools/${schoolId}`}>回工作台继续补充</Link>
+            </Button>
+          </section>
         </>
       ) : null}
     </div>

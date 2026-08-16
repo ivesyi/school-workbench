@@ -31,6 +31,36 @@ export const stateOverviewViewSchema = z.object({
   dimensions: z.array(stateDimensionViewSchema).length(5),
 })
 
+export const stateChangeKindSchema = z.enum([
+  'improved',
+  'unchanged',
+  'declined',
+  'newly_verified',
+  'became_unverified',
+])
+
+export const stateDimensionChangeViewSchema = z.object({
+  dimensionKey: stageDimensionKeySchema,
+  label: z.string().min(1),
+  kind: stateChangeKindSchema,
+  kindLabel: z.string().min(1),
+  symbol: z.enum(['↑', '→', '↓', '◆', '?']),
+  previousStatus: dimensionAssessmentStatusSchema,
+  currentStatus: dimensionAssessmentStatusSchema,
+  previousStatusLabel: z.string().min(1),
+  currentStatusLabel: z.string().min(1),
+  previousSummary: z.string().min(1),
+  currentSummary: z.string().min(1),
+  basis: z.array(z.string().min(1)),
+  summaryChanged: z.boolean(),
+})
+
+export const stateChangeViewSchema = z.object({
+  newJudgmentCount: z.number().int().positive(),
+  summary: z.string().min(1),
+  dimensions: z.array(stateDimensionChangeViewSchema).length(5),
+})
+
 export const stateWorkspaceViewSchema = z.discriminatedUnion('state', [
   z.object({ state: z.literal('needs_stage') }),
   z.object({
@@ -44,6 +74,16 @@ export const stateWorkspaceViewSchema = z.discriminatedUnion('state', [
   z.object({
     state: z.literal('baseline'),
     overview: stateOverviewViewSchema,
+  }),
+  z.object({
+    state: z.literal('update_draft'),
+    overview: stateOverviewViewSchema,
+    change: stateChangeViewSchema,
+  }),
+  z.object({
+    state: z.literal('current'),
+    overview: stateOverviewViewSchema,
+    change: stateChangeViewSchema,
   }),
 ])
 
@@ -65,6 +105,9 @@ export const stateIpcChannels = {
 export type DimensionAssessmentStatus = z.infer<typeof dimensionAssessmentStatusSchema>
 export type StateDimensionView = z.infer<typeof stateDimensionViewSchema>
 export type StateOverviewView = z.infer<typeof stateOverviewViewSchema>
+export type StateChangeKind = z.infer<typeof stateChangeKindSchema>
+export type StateDimensionChangeView = z.infer<typeof stateDimensionChangeViewSchema>
+export type StateChangeView = z.infer<typeof stateChangeViewSchema>
 export type StateWorkspaceView = z.infer<typeof stateWorkspaceViewSchema>
 export type AdjustStateInput = z.infer<typeof adjustStateInputSchema>
 export type ConfirmStateInput = z.infer<typeof confirmStateInputSchema>

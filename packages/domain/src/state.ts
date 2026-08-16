@@ -73,10 +73,18 @@ function unique(values: readonly string[]): string[] {
   return [...new Set(values)]
 }
 
+function sameSetContainsAll(container: readonly string[], required: readonly string[]): boolean {
+  const ids = new Set(container)
+  return required.every((id) => ids.has(id))
+}
+
 export function validateStateAssessmentDraft(draft: StateAssessmentDraft): void {
   if (!draft.stageId.trim()) throw new Error('状态整理必须对应一个当前阶段')
   if (!draft.summary.trim()) throw new Error('状态整理需要一句总体说明')
   if (draft.judgmentIds.length === 0) throw new Error('没有正式判断时不能确认学校状态')
+  if (unique(draft.judgmentIds).length !== draft.judgmentIds.length) {
+    throw new Error('学校状态不能重复引用同一条正式判断')
+  }
   if (draft.assessments.length !== stageDimensionKeys.length) {
     throw new Error('学校状态必须完整覆盖五个方面')
   }
@@ -87,6 +95,9 @@ export function validateStateAssessmentDraft(draft: StateAssessmentDraft): void 
     if (dimensions.has(item.dimensionKey)) throw new Error('学校状态不能重复同一个方面')
     dimensions.add(item.dimensionKey)
     if (!item.summary.trim()) throw new Error('每个方面都需要一句说明')
+    if (unique(item.judgmentIds).length !== item.judgmentIds.length) {
+      throw new Error('方面判断不能重复引用同一条正式判断')
+    }
     if (item.status !== 'unverified' && item.judgmentIds.length === 0) {
       throw new Error('形成达到情况判断时至少需要一条正式判断')
     }
@@ -100,10 +111,15 @@ export function validateStateAssessmentDraft(draft: StateAssessmentDraft): void 
   }
 }
 
-export function createBaselineState(
+function createStateRecord(
   schoolId: string,
   draft: StateAssessmentDraft,
-  dependencies: StateFactoryDependencies = defaultDependencies,
+  snapshotShape: {
+    previousSnapshotId: string | null
+    sequence: number
+    isBaseline: boolean
+  },
+  dependencies: StateFactoryDependencies,
 ): StateRecord {
   validateStateAssessmentDraft(draft)
 
@@ -113,10 +129,10 @@ export function createBaselineState(
     id: snapshotId,
     schoolId,
     stageId: draft.stageId,
-    previousSnapshotId: null,
-    sequence: 1,
+    previousSnapshotId: snapshotShape.previousSnapshotId,
+    sequence: snapshotShape.sequence,
     summary: draft.summary.trim(),
-    isBaseline: true,
+    isBaseline: snapshotShape.isBaseline,
     confirmedAt,
     createdAt: confirmedAt,
   })
@@ -135,18 +151,60 @@ export function createBaselineState(
     })
     return Object.freeze({
       assessment,
-      judgmentIds: Object.freeze(unique(item.judgmentIds)),
+      judgmentIds: Object.freeze([...item.judgmentIds]),
     })
   })
 
   return Object.freeze({
     snapshot,
     assessments: Object.freeze(assessments),
-    judgmentIds: Object.freeze(unique(draft.judgmentIds)),
+    judgmentIds: Object.freeze([...draft.judgmentIds]),
   })
+}
+
+export function createBaselineState(
+  schoolId: string,
+  draft: StateAssessmentDraft,
+  dependencies: StateFactoryDependencies = defaultDependencies,
+): StateRecord {
+  return createStateRecord(
+    schoolId,
+    draft,
+    { previousSnapshotId: null, sequence: 1, isBaseline: true },
+    dependencies,
+  )
+}
+
+export function createNextState(
+  schoolId: string,
+  previous: StateRecord,
+  draft: StateAssessmentDraft,
+  dependencies: StateFactoryDependencies = defaultDependencies,
+): StateRecord {
+  validateStateAssessmentDraft(draft)
+  if (previous.snapshot.schoolId !== schoolId) throw new Error('上一份状态不属于这所学校')
+  if (!sameSetContainsAll(draft.judgmentIds, previous.judgmentIds)) {
+    throw new Error('新的状态不能丢失上一份状态已经使用的正式判断')
+  }
+  if (draft.judgmentIds.length === new Set(previous.judgmentIds).size) {
+    throw new Error('没有新的正式判断时不能记录下一次状态')
+  }
+
+  return createStateRecord(
+    schoolId,
+    draft,
+    {
+      previousSnapshotId: previous.snapshot.id,
+      sequence: previous.snapshot.sequence + 1,
+      isBaseline: false,
+    },
+    dependencies,
+  )
 }
 
 export interface StateRepository {
   findLatest(schoolId: string): Promise<StateRecord | null>
+  findById(id: string): Promise<StateRecord | null>
   saveBaseline(record: StateRecord): Promise<void>
+  saveNext(record: StateRecord, expectedPreviousSnapshotId: string): Promise<void>
 }

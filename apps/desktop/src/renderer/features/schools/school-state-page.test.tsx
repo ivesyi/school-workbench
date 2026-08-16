@@ -76,6 +76,54 @@ const draft: StateWorkspaceView = {
   },
 }
 
+const updateDraft: StateWorkspaceView = {
+  state: 'update_draft',
+  overview: {
+    ...draft.overview,
+    summary: '目前五个方面都已经有新的正式判断可以参考。',
+    dimensions: draft.overview.dimensions.map((item) =>
+      item.dimensionKey === 'leadership'
+        ? {
+            ...item,
+            status: 'partial' as const,
+            statusLabel: '部分达到阶段目标',
+            summary: '中层开始独立拆解任务，校长也开始授权。',
+            basis: [
+              '中层仍然依赖校长完成关键任务拆解。',
+              '中层已经能够独立完成关键任务拆解，校长开始授权中层承担真实责任。',
+            ],
+          }
+        : item,
+    ),
+  },
+  change: {
+    newJudgmentCount: 1,
+    summary: '和上一次相比，有 1 个方面出现明确变化，其余方面目前基本不变。',
+    dimensions: draft.overview.dimensions.map((item) => ({
+      dimensionKey: item.dimensionKey,
+      label: item.label,
+      kind: item.dimensionKey === 'leadership' ? ('improved' as const) : ('unchanged' as const),
+      kindLabel: item.dimensionKey === 'leadership' ? '改善' : '基本不变',
+      symbol: item.dimensionKey === 'leadership' ? ('↑' as const) : ('→' as const),
+      previousStatus: item.status,
+      currentStatus: item.dimensionKey === 'leadership' ? ('partial' as const) : item.status,
+      previousStatusLabel: item.statusLabel,
+      currentStatusLabel:
+        item.dimensionKey === 'leadership' ? '部分达到阶段目标' : item.statusLabel,
+      previousSummary: item.summary,
+      currentSummary:
+        item.dimensionKey === 'leadership'
+          ? '中层开始独立拆解任务，校长也开始授权。'
+          : item.summary,
+      basis:
+        item.dimensionKey === 'leadership'
+          ? ['中层已经能够独立完成关键任务拆解，校长开始授权中层承担真实责任。']
+          : item.basis,
+      summaryChanged: item.dimensionKey === 'leadership',
+    })),
+  },
+}
+
 function baseApi(stateView: StateWorkspaceView = draft): WorkbenchApi {
   return {
     schools: {
@@ -168,6 +216,38 @@ describe('SchoolStatePage', () => {
     expect(await screen.findByText('已经记录这所学校当前的起点状态。')).toBeInTheDocument()
     expect(screen.getByText('起点状态')).toBeInTheDocument()
     expect(api.states.confirm).toHaveBeenCalledWith({ schoolId: 'school-1' })
+  })
+
+  it('shows new changes, keeps adjustment transient and confirms the current state with comparison', async () => {
+    const adjusted: StateWorkspaceView = {
+      ...updateDraft,
+      overview: {
+        ...updateDraft.overview,
+        summary: '结合你的补充，我重新整理了当前状态。',
+      },
+    }
+    const current: StateWorkspaceView = { ...adjusted, state: 'current' }
+    const api = baseApi(updateDraft)
+    vi.mocked(api.states.adjust).mockResolvedValue(adjusted)
+    vi.mocked(api.states.confirm).mockResolvedValue(current)
+
+    renderPage(api)
+
+    expect(
+      await screen.findByText('这轮你已经确认了 1 个新的变化，我重新整理了一下学校现在的状态。'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('和上一次相比')).toBeInTheDocument()
+    expect(screen.getByText('改善')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '我想调整' }))
+    await userEvent.type(screen.getByLabelText('哪里需要调整？'), '文化这部分先别判断')
+    await userEvent.click(screen.getByRole('button', { name: '重新整理当前状态' }))
+    expect(await screen.findByText('结合你的补充，我重新整理了当前状态。')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '确认现在的状态' }))
+    expect(await screen.findByText('已经记录这所学校现在的状态。')).toBeInTheDocument()
+    expect(screen.getByText('和上一次相比')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '确认现在的状态' })).not.toBeInTheDocument()
   })
 
   it('gives an actionable empty state when there is no active stage', async () => {

@@ -2,8 +2,6 @@ import type {
   AcceptedJudgment,
   DiagnosisProposal,
   JudgmentRepository,
-  ProposalChain,
-  ReviewOutcome,
   School,
   SchoolRepository,
   StageRecommendation,
@@ -79,7 +77,7 @@ function judgment(id: string, statement: string, createdAt: string): AcceptedJud
   }
 }
 
-const judgments = [
+const initialJudgments = [
   judgment(
     'judgment-2',
     '教师已经开始稳定教研复盘，能够根据课堂情况调整。',
@@ -96,12 +94,15 @@ function schoolRepository(): SchoolRepository {
   }
 }
 
-function judgmentRepository(items = judgments): JudgmentRepository {
-  return {
-    saveProposalChain: vi.fn<(chain: ProposalChain) => Promise<void>>(),
-    findProposal: vi.fn<(id: string) => Promise<DiagnosisProposal | null>>(),
-    saveReviewOutcome: vi.fn<(outcome: ReviewOutcome) => Promise<void>>(),
-    listAcceptedJudgments: vi.fn().mockResolvedValue(items),
+class MemoryJudgmentRepository implements JudgmentRepository {
+  constructor(public items: AcceptedJudgment[] = [...initialJudgments]) {}
+  async saveProposalChain(): Promise<void> {}
+  async findProposal(): Promise<DiagnosisProposal | null> {
+    return null
+  }
+  async saveReviewOutcome(): Promise<void> {}
+  async listAcceptedJudgments(schoolId: string): Promise<AcceptedJudgment[]> {
+    return this.items.filter((item) => item.schoolId === schoolId)
   }
 }
 
@@ -126,16 +127,33 @@ class MemoryStageRepository implements StageRepository {
 }
 
 class MemoryStateRepository implements StateRepository {
-  record: StateRecord | null = null
+  records: StateRecord[] = []
   saves = 0
 
   async findLatest(schoolId: string): Promise<StateRecord | null> {
-    return this.record?.snapshot.schoolId === schoolId ? this.record : null
+    return (
+      this.records
+        .filter((item) => item.snapshot.schoolId === schoolId)
+        .sort((left, right) => right.snapshot.sequence - left.snapshot.sequence)[0] ?? null
+    )
+  }
+
+  async findById(id: string): Promise<StateRecord | null> {
+    return this.records.find((item) => item.snapshot.id === id) ?? null
   }
 
   async saveBaseline(record: StateRecord): Promise<void> {
-    if (this.record) throw new Error('已经记录起点状态')
-    this.record = record
+    if (await this.findLatest(record.snapshot.schoolId)) throw new Error('已经记录起点状态')
+    this.records.push(record)
+    this.saves += 1
+  }
+
+  async saveNext(record: StateRecord, expectedPreviousSnapshotId: string): Promise<void> {
+    const latest = await this.findLatest(record.snapshot.schoolId)
+    if (!latest || latest.snapshot.id !== expectedPreviousSnapshotId) {
+      throw new Error('学校状态已经有更新')
+    }
+    this.records.push(record)
     this.saves += 1
   }
 }
@@ -143,7 +161,7 @@ class MemoryStateRepository implements StateRepository {
 describe('BaselineStateAssessmentEngine', () => {
   it('uses only confirmed stage targets, covers all five dimensions and stays unverified when evidence is absent', async () => {
     const engine = new BaselineStateAssessmentEngine()
-    const draft = await engine.assess(activeStage, judgments)
+    const draft = await engine.assess(activeStage, initialJudgments)
 
     expect(draft.judgmentIds).toEqual(['judgment-2', 'judgment-1'])
     expect(draft.assessments).toHaveLength(5)
@@ -166,14 +184,14 @@ describe('BaselineStateAssessmentEngine', () => {
 
   it('uses natural-language feedback to reframe a transient dimension assessment', async () => {
     const engine = new BaselineStateAssessmentEngine()
-    const initial = await engine.assess(activeStage, judgments)
+    const initial = await engine.assess(activeStage, initialJudgments)
     expect(initial.assessments.find((item) => item.dimensionKey === 'leadership')?.status).toBe(
       'far_below',
     )
 
     const adjusted = await engine.assess(
       activeStage,
-      judgments,
+      initialJudgments,
       '领导力这部分先别判断，还需要更多观察',
     )
     const leadership = adjusted.assessments.find((item) => item.dimensionKey === 'leadership')
@@ -185,8 +203,9 @@ describe('BaselineStateAssessmentEngine', () => {
 })
 
 describe('StateService', () => {
-  it('keeps the draft transient, persists only on confirmation and makes repeated confirmation idempotent', async () => {
+  it('keeps baseline draft transient, persists only on confirmation and makes repeated confirmation idempotent', async () => {
     const states = new MemoryStateRepository()
+    const judgments = new MemoryJudgmentRepository()
     const baselineEngine = new BaselineStateAssessmentEngine()
     const assess = vi.fn(
       (stage: StageRecommendation, items: AcceptedJudgment[], feedback?: string) =>
@@ -195,7 +214,7 @@ describe('StateService', () => {
     const engine: StateAssessmentEngine = { assess }
     const service = new StateService(
       schoolRepository(),
-      judgmentRepository(),
+      judgments,
       new MemoryStageRepository(),
       states,
       engine,
@@ -203,29 +222,113 @@ describe('StateService', () => {
 
     const initial = await service.getWorkspace(school.id)
     expect(initial.state).toBe('draft')
-    expect(states.record).toBeNull()
+    expect(states.records).toHaveLength(0)
 
     const adjusted = await service.adjust({
       schoolId: school.id,
       feedback: '领导力这部分先别判断，还需要更多观察',
     })
     expect(adjusted.state).toBe('draft')
-    expect(states.record).toBeNull()
-    expect(assess).toHaveBeenLastCalledWith(
-      activeStage,
-      judgments,
-      '领导力这部分先别判断，还需要更多观察',
-    )
+    expect(states.records).toHaveLength(0)
 
     const confirmed = await service.confirm({ schoolId: school.id })
     expect(confirmed.state).toBe('baseline')
-    expect(states.record?.snapshot.sequence).toBe(1)
-    expect(states.record?.snapshot.isBaseline).toBe(true)
-    expect(states.record?.judgmentIds).toEqual(['judgment-2', 'judgment-1'])
+    expect(states.records[0]?.snapshot.sequence).toBe(1)
+    expect(states.records[0]?.snapshot.isBaseline).toBe(true)
+    expect(states.records[0]?.judgmentIds).toEqual(['judgment-2', 'judgment-1'])
     expect(states.saves).toBe(1)
 
     const repeated = await service.confirm({ schoolId: school.id })
     expect(repeated.state).toBe('baseline')
     expect(states.saves).toBe(1)
+  })
+
+  it('forms an update draft only when new judgments exist, compares it to baseline and confirms immutable snapshot #2', async () => {
+    const states = new MemoryStateRepository()
+    const judgments = new MemoryJudgmentRepository()
+    const service = new StateService(
+      schoolRepository(),
+      judgments,
+      new MemoryStageRepository(),
+      states,
+    )
+
+    await service.getWorkspace(school.id)
+    await service.confirm({ schoolId: school.id })
+    expect((await service.getWorkspace(school.id)).state).toBe('baseline')
+
+    judgments.items.unshift(
+      judgment(
+        'judgment-3',
+        '中层已经能够独立完成关键任务拆解，校长开始授权中层承担真实责任。',
+        '2026-08-17T03:00:00.000Z',
+      ),
+    )
+
+    const update = await service.getWorkspace(school.id)
+    expect(update.state).toBe('update_draft')
+    if (update.state !== 'update_draft') throw new Error('expected update draft')
+    expect(update.change.newJudgmentCount).toBe(1)
+    expect(update.change.dimensions.find((item) => item.dimensionKey === 'leadership')?.kind).toBe(
+      'improved',
+    )
+    expect(states.records).toHaveLength(1)
+
+    const adjusted = await service.adjust({
+      schoolId: school.id,
+      feedback: '文化这部分先别判断，还需要更多观察',
+    })
+    expect(adjusted.state).toBe('update_draft')
+    expect(states.records).toHaveLength(1)
+
+    const confirmed = await service.confirm({ schoolId: school.id })
+    expect(confirmed.state).toBe('current')
+    expect(states.records).toHaveLength(2)
+    expect(states.records[0]?.snapshot.sequence).toBe(1)
+    expect(states.records[0]?.snapshot.isBaseline).toBe(true)
+    expect(states.records[1]?.snapshot.sequence).toBe(2)
+    expect(states.records[1]?.snapshot.previousSnapshotId).toBe(states.records[0]?.snapshot.id)
+    expect(states.records[1]?.snapshot.isBaseline).toBe(false)
+    expect(states.records[1]?.judgmentIds).toEqual(['judgment-3', 'judgment-2', 'judgment-1'])
+
+    const repeated = await service.confirm({ schoolId: school.id })
+    expect(repeated.state).toBe('current')
+    expect(states.records).toHaveLength(2)
+  })
+
+  it('rejects a stale update draft when another judgment is accepted before confirmation', async () => {
+    const states = new MemoryStateRepository()
+    const judgments = new MemoryJudgmentRepository()
+    const service = new StateService(
+      schoolRepository(),
+      judgments,
+      new MemoryStageRepository(),
+      states,
+    )
+
+    await service.getWorkspace(school.id)
+    await service.confirm({ schoolId: school.id })
+    judgments.items.unshift(
+      judgment(
+        'judgment-3',
+        '中层已经能够独立完成关键任务拆解，校长开始授权。',
+        '2026-08-17T03:00:00.000Z',
+      ),
+    )
+    expect((await service.getWorkspace(school.id)).state).toBe('update_draft')
+
+    judgments.items.unshift(
+      judgment(
+        'judgment-4',
+        '团队已经开始公开讨论推进中的问题，并共同承担结果。',
+        '2026-08-17T03:30:00.000Z',
+      ),
+    )
+    await expect(service.confirm({ schoolId: school.id })).rejects.toThrow('新的正式判断')
+    expect(states.records).toHaveLength(1)
+
+    const refreshed = await service.getWorkspace(school.id)
+    expect(refreshed.state).toBe('update_draft')
+    if (refreshed.state === 'update_draft') expect(refreshed.change.newJudgmentCount).toBe(2)
   })
 })
