@@ -85,7 +85,10 @@ function sameProjectionContent(
   return JSON.stringify(fileProjection) === JSON.stringify(persistedProjection)
 }
 
-function selectedConstructIds(pack: MethodologyPack, criterionIds: ReadonlySet<string>): Set<string> {
+function selectedConstructIds(
+  pack: MethodologyPack,
+  criterionIds: ReadonlySet<string>,
+): Set<string> {
   const constructById = new Map(pack.constructs.map((construct) => [construct.id, construct]))
   const result = new Set<string>()
 
@@ -141,8 +144,7 @@ export class WorkbenchReadCapabilityService {
         : null,
       recentJudgments: recentJudgments.map((judgment) => ({
         ...judgment,
-        scope:
-          typeof judgment.scope === 'string' ? parseJsonValue(judgment.scope) : judgment.scope,
+        scope: typeof judgment.scope === 'string' ? parseJsonValue(judgment.scope) : judgment.scope,
       })),
       judgmentLimit: 10 as const,
       judgmentOrder: 'createdAt_desc_id_desc' as const,
@@ -278,7 +280,8 @@ export class WorkbenchReadCapabilityService {
       .filter(
         (criterion) =>
           !parsed.dimensionKeys?.length ||
-          (criterion.dimensionKey !== null && parsed.dimensionKeys.includes(criterion.dimensionKey)),
+          (criterion.dimensionKey !== null &&
+            parsed.dimensionKeys.includes(criterion.dimensionKey)),
       )
       .filter((criterion) => !parsed.practiceType || criterion.practiceType === parsed.practiceType)
       .filter(
@@ -323,7 +326,9 @@ export class WorkbenchReadCapabilityService {
           sourceLocator: criterion.sourceLocator,
         }
       }),
-      behaviorAnchors: filePack.behaviorAnchors.filter((anchor) => selectedIds.has(anchor.criterionId)),
+      behaviorAnchors: filePack.behaviorAnchors.filter((anchor) =>
+        selectedIds.has(anchor.criterionId),
+      ),
     })
   }
 

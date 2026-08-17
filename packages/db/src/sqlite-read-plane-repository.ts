@@ -99,7 +99,7 @@ export class SqliteReadPlaneRepository implements ReadPlaneRepository {
 
   async getActiveStage(
     schoolId: string,
-  ): Promise<(Extract<StageCurrentDto, { status: 'present' }>['stage']) | null> {
+  ): Promise<Extract<StageCurrentDto, { status: 'present' }>['stage'] | null> {
     const row = this.database.client
       .prepare(
         `SELECT id, school_id, title, summary, focus, sequence, starts_at
@@ -180,23 +180,25 @@ export class SqliteReadPlaneRepository implements ReadPlaneRepository {
     schoolId: string,
     query: Readonly<{ limit: number; beforeSequence: number | null }>,
   ): Promise<BoundedPage<StateRecordDto>> {
-    const rows = (query.beforeSequence === null
-      ? this.database.client
-          .prepare(
-            `SELECT id, school_id, stage_id, previous_snapshot_id, sequence, summary,
+    const rows = (
+      query.beforeSequence === null
+        ? this.database.client
+            .prepare(
+              `SELECT id, school_id, stage_id, previous_snapshot_id, sequence, summary,
                     is_baseline, confirmed_at, created_at
              FROM state_snapshots WHERE school_id = ?
              ORDER BY sequence DESC LIMIT ?`,
-          )
-          .all(schoolId, query.limit + 1)
-      : this.database.client
-          .prepare(
-            `SELECT id, school_id, stage_id, previous_snapshot_id, sequence, summary,
+            )
+            .all(schoolId, query.limit + 1)
+        : this.database.client
+            .prepare(
+              `SELECT id, school_id, stage_id, previous_snapshot_id, sequence, summary,
                     is_baseline, confirmed_at, created_at
              FROM state_snapshots WHERE school_id = ? AND sequence < ?
              ORDER BY sequence DESC LIMIT ?`,
-          )
-          .all(schoolId, query.beforeSequence, query.limit + 1)) as SnapshotRow[]
+            )
+            .all(schoolId, query.beforeSequence, query.limit + 1)
+    ) as SnapshotRow[]
 
     const hasMore = rows.length > query.limit
     const selected = rows.slice(0, query.limit)
@@ -236,7 +238,11 @@ export class SqliteReadPlaneRepository implements ReadPlaneRepository {
           id: row.id,
           proposalId: row.proposal_id,
           statement: row.statement,
-          scope: assertSchoolScope(parseJson(row.scope_json, 'judgment scope'), schoolId, 'Judgment'),
+          scope: assertSchoolScope(
+            parseJson(row.scope_json, 'judgment scope'),
+            schoolId,
+            'Judgment',
+          ),
           validFrom: row.valid_from,
           validTo: row.valid_to,
           createdAt: row.created_at,
@@ -249,30 +255,32 @@ export class SqliteReadPlaneRepository implements ReadPlaneRepository {
     schoolId: string,
     query: EvidenceQuery,
   ): Promise<BoundedPage<EvidenceMetadataDto>> {
-    const rows = (query.before
-      ? this.database.client
-          .prepare(
-            `SELECT id, school_id, source_type, uri, inline_text, title, locator_json, content_hash,
+    const rows = (
+      query.before
+        ? this.database.client
+            .prepare(
+              `SELECT id, school_id, source_type, uri, inline_text, title, locator_json, content_hash,
                     captured_at, registered_by, agent_run_id, created_at
              FROM evidence
              WHERE school_id = ? AND (created_at < ? OR (created_at = ? AND id < ?))
              ORDER BY created_at DESC, id DESC LIMIT ?`,
-          )
-          .all(
-            schoolId,
-            query.before.createdAt,
-            query.before.createdAt,
-            query.before.id,
-            query.limit + 1,
-          )
-      : this.database.client
-          .prepare(
-            `SELECT id, school_id, source_type, uri, inline_text, title, locator_json, content_hash,
+            )
+            .all(
+              schoolId,
+              query.before.createdAt,
+              query.before.createdAt,
+              query.before.id,
+              query.limit + 1,
+            )
+        : this.database.client
+            .prepare(
+              `SELECT id, school_id, source_type, uri, inline_text, title, locator_json, content_hash,
                     captured_at, registered_by, agent_run_id, created_at
              FROM evidence WHERE school_id = ?
              ORDER BY created_at DESC, id DESC LIMIT ?`,
-          )
-          .all(schoolId, query.limit + 1)) as Array<{
+            )
+            .all(schoolId, query.limit + 1)
+    ) as Array<{
       id: string
       school_id: string
       source_type: string
@@ -314,28 +322,30 @@ export class SqliteReadPlaneRepository implements ReadPlaneRepository {
     schoolId: string,
     query: DiagnosisQuery,
   ): Promise<BoundedPage<DiagnosisMetadataDto>> {
-    const rows = (query.before
-      ? this.database.client
-          .prepare(
-            `SELECT id, school_id, type, title, confidence, status, created_at
+    const rows = (
+      query.before
+        ? this.database.client
+            .prepare(
+              `SELECT id, school_id, type, title, confidence, status, created_at
              FROM diagnosis_proposals
              WHERE school_id = ? AND (created_at < ? OR (created_at = ? AND id < ?))
              ORDER BY created_at DESC, id DESC LIMIT ?`,
-          )
-          .all(
-            schoolId,
-            query.before.createdAt,
-            query.before.createdAt,
-            query.before.id,
-            query.limit + 1,
-          )
-      : this.database.client
-          .prepare(
-            `SELECT id, school_id, type, title, confidence, status, created_at
+            )
+            .all(
+              schoolId,
+              query.before.createdAt,
+              query.before.createdAt,
+              query.before.id,
+              query.limit + 1,
+            )
+        : this.database.client
+            .prepare(
+              `SELECT id, school_id, type, title, confidence, status, created_at
              FROM diagnosis_proposals WHERE school_id = ?
              ORDER BY created_at DESC, id DESC LIMIT ?`,
-          )
-          .all(schoolId, query.limit + 1)) as Array<{
+            )
+            .all(schoolId, query.limit + 1)
+    ) as Array<{
       id: string
       school_id: string
       type: string

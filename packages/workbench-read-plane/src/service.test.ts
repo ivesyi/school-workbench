@@ -185,7 +185,10 @@ describe('WorkbenchReadCapabilityService', () => {
   )
 
   it.each([
-    ['content hash', (pack: MethodologyPackProjection) => ({ ...pack, contentHash: '0'.repeat(64) })],
+    [
+      'content hash',
+      (pack: MethodologyPackProjection) => ({ ...pack, contentHash: '0'.repeat(64) }),
+    ],
     [
       'source fingerprint',
       (pack: MethodologyPackProjection) => ({ ...pack, sourceFingerprint: '1'.repeat(64) }),
@@ -199,20 +202,17 @@ describe('WorkbenchReadCapabilityService', () => {
         ),
       }),
     ],
-  ] as const)(
-    'fails closed on active %s drift',
-    async (_label, mutate) => {
-      const { registry, pack } = activeSbdFixture()
-      const service = createService(registry, [mutate(projectMethodologyPack(pack))])
-      await expect(
-        service.standardsGet(school.id, {
-          packKey: pack.key,
-          version: pack.version,
-          criterionRefs: ['SBD.C1.RESULT_CLARITY'],
-        }),
-      ).rejects.toMatchObject({ code: 'STANDARDS_DRIFT' })
-    },
-  )
+  ] as const)('fails closed on active %s drift', async (_label, mutate) => {
+    const { registry, pack } = activeSbdFixture()
+    const service = createService(registry, [mutate(projectMethodologyPack(pack))])
+    await expect(
+      service.standardsGet(school.id, {
+        packKey: pack.key,
+        version: pack.version,
+        criterionRefs: ['SBD.C1.RESULT_CLARITY'],
+      }),
+    ).rejects.toMatchObject({ code: 'STANDARDS_DRIFT' })
+  })
 
   it.each([
     { packKey: 'schooling-by-design', version: '404', criterionRefs: ['SBD.C1.RESULT_CLARITY'] },
@@ -233,6 +233,8 @@ describe('WorkbenchReadCapabilityService', () => {
     const { registry, pack } = activeSbdFixture()
     const service = createService(registry, [projectMethodologyPack(pack)])
     await expect(service.standardsGet(school.id, input)).rejects.toBeInstanceOf(ReadPlaneError)
-    await expect(service.standardsGet(school.id, input)).rejects.toMatchObject({ code: 'INPUT_INVALID' })
+    await expect(service.standardsGet(school.id, input)).rejects.toMatchObject({
+      code: 'INPUT_INVALID',
+    })
   })
 })

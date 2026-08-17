@@ -75,7 +75,10 @@ export const standardsGetInputSchema = z
     schoolId: scopedSchoolIdSchema.optional(),
     packKey: z.string().trim().min(1).max(120),
     version: z.string().trim().min(1).max(80),
-    dimensionKeys: z.array(z.enum(canonicalDimensionKeys)).max(canonicalDimensionKeys.length).optional(),
+    dimensionKeys: z
+      .array(z.enum(canonicalDimensionKeys))
+      .max(canonicalDimensionKeys.length)
+      .optional(),
     practiceType: z.string().trim().min(1).max(120).optional(),
     criterionRefs: z.array(z.string().trim().min(1).max(200)).max(25).optional(),
   })
@@ -112,11 +115,7 @@ export type DiagnosisListInput = z.infer<typeof diagnosisListInputSchema>
 export type StandardsGetInput = z.infer<typeof standardsGetInputSchema>
 
 export type ReadPlaneErrorCode =
-  | 'INPUT_INVALID'
-  | 'SCHOOL_NOT_FOUND'
-  | 'READ_STALE'
-  | 'STANDARDS_DRIFT'
-  | 'INTERNAL'
+  'INPUT_INVALID' | 'SCHOOL_NOT_FOUND' | 'READ_STALE' | 'STANDARDS_DRIFT' | 'INTERNAL'
 
 export class ReadPlaneError extends Error {
   constructor(
@@ -358,13 +357,18 @@ export type BoundedPage<T> = Readonly<{
 
 export interface ReadPlaneRepository {
   getSchool(schoolId: string): Promise<SchoolDto | null>
-  getActiveStage(schoolId: string): Promise<(StageSummaryDto & { targets: readonly StageTargetDto[] }) | null>
+  getActiveStage(
+    schoolId: string,
+  ): Promise<(StageSummaryDto & { targets: readonly StageTargetDto[] }) | null>
   getLatestState(schoolId: string): Promise<StateRecordDto | null>
   listStateHistory(
     schoolId: string,
     query: Readonly<{ limit: number; beforeSequence: number | null }>,
   ): Promise<BoundedPage<StateRecordDto>>
-  listRecentJudgments(schoolId: string, limit: number): Promise<readonly AcceptedJudgmentSummaryDto[]>
+  listRecentJudgments(
+    schoolId: string,
+    limit: number,
+  ): Promise<readonly AcceptedJudgmentSummaryDto[]>
   listEvidence(schoolId: string, query: EvidenceQuery): Promise<BoundedPage<EvidenceMetadataDto>>
   listDiagnoses(schoolId: string, query: DiagnosisQuery): Promise<BoundedPage<DiagnosisMetadataDto>>
 }

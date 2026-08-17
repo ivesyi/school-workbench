@@ -56,12 +56,14 @@ function tokenDigest(token: string): string {
 
 function requireOpaqueIdentity(value: string, field: string): string {
   const trimmed = value.trim()
-  if (!trimmed || trimmed.length > 160) throw new Error(`${field} must be a bounded opaque identity`)
+  if (!trimmed || trimmed.length > 160)
+    throw new Error(`${field} must be a bounded opaque identity`)
   return trimmed
 }
 
 function parseBearer(authorization: string | undefined): string {
-  if (!authorization) throw new CapabilityAuthError('AUTH_MISSING', 'Bearer authorization is required')
+  if (!authorization)
+    throw new CapabilityAuthError('AUTH_MISSING', 'Bearer authorization is required')
   const match = /^Bearer ([A-Za-z0-9_-]{32,512})$/.exec(authorization)
   if (!match?.[1]) throw new CapabilityAuthError('AUTH_UNKNOWN', 'Bearer authorization is invalid')
   return match[1]
@@ -83,12 +85,14 @@ export class CapabilityTokenStore {
 
   constructor(private readonly now: () => number = () => Date.now()) {}
 
-  issue(input: Readonly<{
-    agentRunId: string
-    schoolId: string
-    scopes: readonly string[]
-    ttlMs?: number
-  }>): CapabilityTokenGrant {
+  issue(
+    input: Readonly<{
+      agentRunId: string
+      schoolId: string
+      scopes: readonly string[]
+      ttlMs?: number
+    }>,
+  ): CapabilityTokenGrant {
     const agentRunId = requireOpaqueIdentity(input.agentRunId, 'agentRunId')
     const schoolId = requireOpaqueIdentity(input.schoolId, 'schoolId')
     if (input.scopes.length === 0 || new Set(input.scopes).size !== input.scopes.length) {

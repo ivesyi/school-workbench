@@ -10,9 +10,7 @@ import { CapabilityAuthError, CapabilityTokenStore, type CapabilityTokenGrant } 
 import type { WorkbenchReadCapabilityService } from './service'
 
 export type ReadPlaneApiErrorCode =
-  | CapabilityAuthError['code']
-  | ReadPlaneError['code']
-  | 'CAPABILITY_NOT_FOUND'
+  CapabilityAuthError['code'] | ReadPlaneError['code'] | 'CAPABILITY_NOT_FOUND'
 
 export type ReadPlaneApiErrorEnvelope = Readonly<{
   ok: false
@@ -45,10 +43,7 @@ function statusFor(error: CapabilityAuthError | ReadPlaneError): number {
   return 500
 }
 
-function errorEnvelope(
-  code: ReadPlaneApiErrorCode,
-  message: string,
-): ReadPlaneApiErrorEnvelope {
+function errorEnvelope(code: ReadPlaneApiErrorCode, message: string): ReadPlaneApiErrorEnvelope {
   return Object.freeze({ ok: false, error: Object.freeze({ code, message }) })
 }
 
@@ -95,7 +90,9 @@ export class WorkbenchLoopbackReadPlane {
       const capability = (request.params as { capability?: string }).capability ?? ''
       if (!readCapabilityNames.includes(capability as ReadCapabilityName)) {
         this.safeLog({ level: 'warn', capability, code: 'CAPABILITY_NOT_FOUND' })
-        return reply.code(404).send(errorEnvelope('CAPABILITY_NOT_FOUND', 'Read capability not found'))
+        return reply
+          .code(404)
+          .send(errorEnvelope('CAPABILITY_NOT_FOUND', 'Read capability not found'))
       }
 
       const typedCapability = capability as ReadCapabilityName
@@ -156,12 +153,14 @@ export class WorkbenchLoopbackReadPlane {
     await this.#server.close()
   }
 
-  issueToken(input: Readonly<{
-    schoolId: string
-    agentRunId: string
-    scopes: readonly string[]
-    ttlMs?: number
-  }>): CapabilityTokenGrant {
+  issueToken(
+    input: Readonly<{
+      schoolId: string
+      agentRunId: string
+      scopes: readonly string[]
+      ttlMs?: number
+    }>,
+  ): CapabilityTokenGrant {
     return this.tokens.issue(input)
   }
 

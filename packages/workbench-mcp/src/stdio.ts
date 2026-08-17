@@ -12,21 +12,21 @@ import {
   type ReadCapabilityName,
 } from '@school-workbench/workbench-read-plane'
 
-const ENV_KEYS = [
-  'SWB_ENDPOINT',
-  'SWB_TOKEN',
-  'SWB_SCHOOL_ID',
-  'SWB_AGENT_RUN_ID',
-] as const
+const ENV_KEYS = ['SWB_ENDPOINT', 'SWB_TOKEN', 'SWB_SCHOOL_ID', 'SWB_AGENT_RUN_ID'] as const
 
 const TOOL_DESCRIPTIONS: Readonly<Record<ReadCapabilityName, string>> = Object.freeze({
-  school_context: 'Read the scoped school context, active stage summary, current state summary, and recent accepted judgments.',
-  stage_current: 'Read the scoped school current active stage and its confirmed five-dimensional targets.',
+  school_context:
+    'Read the scoped school context, active stage summary, current state summary, and recent accepted judgments.',
+  stage_current:
+    'Read the scoped school current active stage and its confirmed five-dimensional targets.',
   state_current: 'Read the scoped school latest immutable formal state and judgment provenance.',
   state_history: 'Read a bounded page of the scoped school formal state history.',
-  evidence_list: 'Read a bounded page of scoped Evidence metadata and provenance without raw content.',
-  diagnosis_list: 'Read a bounded page of immutable DiagnosisProposal metadata and provenance refs.',
-  standards_get: 'Read a bounded, filtered projection of an exactly matched active methodology pack.',
+  evidence_list:
+    'Read a bounded page of scoped Evidence metadata and provenance without raw content.',
+  diagnosis_list:
+    'Read a bounded page of immutable DiagnosisProposal metadata and provenance refs.',
+  standards_get:
+    'Read a bounded, filtered projection of an exactly matched active methodology pack.',
 })
 
 const READ_ONLY_ANNOTATIONS = Object.freeze({
@@ -121,11 +121,17 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function parseApiEnvelope(value: unknown): unknown {
   if (!isObject(value) || typeof value.ok !== 'boolean') {
-    throw new LocalApiError('LOCAL_API_PROTOCOL_ERROR', 'Internal Local API returned an invalid envelope')
+    throw new LocalApiError(
+      'LOCAL_API_PROTOCOL_ERROR',
+      'Internal Local API returned an invalid envelope',
+    )
   }
   if (value.ok === true) {
     if (!Object.hasOwn(value, 'data')) {
-      throw new LocalApiError('LOCAL_API_PROTOCOL_ERROR', 'Internal Local API response is missing data')
+      throw new LocalApiError(
+        'LOCAL_API_PROTOCOL_ERROR',
+        'Internal Local API response is missing data',
+      )
     }
     return value.data
   }
@@ -137,7 +143,10 @@ function parseApiEnvelope(value: unknown): unknown {
     typeof error.message !== 'string' ||
     !error.message
   ) {
-    throw new LocalApiError('LOCAL_API_PROTOCOL_ERROR', 'Internal Local API returned an invalid error')
+    throw new LocalApiError(
+      'LOCAL_API_PROTOCOL_ERROR',
+      'Internal Local API returned an invalid error',
+    )
   }
   throw new LocalApiError(error.code, error.message)
 }
@@ -194,15 +203,13 @@ function errorResult(error: unknown) {
 
 function createServer(config: BootstrapConfig): McpServer {
   const server = new McpServer({ name: 'school-workbench-read-plane', version: '0.1.0' })
-  const handler =
-    (capability: ReadCapabilityName) =>
-    async (input: unknown) => {
-      try {
-        return successResult(await callLocalApi(config, capability, input))
-      } catch (error) {
-        return errorResult(error)
-      }
+  const handler = (capability: ReadCapabilityName) => async (input: unknown) => {
+    try {
+      return successResult(await callLocalApi(config, capability, input))
+    } catch (error) {
+      return errorResult(error)
     }
+  }
 
   server.registerTool(
     'school_context',

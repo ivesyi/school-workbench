@@ -105,30 +105,45 @@ describe('Workbench loopback capability auth', () => {
       scopes: ['school.read'],
       ttlMs: 5_000,
     })
-    const legal = await post(endpoint, 'school_context', {}, {
-      token: valid.token,
-      schoolId: 'school-a',
-      agentRunId: 'run-a',
-    })
+    const legal = await post(
+      endpoint,
+      'school_context',
+      {},
+      {
+        token: valid.token,
+        schoolId: 'school-a',
+        agentRunId: 'run-a',
+      },
+    )
     expect(legal.status).toBe(200)
     await expect(legal.json()).resolves.toMatchObject({
       ok: true,
       data: { school: { id: 'school-a' } },
     })
 
-    const missing = await post(endpoint, 'school_context', {}, {
-      schoolId: 'school-a',
-      agentRunId: 'run-a',
-    })
+    const missing = await post(
+      endpoint,
+      'school_context',
+      {},
+      {
+        schoolId: 'school-a',
+        agentRunId: 'run-a',
+      },
+    )
     expect(missing.status).toBe(401)
     await expect(missing.json()).resolves.toMatchObject({ error: { code: 'AUTH_MISSING' } })
 
     const unknownToken = 'u'.repeat(43)
-    const unknown = await post(endpoint, 'school_context', {}, {
-      token: unknownToken,
-      schoolId: 'school-a',
-      agentRunId: 'run-a',
-    })
+    const unknown = await post(
+      endpoint,
+      'school_context',
+      {},
+      {
+        token: unknownToken,
+        schoolId: 'school-a',
+        agentRunId: 'run-a',
+      },
+    )
     expect(unknown.status).toBe(401)
     expect(JSON.stringify(await unknown.json())).not.toContain(unknownToken)
 
@@ -139,11 +154,16 @@ describe('Workbench loopback capability auth', () => {
       ttlMs: 1_000,
     })
     now += 1_000
-    const expired = await post(endpoint, 'school_context', {}, {
-      token: expiring.token,
-      schoolId: 'school-a',
-      agentRunId: 'run-a',
-    })
+    const expired = await post(
+      endpoint,
+      'school_context',
+      {},
+      {
+        token: expiring.token,
+        schoolId: 'school-a',
+        agentRunId: 'run-a',
+      },
+    )
     expect(expired.status).toBe(401)
     await expect(expired.json()).resolves.toMatchObject({ error: { code: 'AUTH_EXPIRED' } })
 
@@ -153,11 +173,16 @@ describe('Workbench loopback capability auth', () => {
       scopes: ['school.read'],
     })
     expect(server.revokeToken(revoked.token)).toBe(true)
-    const revokedResponse = await post(endpoint, 'school_context', {}, {
-      token: revoked.token,
-      schoolId: 'school-a',
-      agentRunId: 'run-a',
-    })
+    const revokedResponse = await post(
+      endpoint,
+      'school_context',
+      {},
+      {
+        token: revoked.token,
+        schoolId: 'school-a',
+        agentRunId: 'run-a',
+      },
+    )
     expect(revokedResponse.status).toBe(401)
     await expect(revokedResponse.json()).resolves.toMatchObject({ error: { code: 'AUTH_REVOKED' } })
 
@@ -166,44 +191,70 @@ describe('Workbench loopback capability auth', () => {
       agentRunId: 'run-a',
       scopes: ['stage.read'],
     })
-    const scopeResponse = await post(endpoint, 'school_context', {}, {
-      token: wrongScope.token,
-      schoolId: 'school-a',
-      agentRunId: 'run-a',
-    })
+    const scopeResponse = await post(
+      endpoint,
+      'school_context',
+      {},
+      {
+        token: wrongScope.token,
+        schoolId: 'school-a',
+        agentRunId: 'run-a',
+      },
+    )
     expect(scopeResponse.status).toBe(403)
     await expect(scopeResponse.json()).resolves.toMatchObject({
       error: { code: 'AUTH_SCOPE_DENIED' },
     })
 
-    const wrongSchool = await post(endpoint, 'school_context', {}, {
-      token: valid.token,
-      schoolId: 'school-b',
-      agentRunId: 'run-a',
-    })
+    const wrongSchool = await post(
+      endpoint,
+      'school_context',
+      {},
+      {
+        token: valid.token,
+        schoolId: 'school-b',
+        agentRunId: 'run-a',
+      },
+    )
     expect(wrongSchool.status).toBe(403)
     await expect(wrongSchool.json()).resolves.toMatchObject({
       error: { code: 'AUTH_SCHOOL_MISMATCH' },
     })
 
-    const wrongRun = await post(endpoint, 'school_context', {}, {
-      token: valid.token,
-      schoolId: 'school-a',
-      agentRunId: 'run-b',
-    })
+    const wrongRun = await post(
+      endpoint,
+      'school_context',
+      {},
+      {
+        token: valid.token,
+        schoolId: 'school-a',
+        agentRunId: 'run-b',
+      },
+    )
     expect(wrongRun.status).toBe(403)
     await expect(wrongRun.json()).resolves.toMatchObject({ error: { code: 'AUTH_RUN_MISMATCH' } })
 
-    const bodyScope = await post(endpoint, 'school_context', { schoolId: 'school-b' }, {
-      token: valid.token,
-      schoolId: 'school-a',
-      agentRunId: 'run-a',
-    })
+    const bodyScope = await post(
+      endpoint,
+      'school_context',
+      { schoolId: 'school-b' },
+      {
+        token: valid.token,
+        schoolId: 'school-a',
+        agentRunId: 'run-a',
+      },
+    )
     expect(bodyScope.status).toBe(400)
     await expect(bodyScope.json()).resolves.toMatchObject({ error: { code: 'INPUT_INVALID' } })
 
     const serializedLogs = JSON.stringify(logs)
-    for (const token of [valid.token, unknownToken, expiring.token, revoked.token, wrongScope.token]) {
+    for (const token of [
+      valid.token,
+      unknownToken,
+      expiring.token,
+      revoked.token,
+      wrongScope.token,
+    ]) {
       expect(serializedLogs).not.toContain(token)
     }
   })
