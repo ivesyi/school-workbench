@@ -1,7 +1,6 @@
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { syntheticGoldenSuite } from '../golden/v1/cases'
 import {
-  loadGoldenCaseFixtureFile,
   loadGoldenCaseFixtures,
   runGoldenCaseWithAdapter,
   runGoldenSuite,
@@ -9,8 +8,7 @@ import {
 } from './golden'
 import { registryForProfile } from './test-support'
 
-const fixturePath = resolve('packages/assessment/golden/v1/cases.json')
-const goldenCases = loadGoldenCaseFixtureFile(fixturePath)
+const goldenCases = loadGoldenCaseFixtures(syntheticGoldenSuite)
 
 function allKeys(value: unknown, keys = new Set<string>()): Set<string> {
   if (Array.isArray(value)) {
@@ -41,17 +39,15 @@ describe('assessment golden quality harness', () => {
     if (!firstCase) throw new Error('Golden fixture suite is empty')
 
     expect(() =>
-      loadGoldenCaseFixtures(
-        JSON.stringify({
-          schemaVersion: 1,
-          cases: [
-            {
-              ...firstCase,
-              unexpected: true,
-            },
-          ],
-        }),
-      ),
+      loadGoldenCaseFixtures({
+        schemaVersion: 1,
+        cases: [
+          {
+            ...firstCase,
+            unexpected: true,
+          },
+        ],
+      }),
     ).toThrow()
   })
 
