@@ -25,45 +25,38 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - name: Install and refresh lockfile
-        run: pnpm install --no-frozen-lockfile
-      - name: Generate Drizzle migration
-        run: pnpm db:generate
-      - name: Normalize test query
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Generate Drizzle check
+        run: |
+          pnpm db:generate
+          git diff --exit-code -- packages/db/drizzle
+      - name: Normalize diagnosis repository types
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
 
-          path = Path('packages/db/src/sqlite-grounded-diagnosis-repository.test.ts')
+          path = Path('packages/db/src/sqlite-grounded-diagnosis-repository.ts')
           text = path.read_text()
-          text = text.replace("import { methodologyCriteria, methodologyPacks } from './methodology-schema'\n", '')
-          pattern = re.compile(
-              r"    const persistedCriterion = database\.db\n"
-              r"      \.select\(\{ id: methodologyCriteria\.id \}\)\n"
-              r"      \.from\(methodologyCriteria\)\n"
-              r"      \.where\(\(fields, operators\) => operators\.eq\(fields\.stableKey, SBD\.criterionId\)\)\n"
-              r"      \.get\(\)\n"
-              r"    if \(!persistedCriterion\) throw new Error\('criterion fixture missing'\)"
+          text = text.replace(
+              "      Boolean(parsed) &&\n      typeof parsed === 'object' &&",
+              "      parsed !== null &&\n      typeof parsed === 'object' &&",
           )
-          replacement = """    const persistedCriterion = database.client
-              .prepare('SELECT id FROM methodology_criteria WHERE stable_key = ?')
-              .get(SBD.criterionId) as { id: string } | undefined
-            if (!persistedCriterion) throw new Error('criterion fixture missing')"""
-          text, count = pattern.subn(replacement, text)
-          if count != 1:
-              raise SystemExit(f'expected one criterion query block, found {count}')
+          text = text.replace(
+              "    stageTargetIds: Object.freeze([...record.stageTargetIds]),\n  })\n}\n\nexport class SqliteGroundedDiagnosisRepository",
+              "    stageTargetIds: Object.freeze([...record.stageTargetIds]),\n  }) as unknown as GroundedDiagnosisRecord\n}\n\nexport class SqliteGroundedDiagnosisRepository",
+          )
           path.write_text(text)
           PY
-      - name: Format generated and changed files
+      - name: Format changed files
         run: pnpm format:write
-      - name: Commit generated artifacts and normalization
+      - name: Commit normalization
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
           if ! git diff --cached --quiet; then
-            git commit -m "chore(db): generate grounded diagnosis migration [generated]"
+            git commit -m "fix(db): normalize grounded diagnosis types [generated]"
             git push origin HEAD:validated-diagnosis-seam-20260817
           fi
       - name: Lint
