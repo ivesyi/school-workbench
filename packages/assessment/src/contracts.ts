@@ -150,6 +150,7 @@ export const assessmentCandidateSchema = z
   .object({
     protocolVersion: z.literal(assessmentProtocolVersion),
     school: schoolScopeSchema,
+    claimRefs: z.array(idSchema),
     criterionMappings: z.array(criterionMappingSchema),
     stageTargetRefs: z.array(idSchema),
     supportingFactRefs: z.array(idSchema),
