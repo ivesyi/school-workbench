@@ -40,6 +40,24 @@ jobs:
           text = text.replace("readFileSync(serverBundle, 'utf8')", "readFileSync(resolve('packages/workbench-mcp/src/stdio.ts'), 'utf8')")
           integration.write_text(text)
 
+          loopback = Path('packages/workbench-read-plane/src/loopback.ts')
+          text = loopback.read_text().replace("      disableRequestLogging: true,\n", "")
+          loopback.write_text(text)
+
+          db_test = Path('packages/db/src/sqlite-read-plane-repository.test.ts')
+          text = db_test.read_text()
+          text = text.replace(
+              "  for (const [index, input] of [\n    ['evidence-a-3'",
+              "  for (const [index, input] of ([\n    ['evidence-a-3'",
+              1,
+          )
+          text = text.replace(
+              "    ['evidence-b-1', 'school-b', '2026-08-17T01:04:00.000Z', 'B1'],\n  ] as const) {\n    db.prepare(",
+              "    ['evidence-b-1', 'school-b', '2026-08-17T01:04:00.000Z', 'B1'],\n  ] as const).entries()) {\n    db.prepare(",
+              1,
+          )
+          db_test.write_text(text)
+
           auth_test = Path('packages/workbench-read-plane/src/auth.test.ts')
           text = auth_test.read_text()
           query_marker = "    const serializedLogs = JSON.stringify(logs)"
