@@ -89,6 +89,7 @@ function baseCandidate(
   return {
     protocolVersion: 1,
     school: { kind: 'school', schoolId },
+    claimRefs: [`${schoolId}-c1`],
     criterionMappings: criterionRef
       ? [
           {
@@ -102,7 +103,7 @@ function baseCandidate(
     counterFactRefs: [],
     counterEvidenceSearch: {
       completed: true,
-      summary: '已检查当前输入中的全部合成事实及其 ClaimFact stance，未发现已登记的相反事实。',
+      summary: '已检查当前候选 Claim 范围内的合成事实与 ClaimFact stance，未发现已登记的相反事实。',
       searchedEvidenceRefs: [`${schoolId}-e1`],
       searchedFactRefs: [`${schoolId}-f1`],
     },
@@ -197,6 +198,80 @@ counterInput.claimFacts.push({
 const counterCandidate = baseCandidate(counterSchool, SBD_SYSTEM_ALIGNMENT)
 counterCandidate.counterEvidenceSearch.searchedFactRefs.push(`${counterSchool}-f2`)
 
+const unrelatedCounterSchool = 'school-unrelated-counter-synthetic'
+const unrelatedCounterInput = baseInput(unrelatedCounterSchool, SBD_SYSTEM_ALIGNMENT)
+unrelatedCounterInput.observationFacts.push({
+  kind: 'observation_fact',
+  id: `${unrelatedCounterSchool}-f2`,
+  schoolId: unrelatedCounterSchool,
+  evidenceId: `${unrelatedCounterSchool}-e1`,
+  factType: 'context',
+  text: '另一个未被候选选择的议题存在一条相反事实。',
+  locator: 'synthetic:meeting-note:fact-2',
+  directness: 'high',
+})
+unrelatedCounterInput.claims.push({
+  kind: 'claim',
+  id: `${unrelatedCounterSchool}-c2`,
+  schoolId: unrelatedCounterSchool,
+  statement: '这是与候选 Claim A 无关的 Claim B。',
+  predicateKey: 'synthetic:unrelated_claim',
+  scope: { kind: 'school', schoolId: unrelatedCounterSchool },
+})
+unrelatedCounterInput.claimFacts.push({
+  claimId: `${unrelatedCounterSchool}-c2`,
+  factId: `${unrelatedCounterSchool}-f2`,
+  stance: 'counter',
+})
+const unrelatedCounterCandidate = baseCandidate(unrelatedCounterSchool, SBD_SYSTEM_ALIGNMENT)
+
+const selectedCounterSchool = 'school-selected-counter-synthetic'
+const selectedCounterInput = baseInput(selectedCounterSchool, SBD_SYSTEM_ALIGNMENT)
+selectedCounterInput.observationFacts.push(
+  {
+    kind: 'observation_fact',
+    id: `${selectedCounterSchool}-f2`,
+    schoolId: selectedCounterSchool,
+    evidenceId: `${selectedCounterSchool}-e1`,
+    factType: 'organization',
+    text: 'Claim A 同时存在一条需要纳入候选的相反事实。',
+    locator: 'synthetic:meeting-note:fact-2',
+    directness: 'high',
+  },
+  {
+    kind: 'observation_fact',
+    id: `${selectedCounterSchool}-f3`,
+    schoolId: selectedCounterSchool,
+    evidenceId: `${selectedCounterSchool}-e1`,
+    factType: 'context',
+    text: '未选中的 Claim B 也存在一条相反事实。',
+    locator: 'synthetic:meeting-note:fact-3',
+    directness: 'high',
+  },
+)
+selectedCounterInput.claims.push({
+  kind: 'claim',
+  id: `${selectedCounterSchool}-c2`,
+  schoolId: selectedCounterSchool,
+  statement: '这是与候选 Claim A 无关的 Claim B。',
+  predicateKey: 'synthetic:unrelated_claim',
+  scope: { kind: 'school', schoolId: selectedCounterSchool },
+})
+selectedCounterInput.claimFacts.push(
+  {
+    claimId: `${selectedCounterSchool}-c1`,
+    factId: `${selectedCounterSchool}-f2`,
+    stance: 'counter',
+  },
+  {
+    claimId: `${selectedCounterSchool}-c2`,
+    factId: `${selectedCounterSchool}-f3`,
+    stance: 'counter',
+  },
+)
+const selectedCounterCandidate = baseCandidate(selectedCounterSchool, SBD_SYSTEM_ALIGNMENT)
+selectedCounterCandidate.counterEvidenceSearch.searchedFactRefs.push(`${selectedCounterSchool}-f2`)
+
 const vagueSchool = 'school-vague-synthetic'
 const vagueInput = baseInput(
   vagueSchool,
@@ -209,6 +284,7 @@ vagueInput.claimFacts = []
 const vagueCandidate = {
   protocolVersion: 1,
   school: { kind: 'school', schoolId: vagueSchool },
+  claimRefs: [],
   criterionMappings: [],
   stageTargetRefs: [],
   supportingFactRefs: [],
@@ -304,6 +380,26 @@ export const syntheticGoldenSuite = {
       'active',
       counterInput,
       counterCandidate,
+      {
+        validationOutcome: 'fail',
+        errorCodes: ['ASSESSMENT_COUNTER_FACT_OMITTED'],
+        substantiveReviewStatus: 'not_applicable',
+      },
+    ),
+    goldenCase(
+      'unselected-claim-counter-does-not-pollute',
+      'Counter fact on an unselected Claim does not pollute the candidate',
+      'active',
+      unrelatedCounterInput,
+      unrelatedCounterCandidate,
+      { validationOutcome: 'pass', errorCodes: [], substantiveReviewStatus: 'pending_review' },
+    ),
+    goldenCase(
+      'selected-claim-counter-still-required',
+      'Counter fact on the selected Claim remains required while unrelated Claim is ignored',
+      'active',
+      selectedCounterInput,
+      selectedCounterCandidate,
       {
         validationOutcome: 'fail',
         errorCodes: ['ASSESSMENT_COUNTER_FACT_OMITTED'],

@@ -25,7 +25,7 @@ function allKeys(value: unknown, keys = new Set<string>()): Set<string> {
 
 describe('assessment golden quality harness', () => {
   it('loads a versioned strict fixture suite made only from synthetic school material', () => {
-    expect(goldenCases).toHaveLength(10)
+    expect(goldenCases).toHaveLength(12)
     expect(goldenCases.every((goldenCase) => goldenCase.materialPolicy === 'synthetic_only')).toBe(
       true,
     )
@@ -76,6 +76,10 @@ describe('assessment golden quality harness', () => {
     const byId = new Map(results.map((result) => [result.caseId, result]))
 
     expect(byId.get('counter-fact-omitted')?.errorCodes).toEqual([
+      'ASSESSMENT_COUNTER_FACT_OMITTED',
+    ])
+    expect(byId.get('unselected-claim-counter-does-not-pollute')?.validationOutcome).toBe('pass')
+    expect(byId.get('selected-claim-counter-still-required')?.errorCodes).toEqual([
       'ASSESSMENT_COUNTER_FACT_OMITTED',
     ])
     expect(byId.get('observation-interpretation-confusion')?.errorCodes).toEqual([

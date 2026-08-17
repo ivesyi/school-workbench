@@ -20,6 +20,12 @@ export type AssessmentValidationResult =
       errors: readonly AssessmentProtocolError[]
     }>
 
+type DuplicateEntry = Readonly<{
+  key: string
+  path: string
+  label: string
+}>
+
 function uniqueErrors(errors: readonly AssessmentProtocolError[]): AssessmentProtocolError[] {
   const seen = new Set<string>()
   return errors.filter((error) => {
@@ -28,6 +34,27 @@ function uniqueErrors(errors: readonly AssessmentProtocolError[]): AssessmentPro
     seen.add(key)
     return true
   })
+}
+
+function addDuplicateErrors(
+  errors: AssessmentProtocolError[],
+  entries: readonly DuplicateEntry[],
+  code: 'ASSESSMENT_DUPLICATE_ID' | 'ASSESSMENT_DUPLICATE_REF',
+): void {
+  const seen = new Set<string>()
+  for (const entry of entries) {
+    if (seen.has(entry.key)) {
+      errors.push(
+        protocolError(
+          code,
+          entry.path,
+          `${entry.label} must be unique within AssessmentCandidate.`,
+        ),
+      )
+      continue
+    }
+    seen.add(entry.key)
+  }
 }
 
 function parseCandidate(
@@ -127,6 +154,81 @@ export function validateAssessmentCandidate(
   const { candidate } = candidateResult
   const errors: AssessmentProtocolError[] = []
 
+  addDuplicateErrors(
+    errors,
+    candidate.claimRefs.map((ref, index) => ({
+      key: ref,
+      path: `$.candidate.claimRefs[${index}]`,
+      label: 'Claim ref',
+    })),
+    'ASSESSMENT_DUPLICATE_REF',
+  )
+  addDuplicateErrors(
+    errors,
+    candidate.stageTargetRefs.map((ref, index) => ({
+      key: ref,
+      path: `$.candidate.stageTargetRefs[${index}]`,
+      label: 'StageTarget ref',
+    })),
+    'ASSESSMENT_DUPLICATE_REF',
+  )
+  addDuplicateErrors(
+    errors,
+    candidate.supportingFactRefs.map((ref, index) => ({
+      key: ref,
+      path: `$.candidate.supportingFactRefs[${index}]`,
+      label: 'Supporting fact ref',
+    })),
+    'ASSESSMENT_DUPLICATE_REF',
+  )
+  addDuplicateErrors(
+    errors,
+    candidate.counterFactRefs.map((ref, index) => ({
+      key: ref,
+      path: `$.candidate.counterFactRefs[${index}]`,
+      label: 'Counter fact ref',
+    })),
+    'ASSESSMENT_DUPLICATE_REF',
+  )
+  addDuplicateErrors(
+    errors,
+    candidate.counterEvidenceSearch.searchedEvidenceRefs.map((ref, index) => ({
+      key: ref,
+      path: `$.candidate.counterEvidenceSearch.searchedEvidenceRefs[${index}]`,
+      label: 'Searched Evidence ref',
+    })),
+    'ASSESSMENT_DUPLICATE_REF',
+  )
+  addDuplicateErrors(
+    errors,
+    candidate.counterEvidenceSearch.searchedFactRefs.map((ref, index) => ({
+      key: ref,
+      path: `$.candidate.counterEvidenceSearch.searchedFactRefs[${index}]`,
+      label: 'Searched ObservationFact ref',
+    })),
+    'ASSESSMENT_DUPLICATE_REF',
+  )
+  addDuplicateErrors(
+    errors,
+    candidate.interpretations.map((interpretation, index) => ({
+      key: interpretation.id,
+      path: `$.candidate.interpretations[${index}].id`,
+      label: 'Interpretation id',
+    })),
+    'ASSESSMENT_DUPLICATE_ID',
+  )
+  for (const [interpretationIndex, interpretation] of candidate.interpretations.entries()) {
+    addDuplicateErrors(
+      errors,
+      interpretation.factRefs.map((ref, factIndex) => ({
+        key: ref,
+        path: `$.candidate.interpretations[${interpretationIndex}].factRefs[${factIndex}]`,
+        label: 'Interpretation fact ref',
+      })),
+      'ASSESSMENT_DUPLICATE_REF',
+    )
+  }
+
   if (candidate.school.schoolId !== input.school.schoolId) {
     errors.push(
       protocolError(
@@ -135,6 +237,22 @@ export function validateAssessmentCandidate(
         'Candidate school scope does not match AssessmentInput.',
       ),
     )
+  }
+
+  const claimIds = new Set(input.claims.map((claim) => claim.id))
+  const selectedClaimIds = new Set<string>()
+  for (const [index, claimRef] of candidate.claimRefs.entries()) {
+    if (!claimIds.has(claimRef)) {
+      errors.push(
+        protocolError(
+          'ASSESSMENT_CLAIM_REF_DANGLING',
+          `$.candidate.claimRefs[${index}]`,
+          `Claim ref ${claimRef} is not present in AssessmentInput.`,
+        ),
+      )
+      continue
+    }
+    selectedClaimIds.add(claimRef)
   }
 
   const targetIds = new Set(input.confirmedStageTargets.map((target) => target.id))
@@ -153,11 +271,12 @@ export function validateAssessmentCandidate(
   const evidenceIds = new Set(input.evidence.map((item) => item.id))
   const factIds = new Set(input.observationFacts.map((fact) => fact.id))
   const interpretationIds = new Set(candidate.interpretations.map((item) => item.id))
-  const supportingStanceFacts = new Set(
-    input.claimFacts.filter((link) => link.stance === 'supporting').map((link) => link.factId),
+  const selectedClaimFacts = input.claimFacts.filter((link) => selectedClaimIds.has(link.claimId))
+  const selectedSupportingStanceFacts = new Set(
+    selectedClaimFacts.filter((link) => link.stance === 'supporting').map((link) => link.factId),
   )
-  const counterStanceFacts = new Set(
-    input.claimFacts.filter((link) => link.stance === 'counter').map((link) => link.factId),
+  const selectedCounterStanceFacts = new Set(
+    selectedClaimFacts.filter((link) => link.stance === 'counter').map((link) => link.factId),
   )
 
   for (const [index, factRef] of candidate.supportingFactRefs.entries()) {
@@ -168,12 +287,12 @@ export function validateAssessmentCandidate(
       factIds,
       interpretationIds,
     )
-    if (factIds.has(factRef) && !supportingStanceFacts.has(factRef)) {
+    if (factIds.has(factRef) && !selectedSupportingStanceFacts.has(factRef)) {
       errors.push(
         protocolError(
           'ASSESSMENT_FACT_STANCE_MISMATCH',
           `$.candidate.supportingFactRefs[${index}]`,
-          `Fact ${factRef} is not linked to a Claim with supporting stance.`,
+          `Fact ${factRef} is not linked with supporting stance to a selected Claim.`,
         ),
       )
     }
@@ -187,12 +306,12 @@ export function validateAssessmentCandidate(
       factIds,
       interpretationIds,
     )
-    if (factIds.has(factRef) && !counterStanceFacts.has(factRef)) {
+    if (factIds.has(factRef) && !selectedCounterStanceFacts.has(factRef)) {
       errors.push(
         protocolError(
           'ASSESSMENT_FACT_STANCE_MISMATCH',
           `$.candidate.counterFactRefs[${index}]`,
-          `Fact ${factRef} is not linked to a Claim with counter stance.`,
+          `Fact ${factRef} is not linked with counter stance to a selected Claim.`,
         ),
       )
     }
@@ -264,12 +383,22 @@ export function validateAssessmentCandidate(
   }
 
   if (candidate.status === 'proposed') {
-    if (context.resolvedMethodology.length === 0 || supportingStanceFacts.size === 0) {
+    if (context.resolvedMethodology.length === 0 || selectedSupportingStanceFacts.size === 0) {
       errors.push(
         protocolError(
           'ASSESSMENT_ABSTENTION_REQUIRED',
           '$.candidate.status',
-          'Without an active criterion mapping context and supporting ClaimFact, the candidate must abstain.',
+          'Without an active criterion mapping context and supporting ClaimFact on a selected Claim, the candidate must abstain.',
+        ),
+      )
+    }
+
+    if (candidate.claimRefs.length === 0) {
+      errors.push(
+        protocolError(
+          'ASSESSMENT_PROPOSED_CLAIM_REQUIRED',
+          '$.candidate.claimRefs',
+          'A proposed candidate requires at least one selected Claim ref.',
         ),
       )
     }
@@ -319,7 +448,21 @@ export function validateAssessmentCandidate(
         protocolError(
           'ASSESSMENT_COUNTER_SEARCH_REQUIRED',
           '$.candidate.counterEvidenceSearch.completed',
-          'A proposed candidate must explicitly complete counter-evidence search.',
+          'A proposed candidate must explicitly declare counter-evidence search complete.',
+        ),
+      )
+    }
+
+    if (
+      candidate.counterEvidenceSearch.completed &&
+      candidate.counterEvidenceSearch.searchedEvidenceRefs.length === 0 &&
+      candidate.counterEvidenceSearch.searchedFactRefs.length === 0
+    ) {
+      errors.push(
+        protocolError(
+          'ASSESSMENT_COUNTER_SEARCH_AUDIT_REFS_REQUIRED',
+          '$.candidate.counterEvidenceSearch',
+          'A declared completed counter-evidence search requires at least one auditable Evidence or ObservationFact ref.',
         ),
       )
     }
@@ -336,7 +479,7 @@ export function validateAssessmentCandidate(
 
     const candidateCounterFacts = new Set(candidate.counterFactRefs)
     const searchedCounterFacts = new Set(candidate.counterEvidenceSearch.searchedFactRefs)
-    const omittedCounterFacts = [...counterStanceFacts].filter(
+    const omittedCounterFacts = [...selectedCounterStanceFacts].filter(
       (factId) => !candidateCounterFacts.has(factId),
     )
     if (omittedCounterFacts.length > 0) {
@@ -344,20 +487,20 @@ export function validateAssessmentCandidate(
         protocolError(
           'ASSESSMENT_COUNTER_FACT_OMITTED',
           '$.candidate.counterFactRefs',
-          `Candidate omitted known counter facts: ${omittedCounterFacts.join(', ')}`,
+          `Candidate omitted known counter facts for selected Claims: ${omittedCounterFacts.join(', ')}`,
         ),
       )
     }
 
     if (
       candidate.counterEvidenceSearch.completed &&
-      [...counterStanceFacts].some((factId) => !searchedCounterFacts.has(factId))
+      [...selectedCounterStanceFacts].some((factId) => !searchedCounterFacts.has(factId))
     ) {
       errors.push(
         protocolError(
           'ASSESSMENT_COUNTER_SEARCH_REQUIRED',
           '$.candidate.counterEvidenceSearch.searchedFactRefs',
-          'Completed counter-evidence search must include every known counter ClaimFact.',
+          'Declared completed counter-evidence search must cite every known counter ClaimFact in selected Claims.',
         ),
       )
     }
