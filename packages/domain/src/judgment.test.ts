@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createProposalChain, createReviewOutcome } from './judgment'
+import { createProposalChain, createReviewOutcome, type DiagnosisProposal } from './judgment'
 
 function dependencies() {
   let index = 0
@@ -68,5 +68,43 @@ describe('judgment epistemic chain', () => {
       dependencies(),
     )
     expect(modified.acceptedJudgment?.statement).toBe('顾问修改后的判断')
+  })
+
+  it('never accepts or modifies an insufficient-evidence proposal', () => {
+    const proposal: DiagnosisProposal = {
+      id: 'proposal-insufficient',
+      schoolId: 'school-1',
+      agentRunId: null,
+      type: 'state',
+      title: '还需要更多依据',
+      scopeJson: JSON.stringify({ kind: 'school', schoolId: 'school-1' }),
+      interpretations: [],
+      provisionalJudgment: null,
+      mechanism: null,
+      alternativeHypotheses: [],
+      unresolvedQuestions: ['还缺什么可观察事实？'],
+      recommendedActions: [],
+      nextObservations: ['补充一次可定位观察。'],
+      impactEvidencePlan: [],
+      evidenceQuality: { directness: 'low', triangulated: false },
+      confidence: 'low',
+      status: 'insufficient_evidence',
+      createdAt: '2026-08-17T00:00:00.000Z',
+    }
+
+    expect(() => createReviewOutcome(proposal, { decision: 'accepted' }, dependencies())).toThrow(
+      /证据不足/,
+    )
+    expect(() =>
+      createReviewOutcome(
+        proposal,
+        { decision: 'modified', finalText: '不能绕过证据门槛' },
+        dependencies(),
+      ),
+    ).toThrow(/证据不足/)
+    expect(
+      createReviewOutcome(proposal, { decision: 'needs_more_evidence' }, dependencies())
+        .acceptedJudgment,
+    ).toBeNull()
   })
 })
