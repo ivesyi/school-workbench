@@ -5,12 +5,15 @@
 ## 已建立的边界
 
 - `AssessmentInput` 显式携带学校 scope、当前 active Stage、confirmed StageTargets、Evidence、ObservationFacts、Claims / ClaimFact stance，以及精确到 `pack key + version + criterion stable id` 的 methodology context。
+- `AssessmentCandidate` 显式携带 `claimRefs`。supporting / counter facts 必须通过 ClaimFact 关系落到候选实际选择的 Claims；未选择 Claim 的 counter fact 不参与该候选的 known-counter coverage。
 - `AssessmentCandidate` 只保存可审核的短理由、引用、暂定判断、机制、替代假设、未决问题、下一步观察与影响证据计划；不保存也不要求隐藏思维链。
 - 所有协议 schema 使用 strict / fail-closed；numeric score、weight、综合等级、学校排名字段不属于协议。
+- Input 中 StageTarget、Evidence、ObservationFact、Claim 的 id，以及 ClaimFact tuple 必须唯一；Candidate 的关键 refs、Interpretation id 与 Interpretation fact refs 同样禁止重复，避免 Map / Set 静默吞掉冲突。
 - `MethodologyRegistry` 只做精确解析。生产校验只接受 `active` Pack；仓库当前两份 Pack 仍保持 `review`。
 - Validator 不选择 Criterion、不生成判断，只验证候选是否满足 scope、引用、stance、counter-evidence、StageTarget 和 methodology 约束。
-- `proposed` 至少需要 Criterion、StageTarget、supporting fact、完成的 counter-evidence search 和一个 alternative hypothesis；已知 counter fact 不能遗漏。
-- 证据不足时允许且要求 `insufficient_evidence`：`provisionalJudgment = null`，并给出 unresolved question 与 next observation。
+- `proposed` 至少需要 Claim、Criterion、StageTarget、supporting fact、声明完成的 counter-evidence search 和一个 alternative hypothesis；候选选中 Claims 范围内的已知 counter fact 不能遗漏。
+- 当 `counterEvidenceSearch.completed=true` 时，必须至少留下一个 searched Evidence / ObservationFact ref，并覆盖候选选中 Claims 范围内已知的 counter facts。这个约束只证明存在可审核引用与已知 counter coverage，不证明现实中的搜索已经完整。
+- 证据不足时允许且要求 `insufficient_evidence`：`provisionalJudgment = null`，并给出 unresolved question 与 next observation；此状态允许 `claimRefs` 为空。
 - methodology context 只接受稳定 Criterion 引用；RAG 相似度、检索片段或原书摘录不是 Criterion，也不是 Evidence。本轮没有 retrieval。
 - Golden Harness 使用完全合成的学校材料，只验证 protocol correctness。需要专业判断的正向案例统一标记 `pending_review`，不声称 consultant agreement 或模型准确率。
 - Runner 与 runtime adapter 解耦；同一 candidate 无论来自何种后续 adapter，都经过同一 validator。
@@ -21,4 +24,4 @@
 
 ## 已知限制
 
-当前 harness 证明的是协议、引用与质量门禁的一致性，不证明候选判断在教育咨询专业上正确。仓库 Methodology Pack 仍处于 `review`；测试通过深拷贝并仅改变生命周期 `status` 构造 active 内存 fixture，不改变仓库 Pack 状态。
+当前 harness 证明的是协议、引用与质量门禁的一致性，不证明候选判断在教育咨询专业上正确，也不证明 counter-evidence search 在现实中穷尽。仓库 Methodology Pack 仍处于 `review`；测试通过深拷贝并仅改变生命周期 `status` 构造 active 内存 fixture，不改变仓库 Pack 状态。
