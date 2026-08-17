@@ -1,10 +1,10 @@
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loadGoldenCaseFixtureFile } from './golden'
+import { syntheticGoldenSuite } from '../golden/v1/cases'
+import { loadGoldenCaseFixtures } from './golden'
 import { registryForProfile } from './test-support'
 import { validateAssessmentCandidate } from './validator'
 
-const goldenCases = loadGoldenCaseFixtureFile(resolve('packages/assessment/golden/v1/cases.json'))
+const goldenCases = loadGoldenCaseFixtures(syntheticGoldenSuite)
 const validCase = goldenCases.find((item) => item.id === 'sbd-system-alignment-proposed')
 
 if (!validCase) throw new Error('Missing valid assessment golden case')
@@ -15,7 +15,11 @@ describe('assessment protocol contracts', () => {
       ...(validCase.input as Record<string, unknown>),
       unexpected: true,
     }
-    const inputResult = validateAssessmentCandidate(input, validCase.candidate, registryForProfile('active'))
+    const inputResult = validateAssessmentCandidate(
+      input,
+      validCase.candidate,
+      registryForProfile('active'),
+    )
     expect(inputResult.ok).toBe(false)
     if (!inputResult.ok) {
       expect(inputResult.errors.map((error) => error.code)).toEqual(['ASSESSMENT_INVALID_INPUT'])
@@ -84,7 +88,9 @@ describe('assessment protocol contracts', () => {
     const criterionMappings = candidate.criterionMappings as readonly Record<string, unknown>[]
     const methodologyRef = methodologyContext[0]
     const criterionMapping = criterionMappings[0]
-    if (!methodologyRef || !criterionMapping) throw new Error('Valid fixture is missing methodology refs')
+    if (!methodologyRef || !criterionMapping) {
+      throw new Error('Valid fixture is missing methodology refs')
+    }
 
     const ragLikeInput = {
       ...input,
