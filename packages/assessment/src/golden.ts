@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { deepFreeze, type MethodologyRegistry } from '@school-workbench/methodology'
 import { z } from 'zod'
 import { assessmentErrorCodeSchema, type AssessmentErrorCode } from './errors'
@@ -82,14 +81,13 @@ function summarizeResult(
   })
 }
 
-export function loadGoldenCaseFixtures(jsonText: string): readonly GoldenCase[] {
-  const parsedJson = JSON.parse(jsonText) as unknown
-  const suite = goldenSuiteSchema.parse(parsedJson)
+export function loadGoldenCaseFixtures(rawFixture: unknown): readonly GoldenCase[] {
+  const suite = goldenSuiteSchema.parse(rawFixture)
   return deepFreeze(suite.cases)
 }
 
-export function loadGoldenCaseFixtureFile(path: string): readonly GoldenCase[] {
-  return loadGoldenCaseFixtures(readFileSync(path, 'utf8'))
+export function parseGoldenCaseFixtureJson(jsonText: string): readonly GoldenCase[] {
+  return loadGoldenCaseFixtures(JSON.parse(jsonText) as unknown)
 }
 
 export function runGoldenCase(
@@ -116,7 +114,9 @@ export function runGoldenSuite(
   goldenCases: readonly GoldenCase[],
   registryForCase: (goldenCase: GoldenCase) => MethodologyRegistry,
 ): readonly GoldenCaseResult[] {
-  return deepFreeze(goldenCases.map((goldenCase) => runGoldenCase(goldenCase, registryForCase(goldenCase))))
+  return deepFreeze(
+    goldenCases.map((goldenCase) => runGoldenCase(goldenCase, registryForCase(goldenCase))),
+  )
 }
 
 export async function runGoldenCaseWithAdapter(
