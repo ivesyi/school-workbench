@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   verify:
-    if: ${{ !contains(github.event.head_commit.message, '[generated]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -81,8 +80,10 @@ jobs:
 
           test_path = Path('packages/methodology/src/loader.test.ts')
           test = test_path.read_text()
-          needle = "    expect(packs.flatMap((pack) => pack.criteria)).toHaveLength(10)\n"
-          assertion = """    expect(packs.flatMap((pack) => pack.criteria)).toHaveLength(10)
+          assertion_marker = "      'SBD.C1.RESULT_CLARITY': 'leadership',"
+          if assertion_marker not in test:
+              needle = "    expect(packs.flatMap((pack) => pack.criteria)).toHaveLength(10)\n"
+              assertion = """    expect(packs.flatMap((pack) => pack.criteria)).toHaveLength(10)
     expect(
       Object.fromEntries(
         packs.flatMap((pack) =>
@@ -102,9 +103,9 @@ jobs:
       'DW.C5.ACTION_IMPACT_COHERENCE': 'leadership',
     })
 """
-          if needle not in test:
-              raise SystemExit('loader test insertion point not found')
-          test = test.replace(needle, assertion, 1)
+              if needle not in test:
+                  raise SystemExit('loader test insertion point not found')
+              test = test.replace(needle, assertion, 1)
           test = test.replace(
               "    expect(registry.findCriteria({ dimensionKey: 'leadership' })).toHaveLength(0)",
               "    expect(registry.findCriteria({ dimensionKey: 'leadership' })).toHaveLength(2)",
@@ -114,8 +115,9 @@ jobs:
 
           crosswalk_path = Path('knowledge/methodology/WORKBENCH-METHODOLOGY-CROSSWALK.md')
           crosswalk = crosswalk_path.read_text()
-          marker = '## 7. Conflict and precedence\n'
-          section = """## 7. Criterion 五维主归属
+          if '## 7. Criterion 五维主归属\n' not in crosswalk:
+              marker = '## 7. Conflict and precedence\n'
+              section = """## 7. Criterion 五维主归属
 
 `dimensionKey` 表示 Criterion 在当前 Workbench 中用于查询、路由和组织诊断联查时的**主归属**，不表示该 Criterion 只能解释该维度，也不把方法论 Criterion 变成五维成熟度锚点。
 
@@ -136,9 +138,10 @@ jobs:
 
 ## 8. Conflict and precedence
 """
-          if marker not in crosswalk:
-              raise SystemExit('crosswalk insertion point not found')
-          crosswalk_path.write_text(crosswalk.replace(marker, section, 1))
+              if marker not in crosswalk:
+                  raise SystemExit('crosswalk insertion point not found')
+              crosswalk = crosswalk.replace(marker, section, 1)
+          crosswalk_path.write_text(crosswalk)
           PY
       - name: Keep raw books out of Git history
         run: |
@@ -156,8 +159,10 @@ jobs:
                   knowledge/methodology/data-wise-v3/pack.json \
                   knowledge/methodology/WORKBENCH-METHODOLOGY-CROSSWALK.md \
                   packages/methodology/src/loader.test.ts
-          git commit -m "feat(methodology): map reviewed criteria to congruence dimensions [generated]"
-          git push origin HEAD:feat-methodology-dimension-mapping-20260817
+          if ! git diff --cached --quiet; then
+            git commit -m "feat(methodology): map reviewed criteria to congruence dimensions [generated]"
+            git push origin HEAD:feat-methodology-dimension-mapping-20260817
+          fi
       - name: Format
         run: pnpm format
       - name: Lint
