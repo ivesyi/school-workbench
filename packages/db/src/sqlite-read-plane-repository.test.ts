@@ -107,11 +107,7 @@ function fixture() {
      (id, school_id, title, summary, focus, sequence, status, starts_at, ends_at,
       adjustment_feedback, created_at, updated_at)
      VALUES ('stage-a', 'school-a', '当前阶段', '阶段摘要', '阶段焦点', 1, 'active', ?, NULL, NULL, ?, ?)`,
-  ).run(
-    '2026-08-17T00:10:00.000Z',
-    '2026-08-17T00:10:00.000Z',
-    '2026-08-17T00:10:00.000Z',
-  )
+  ).run('2026-08-17T00:10:00.000Z', '2026-08-17T00:10:00.000Z', '2026-08-17T00:10:00.000Z')
   for (const [index, dimension] of dimensions.entries()) {
     db.prepare(
       `INSERT INTO stage_targets
@@ -270,13 +266,12 @@ function fixture() {
         snapshotId,
         dimension,
         `${snapshotId} ${dimension}`,
-        snapshotId === 'snapshot-1'
-          ? '2026-08-17T02:00:00.000Z'
-          : '2026-08-17T03:00:00.000Z',
+        snapshotId === 'snapshot-1' ? '2026-08-17T02:00:00.000Z' : '2026-08-17T03:00:00.000Z',
       )
-      db.prepare(
-        `INSERT INTO assessment_judgments (assessment_id, judgment_id) VALUES (?, ?)`,
-      ).run(assessmentId, snapshotId === 'snapshot-1' ? 'judgment-a-1' : 'judgment-a-2')
+      db.prepare(`INSERT INTO assessment_judgments (assessment_id, judgment_id) VALUES (?, ?)`).run(
+        assessmentId,
+        snapshotId === 'snapshot-1' ? 'judgment-a-1' : 'judgment-a-2',
+      )
     }
   }
 
@@ -306,10 +301,7 @@ describe('SqliteReadPlaneRepository', () => {
     expect(context.school.id).toBe('school-a')
     expect(context.activeStage?.id).toBe('stage-a')
     expect(context.latestSnapshot?.sequence).toBe(2)
-    expect(context.recentJudgments.map((item) => item.id)).toEqual([
-      'judgment-a-2',
-      'judgment-a-1',
-    ])
+    expect(context.recentJudgments.map((item) => item.id)).toEqual(['judgment-a-2', 'judgment-a-1'])
 
     const stage = await service.stageCurrent('school-a', {})
     expect(stage.status).toBe('present')
