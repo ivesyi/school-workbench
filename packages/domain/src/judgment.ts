@@ -71,7 +71,7 @@ export type DiagnosisProposal = {
   title: string
   scopeJson: string
   interpretations: string[]
-  provisionalJudgment: string
+  provisionalJudgment: string | null
   mechanism: string | null
   alternativeHypotheses: string[]
   unresolvedQuestions: string[]
@@ -123,6 +123,15 @@ export type AcceptedJudgment = {
 export type ReviewOutcome = {
   review: HumanReview
   acceptedJudgment: AcceptedJudgment | null
+}
+
+export class DiagnosisReviewInvariantError extends Error {
+  readonly code = 'DIAGNOSIS_REVIEW_DECISION_NOT_ALLOWED' as const
+
+  constructor(message: string) {
+    super(message)
+    this.name = 'DiagnosisReviewInvariantError'
+  }
 }
 
 export type AssessmentDraft = {
@@ -239,6 +248,27 @@ export function createProposalChain(
   }
 }
 
+export function assertReviewDecisionAllowed(
+  proposal: DiagnosisProposal,
+  decision: HumanReview['decision'],
+): void {
+  if (
+    proposal.status === 'insufficient_evidence' &&
+    (decision === 'accepted' || decision === 'modified')
+  ) {
+    throw new DiagnosisReviewInvariantError(
+      '证据不足的判断只能被拒绝或标记为需要补充更多依据',
+    )
+  }
+  if (
+    proposal.status === 'proposed' &&
+    (decision === 'accepted' || decision === 'modified') &&
+    !proposal.provisionalJudgment?.trim()
+  ) {
+    throw new DiagnosisReviewInvariantError('待确认判断缺少可接受的暂定判断文本')
+  }
+}
+
 export function createReviewOutcome(
   proposal: DiagnosisProposal,
   input: {
@@ -249,6 +279,8 @@ export function createReviewOutcome(
   },
   dependencies: JudgmentFactoryDependencies = defaultDependencies,
 ): ReviewOutcome {
+  assertReviewDecisionAllowed(proposal, input.decision)
+
   const reviewedAt = dependencies.now().toISOString()
   const reviewId = dependencies.createId()
 
@@ -271,7 +303,9 @@ export function createReviewOutcome(
   }
 
   const statement =
-    input.decision === 'modified' ? input.finalText!.trim() : proposal.provisionalJudgment.trim()
+    input.decision === 'modified'
+      ? input.finalText!.trim()
+      : proposal.provisionalJudgment!.trim()
 
   return {
     review,
