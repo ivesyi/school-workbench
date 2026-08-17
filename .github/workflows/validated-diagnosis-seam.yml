@@ -5,19 +5,14 @@ on:
     branches:
       - validated-diagnosis-seam-20260817
 
-permissions:
-  contents: write
-
 jobs:
   verify:
-    if: ${{ !contains(github.event.head_commit.message, '[generated]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           ref: validated-diagnosis-seam-20260817
-          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.19.0
@@ -27,38 +22,12 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Generate Drizzle check
+      - name: Drizzle no drift
         run: |
           pnpm db:generate
           git diff --exit-code -- packages/db/drizzle
-      - name: Normalize diagnosis repository types
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('packages/db/src/sqlite-grounded-diagnosis-repository.ts')
-          text = path.read_text()
-          text = text.replace(
-              "      Boolean(parsed) &&\n      typeof parsed === 'object' &&",
-              "      parsed !== null &&\n      typeof parsed === 'object' &&",
-          )
-          text = text.replace(
-              "    stageTargetIds: Object.freeze([...record.stageTargetIds]),\n  })\n}\n\nexport class SqliteGroundedDiagnosisRepository",
-              "    stageTargetIds: Object.freeze([...record.stageTargetIds]),\n  }) as unknown as GroundedDiagnosisRecord\n}\n\nexport class SqliteGroundedDiagnosisRepository",
-          )
-          path.write_text(text)
-          PY
-      - name: Format changed files
-        run: pnpm format:write
-      - name: Commit normalization
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "fix(db): normalize grounded diagnosis types [generated]"
-            git push origin HEAD:validated-diagnosis-seam-20260817
-          fi
+      - name: Format
+        run: pnpm format
       - name: Lint
         run: pnpm lint
       - name: Typecheck
@@ -68,4 +37,4 @@ jobs:
       - name: Build
         run: pnpm build
       - name: E2E
-        run: pnpm test:e2e
+        run: xvfb-run -a pnpm test:e2e
