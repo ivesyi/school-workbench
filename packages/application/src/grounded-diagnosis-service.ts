@@ -18,11 +18,13 @@ import {
 } from '@school-workbench/methodology'
 
 export type GroundedMethodologyExpectation = Readonly<{
+  packId: string
   packKey: string
   version: string
   packContentHash: string
-  criterionStableKey: string
-  criterionRowId: string
+  packSourceFingerprint: string
+  criterion: MethodologyPackProjection['criteria'][number]
+  expectedParentRowId: string | null
 }>
 
 export type GroundedDiagnosisPersistenceRequest = Readonly<{
@@ -91,12 +93,27 @@ function criterionProjection(
       ),
     ])
   }
+  const expectedParentRowId = criterion.parentStableKey
+    ? (projection.criteria.find((item) => item.stableKey === criterion.parentStableKey)?.id ?? null)
+    : null
+  if (criterion.parentStableKey && !expectedParentRowId) {
+    throw new GroundedDiagnosisProtocolError([
+      protocolError(
+        'ASSESSMENT_METHODOLOGY_CRITERION_NOT_FOUND',
+        '$.candidate.criterionMappings',
+        `Criterion ${stableKey} has an unresolved parent in ${packKey}@${version}.`,
+      ),
+    ])
+  }
+
   return {
+    packId: projection.id,
     packKey,
     version,
     packContentHash: projection.contentHash,
-    criterionStableKey: stableKey,
-    criterionRowId: criterion.id,
+    packSourceFingerprint: projection.sourceFingerprint,
+    criterion,
+    expectedParentRowId,
   }
 }
 
