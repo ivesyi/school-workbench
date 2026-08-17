@@ -29,6 +29,12 @@ export type AssessmentContextBuildResult =
   | Readonly<{ ok: true; context: AssessmentContext }>
   | Readonly<{ ok: false; errors: readonly AssessmentProtocolError[] }>
 
+type DuplicateEntry = Readonly<{
+  key: string
+  path: string
+  label: string
+}>
+
 function refKey(ref: MethodologyCriterionRef): string {
   return `${ref.packKey}@${ref.version}#${ref.criterionId}`
 }
@@ -41,6 +47,21 @@ function uniqueErrors(errors: readonly AssessmentProtocolError[]): AssessmentPro
     seen.add(key)
     return true
   })
+}
+
+function addDuplicateErrors(
+  errors: AssessmentProtocolError[],
+  entries: readonly DuplicateEntry[],
+  code: 'ASSESSMENT_DUPLICATE_ID' | 'ASSESSMENT_DUPLICATE_REF',
+): void {
+  const seen = new Set<string>()
+  for (const entry of entries) {
+    if (seen.has(entry.key)) {
+      errors.push(protocolError(code, entry.path, `${entry.label} must be unique within AssessmentInput.`))
+      continue
+    }
+    seen.add(entry.key)
+  }
 }
 
 function rawFactsContainInterpretation(value: unknown): boolean {
@@ -125,6 +146,52 @@ export function buildAssessmentContext(
   const input = parsed
   const errors: AssessmentProtocolError[] = []
   const schoolId = input.school.schoolId
+
+  addDuplicateErrors(
+    errors,
+    input.confirmedStageTargets.map((target, index) => ({
+      key: target.id,
+      path: `$.confirmedStageTargets[${index}].id`,
+      label: 'StageTarget id',
+    })),
+    'ASSESSMENT_DUPLICATE_ID',
+  )
+  addDuplicateErrors(
+    errors,
+    input.evidence.map((evidence, index) => ({
+      key: evidence.id,
+      path: `$.evidence[${index}].id`,
+      label: 'Evidence id',
+    })),
+    'ASSESSMENT_DUPLICATE_ID',
+  )
+  addDuplicateErrors(
+    errors,
+    input.observationFacts.map((fact, index) => ({
+      key: fact.id,
+      path: `$.observationFacts[${index}].id`,
+      label: 'ObservationFact id',
+    })),
+    'ASSESSMENT_DUPLICATE_ID',
+  )
+  addDuplicateErrors(
+    errors,
+    input.claims.map((claim, index) => ({
+      key: claim.id,
+      path: `$.claims[${index}].id`,
+      label: 'Claim id',
+    })),
+    'ASSESSMENT_DUPLICATE_ID',
+  )
+  addDuplicateErrors(
+    errors,
+    input.claimFacts.map((link, index) => ({
+      key: `${link.claimId}\u0000${link.factId}\u0000${link.stance}`,
+      path: `$.claimFacts[${index}]`,
+      label: 'ClaimFact claimId+factId+stance tuple',
+    })),
+    'ASSESSMENT_DUPLICATE_REF',
+  )
 
   if (input.activeStage.schoolId !== schoolId) {
     errors.push(
