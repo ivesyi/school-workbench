@@ -1,4 +1,8 @@
-import { deepFreeze, type MethodologyRegistry } from '@school-workbench/methodology'
+import {
+  deepFreeze,
+  type DeepReadonly,
+  type MethodologyRegistry,
+} from '@school-workbench/methodology'
 import { z } from 'zod'
 import { assessmentErrorCodeSchema, type AssessmentErrorCode } from './errors'
 import { validateAssessmentCandidate } from './validator'
@@ -29,8 +33,8 @@ export const goldenSuiteSchema = z
   })
   .strict()
 
-export type GoldenCase = Readonly<z.infer<typeof goldenCaseSchema>>
-export type GoldenSuite = Readonly<z.infer<typeof goldenSuiteSchema>>
+export type GoldenCase = DeepReadonly<z.infer<typeof goldenCaseSchema>>
+export type GoldenSuite = DeepReadonly<z.infer<typeof goldenSuiteSchema>>
 
 export type GoldenCaseResult = Readonly<{
   caseId: string
