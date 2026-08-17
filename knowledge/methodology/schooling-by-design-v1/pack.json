@@ -88,7 +88,7 @@
     {
       "id": "SBD.C1.RESULT_CLARITY",
       "constructId": "SBD.MISSION",
-      "dimensionKey": null,
+      "dimensionKey": "leadership",
       "practiceType": "school_design",
       "title": "结果清晰度",
       "description": "结果清晰度",
@@ -112,7 +112,7 @@
     {
       "id": "SBD.C2.EVIDENCE_BEFORE_ACTION",
       "constructId": "SBD.BACKWARD_DESIGN",
-      "dimensionKey": null,
+      "dimensionKey": "key_tasks",
       "practiceType": "school_design",
       "title": "证据先于行动",
       "description": "证据先于行动",
@@ -137,7 +137,7 @@
     {
       "id": "SBD.C3.GAP_GROUNDED",
       "constructId": "SBD.VISION_REALITY_GAP",
-      "dimensionKey": null,
+      "dimensionKey": "capability",
       "practiceType": "school_design",
       "title": "差距有证据支撑",
       "description": "差距有证据支撑",
@@ -161,7 +161,7 @@
     {
       "id": "SBD.C4.SYSTEM_ALIGNMENT",
       "constructId": "SBD.ALIGNED_ACTION",
-      "dimensionKey": null,
+      "dimensionKey": "structure",
       "practiceType": "school_design",
       "title": "系统对齐",
       "description": "系统对齐",
@@ -186,7 +186,7 @@
     {
       "id": "SBD.C5.FEEDBACK_ADJUSTMENT",
       "constructId": "SBD.PLAN_TO_ADJUST",
-      "dimensionKey": null,
+      "dimensionKey": "culture",
       "practiceType": "school_design",
       "title": "反馈与调整",
       "description": "反馈与调整",
@@ -295,6 +295,6 @@
   ],
   "canonicalContentHash": {
     "algorithm": "sha256",
-    "value": "6cb344c80e4345bd1daa34ca332636b95a231af930a187299808bcf31c2e154c"
+    "value": "0abd8ef4ee81ec9490523ffd24769a5fc3e871652c244311ff37705126bf4f7e"
   }
 }

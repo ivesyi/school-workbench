@@ -94,7 +94,7 @@
     {
       "id": "DW.C1.LEARNING_PROBLEM_QUALITY",
       "constructId": "DW.LEARNING_PROBLEM",
-      "dimensionKey": null,
+      "dimensionKey": "key_tasks",
       "practiceType": "adult_practice",
       "title": "学习问题质量",
       "description": "学习问题质量",
@@ -115,7 +115,7 @@
     {
       "id": "DW.C2.PRACTICE_VISIBILITY",
       "constructId": "DW.PRACTICE_EVIDENCE",
-      "dimensionKey": null,
+      "dimensionKey": "structure",
       "practiceType": "adult_practice",
       "title": "实践可见性",
       "description": "实践可见性",
@@ -136,7 +136,7 @@
     {
       "id": "DW.C3.PROBLEM_OF_PRACTICE_QUALITY",
       "constructId": "DW.PROBLEM_OF_PRACTICE",
-      "dimensionKey": null,
+      "dimensionKey": "culture",
       "practiceType": "adult_practice",
       "title": "实践问题质量",
       "description": "实践问题质量",
@@ -157,7 +157,7 @@
     {
       "id": "DW.C4.INFERENCE_DISCIPLINE",
       "constructId": "DW.LADDER_DISCIPLINE",
-      "dimensionKey": null,
+      "dimensionKey": "capability",
       "practiceType": "adult_practice",
       "title": "推论纪律",
       "description": "推论纪律",
@@ -178,7 +178,7 @@
     {
       "id": "DW.C5.ACTION_IMPACT_COHERENCE",
       "constructId": "DW.ACTION_IMPACT",
-      "dimensionKey": null,
+      "dimensionKey": "leadership",
       "practiceType": "adult_practice",
       "title": "行动—影响连贯性",
       "description": "行动—影响连贯性",
@@ -294,6 +294,6 @@
   ],
   "canonicalContentHash": {
     "algorithm": "sha256",
-    "value": "390a504d2149cf6192cca6a3b09536ac724917bbaab0dd576e351c4964417750"
+    "value": "f3fd2277bde7f4208c61239cfe5d89ebfbc6b4b2d63662bb07700ee7a5fbb34c"
   }
 }

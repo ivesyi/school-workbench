@@ -47,6 +47,24 @@ describe('methodology pack loader and registry', () => {
     expect(packs).toHaveLength(2)
     expect(packs.flatMap((pack) => pack.constructs)).toHaveLength(15)
     expect(packs.flatMap((pack) => pack.criteria)).toHaveLength(10)
+    expect(
+      Object.fromEntries(
+        packs.flatMap((pack) =>
+          pack.criteria.map((criterion) => [criterion.id, criterion.dimensionKey]),
+        ),
+      ),
+    ).toEqual({
+      'SBD.C1.RESULT_CLARITY': 'leadership',
+      'SBD.C2.EVIDENCE_BEFORE_ACTION': 'key_tasks',
+      'SBD.C3.GAP_GROUNDED': 'capability',
+      'SBD.C4.SYSTEM_ALIGNMENT': 'structure',
+      'SBD.C5.FEEDBACK_ADJUSTMENT': 'culture',
+      'DW.C1.LEARNING_PROBLEM_QUALITY': 'key_tasks',
+      'DW.C2.PRACTICE_VISIBILITY': 'structure',
+      'DW.C3.PROBLEM_OF_PRACTICE_QUALITY': 'culture',
+      'DW.C4.INFERENCE_DISCIPLINE': 'capability',
+      'DW.C5.ACTION_IMPACT_COHERENCE': 'leadership',
+    })
     expect(packs.every((pack) => pack.status === 'review')).toBe(true)
     expect(
       packs.every(
@@ -85,7 +103,7 @@ describe('methodology pack loader and registry', () => {
     expect(registry.findCriteria({ constructId: 'DW.PRACTICE_EVIDENCE' })).toHaveLength(1)
     expect(registry.findCriteria({ practiceType: 'school_design' })).toHaveLength(5)
     expect(registry.findCriteria({ practiceType: 'adult_practice' })).toHaveLength(5)
-    expect(registry.findCriteria({ dimensionKey: 'leadership' })).toHaveLength(0)
+    expect(registry.findCriteria({ dimensionKey: 'leadership' })).toHaveLength(2)
     expect(Object.isFrozen(sbd)).toBe(true)
     expect(Object.isFrozen(sbd?.criteria)).toBe(true)
 
