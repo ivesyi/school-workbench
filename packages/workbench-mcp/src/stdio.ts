@@ -10,7 +10,7 @@ import {
   stateCurrentInputSchema,
   stateHistoryInputSchema,
   type ReadCapabilityName,
-} from '@school-workbench/workbench-read-plane'
+} from '@school-workbench/workbench-read-plane/contracts'
 
 const ENV_KEYS = ['SWB_ENDPOINT', 'SWB_TOKEN', 'SWB_SCHOOL_ID', 'SWB_AGENT_RUN_ID'] as const
 

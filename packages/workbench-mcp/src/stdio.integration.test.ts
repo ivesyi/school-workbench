@@ -150,7 +150,9 @@ describe('workbench-mcp stdio process', () => {
         expect(() => JSON.parse(textResult(result))).not.toThrow()
       }
 
-      expect(readFileSync(serverBundle, 'utf8')).not.toContain('console.log(')
+      expect(readFileSync(resolve('packages/workbench-mcp/src/stdio.ts'), 'utf8')).not.toContain(
+        'console.log(',
+      )
     } finally {
       await client.close()
       await loopback.stop()
