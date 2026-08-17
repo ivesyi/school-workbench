@@ -57,6 +57,13 @@
       "when": 1786952147478,
       "tag": "0007_methodology_pack_sign_off",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1786961914727,
+      "tag": "0008_agent_runtime_tables",
+      "breakpoints": true
     }
   ]
 }

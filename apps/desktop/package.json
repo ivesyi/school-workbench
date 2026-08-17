@@ -10,12 +10,16 @@
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json"
   },
   "dependencies": {
+    "@agentclientprotocol/codex-acp": "1.4.0",
+    "@school-workbench/agent-host": "workspace:*",
     "@school-workbench/application": "workspace:*",
     "@school-workbench/db": "workspace:*",
     "@school-workbench/domain": "workspace:*",
     "@school-workbench/experience": "workspace:*",
     "@school-workbench/methodology": "workspace:*",
     "@school-workbench/shared": "workspace:*",
+    "@school-workbench/workbench-mcp": "workspace:*",
+    "@school-workbench/workbench-read-plane": "workspace:*",
     "better-sqlite3": "13.0.3",
     "lucide-react": "1.31.0",
     "react": "19.2.8",

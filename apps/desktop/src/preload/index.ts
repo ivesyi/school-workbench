@@ -1,6 +1,9 @@
 import {
   acceptedJudgmentListSchema,
   adjustStageInputSchema,
+  agentIpcChannels,
+  agentRunViewSchema,
+  runAgentInputSchema,
   adjustStateInputSchema,
   confirmStageInputSchema,
   confirmStateInputSchema,
@@ -21,11 +24,12 @@ import {
   stateIpcChannels,
   stateWorkspaceViewSchema,
   submitSituationInputSchema,
+  type AgentBridge,
   type WorkbenchApi,
 } from '@school-workbench/shared'
 import { contextBridge, ipcRenderer } from 'electron'
 
-const api: WorkbenchApi = {
+const api: WorkbenchApi & AgentBridge = {
   schools: {
     async list() {
       return schoolListSchema.parse(await ipcRenderer.invoke(schoolIpcChannels.list))
@@ -125,6 +129,15 @@ const api: WorkbenchApi = {
         signOffPackInputSchema.parse(input),
       )
       return packReviewWorkbenchViewSchema.parse(result)
+    },
+  },
+  agent: {
+    async run(input) {
+      const result: unknown = await ipcRenderer.invoke(
+        agentIpcChannels.run,
+        runAgentInputSchema.parse(input),
+      )
+      return agentRunViewSchema.parse(result)
     },
   },
 }

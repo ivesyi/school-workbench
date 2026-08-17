@@ -4,7 +4,11 @@ import {
   SqliteMethodologyReviewRepository,
   type WorkbenchDatabase,
 } from '@school-workbench/db'
-import { loadMethodologyRegistry } from '@school-workbench/methodology'
+import {
+  loadMethodologyRegistry,
+  type MethodologyRegistry,
+  type MethodologyRepository,
+} from '@school-workbench/methodology'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
@@ -14,8 +18,19 @@ export type MethodologyPaths = Readonly<{
   origin: 'environment' | 'bundled' | 'repository'
 }>
 
+/**
+ * A ready runtime exposes the registry and repository alongside the review
+ * service, because the read plane's `standards_get` needs exactly the same two
+ * collaborators. They are surfaced here rather than rebuilt at the call site:
+ * a second `SqliteMethodologyRepository` would mean a second `syncRegistry`.
+ */
 export type MethodologyRuntime =
-  | Readonly<{ state: 'ready'; service: MethodologyReviewService }>
+  | Readonly<{
+      state: 'ready'
+      service: MethodologyReviewService
+      registry: MethodologyRegistry
+      repository: MethodologyRepository
+    }>
   | Readonly<{ state: 'unavailable'; detail: string }>
 
 /**
@@ -81,6 +96,8 @@ export async function createMethodologyRuntime(
     return {
       state: 'ready',
       service: new MethodologyReviewService(registry, methodologyRepository, reviewRepository),
+      registry,
+      repository: methodologyRepository,
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)

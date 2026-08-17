@@ -1,3 +1,4 @@
+export * from './agent'
 export * from './api'
 export * from './judgments'
 export * from './methodology'

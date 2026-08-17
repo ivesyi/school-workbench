@@ -9,7 +9,7 @@
     "pnpm": "11.x"
   },
   "scripts": {
-    "dev": "pnpm --filter @school-workbench/desktop dev",
+    "dev": "pnpm --filter @school-workbench/workbench-mcp build && pnpm --filter @school-workbench/desktop dev",
     "build": "pnpm --filter @school-workbench/workbench-mcp build && pnpm --filter @school-workbench/desktop build",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "eslint .",

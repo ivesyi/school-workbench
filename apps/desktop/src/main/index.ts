@@ -6,6 +6,7 @@ import {
 } from '@school-workbench/application'
 import {
   openWorkbenchDatabase,
+  SqliteAgentRuntimeRepository,
   SqliteJudgmentRepository,
   SqliteSchoolRepository,
   SqliteStageRepository,
@@ -14,6 +15,8 @@ import {
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createAgentIpcHandlers, registerAgentIpc, type AgentRunner } from './agent-ipc'
+import { runAgentOnce } from './agent-runtime'
 import { createJudgmentIpcHandlers, registerJudgmentIpc } from './judgment-ipc'
 import { createMethodologyIpcHandlers, registerMethodologyIpc } from './methodology-ipc'
 import {
@@ -21,6 +24,7 @@ import {
   resolveMethodologyPaths,
   type MethodologyRuntime,
 } from './methodology-runtime'
+import { startWorkbenchReadPlane, type ReadPlaneRuntime } from './read-plane-runtime'
 import { createSchoolIpcHandlers, registerSchoolIpc } from './school-ipc'
 import { createStageIpcHandlers, registerStageIpc } from './stage-ipc'
 import { createStateIpcHandlers, registerStateIpc } from './state-ipc'
@@ -33,6 +37,8 @@ if (testUserDataDirectory && !app.isPackaged) {
 }
 
 let closeDatabase: (() => void) | undefined
+let readPlane: ReadPlaneRuntime | undefined
+let agentRunner: AgentRunner | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -96,6 +102,36 @@ app.whenReady().then(() => {
     onError: (message) => process.stderr.write(`${message}\n`),
   })
 
+  // The loopback read plane is the Agent's only route into workbench domain
+  // capability (SPEC 13/16). It starts independently of the methodology runtime:
+  // only `standards_get` needs methodology content, and the other six read
+  // capabilities must not be taken down by an unreadable pack file.
+  const agentRuntimeRepository = new SqliteAgentRuntimeRepository(database)
+  void startWorkbenchReadPlane({ database, methodology: methodologyRuntime })
+    .then((runtime) => {
+      readPlane = runtime
+      agentRunner = (input) =>
+        runAgentOnce(
+          {
+            readPlane: runtime.plane,
+            endpoint: runtime.endpoint,
+            repository: agentRuntimeRepository,
+            mainDirectory: currentDirectory,
+            execPath: process.execPath,
+            userDataDirectory: app.getPath('userData'),
+            onDiagnostic: (message) => process.stderr.write(`${message}\n`),
+          },
+          input,
+        )
+      // Deliberately reports readiness only. The port and the capability tokens
+      // never leave this process.
+      process.stderr.write('workbench read plane ready\n')
+    })
+    .catch((error: unknown) => {
+      const detail = error instanceof Error ? error.message : String(error)
+      process.stderr.write(`workbench read plane unavailable: ${detail}\n`)
+    })
+
   registerSchoolIpc(ipcMain, createSchoolIpcHandlers(schoolService))
   registerJudgmentIpc(ipcMain, createJudgmentIpcHandlers(judgmentService))
   registerStageIpc(ipcMain, createStageIpcHandlers(stageService))
@@ -103,6 +139,10 @@ app.whenReady().then(() => {
   registerMethodologyIpc(
     ipcMain,
     createMethodologyIpcHandlers(() => methodologyRuntime),
+  )
+  registerAgentIpc(
+    ipcMain,
+    createAgentIpcHandlers(() => agentRunner),
   )
 
   createMainWindow()
@@ -116,7 +156,28 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => {
-  closeDatabase?.()
-  closeDatabase = undefined
+let shuttingDown = false
+
+/**
+ * Shutting the loopback down is asynchronous, so the first quit is deferred
+ * until the HTTP server has actually closed. The second pass through this
+ * handler is allowed to proceed. A bounded wait keeps a stuck socket from
+ * turning "quit" into "hang".
+ */
+app.on('before-quit', (event) => {
+  if (shuttingDown) return
+  shuttingDown = true
+  event.preventDefault()
+  void (async () => {
+    const stopping = readPlane?.stop().catch(() => undefined) ?? Promise.resolve()
+    await Promise.race([
+      stopping,
+      new Promise((resolvePromise) => setTimeout(resolvePromise, 2_000).unref?.()),
+    ])
+    readPlane = undefined
+    agentRunner = null
+    closeDatabase?.()
+    closeDatabase = undefined
+    app.quit()
+  })()
 })

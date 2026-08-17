@@ -1,4 +1,5 @@
 import type { MethodologyReviewService } from '@school-workbench/application'
+import { MethodologyRegistry } from '@school-workbench/methodology'
 import type { PackReviewWorkbenchView } from '@school-workbench/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { createMethodologyIpcHandlers } from './methodology-ipc'
@@ -64,7 +65,19 @@ const readyView: PackReviewWorkbenchView = {
 }
 
 function readyRuntime(service: MethodologyReviewService): () => Promise<MethodologyRuntime> {
-  return async () => ({ state: 'ready', service })
+  // These handlers only use `service`; the registry and repository are the
+  // collaborators the read plane needs, so they stay inert here.
+  return async () => ({
+    state: 'ready',
+    service,
+    registry: new MethodologyRegistry([]),
+    repository: {
+      listPacks: async () => [],
+      getPack: async () => null,
+      getCriterion: async () => null,
+      findCriteria: async () => [],
+    },
+  })
 }
 
 describe('methodology IPC handlers', () => {

@@ -8,11 +8,13 @@ import type { Plugin } from 'vite'
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url))
 const internalPackages = [
+  '@school-workbench/agent-host',
   '@school-workbench/application',
   '@school-workbench/db',
   '@school-workbench/domain',
   '@school-workbench/methodology',
   '@school-workbench/shared',
+  '@school-workbench/workbench-read-plane',
 ]
 
 function copyMigrations(): Plugin {
@@ -24,6 +26,29 @@ function copyMigrations(): Plugin {
       rmSync(destination, { recursive: true, force: true })
       mkdirSync(destination, { recursive: true })
       cpSync(source, destination, { recursive: true })
+    },
+  }
+}
+
+/**
+ * Copies the bundled workbench MCP server next to the main bundle.
+ *
+ * The MCP server is a separate process the agent runtime spawns, so it cannot
+ * be part of the main bundle. `packages/workbench-mcp` is built by esbuild into
+ * a single self-contained `dist/stdio.js`, and the root `build` script builds it
+ * before the desktop app. Placing it in the output directory keeps the packaged
+ * application from having to resolve a workspace path at runtime.
+ */
+function copyWorkbenchMcp(): Plugin {
+  return {
+    name: 'copy-workbench-mcp',
+    closeBundle() {
+      const source = resolve(currentDirectory, '../../packages/workbench-mcp/dist/stdio.js')
+      if (!existsSync(source)) return
+      const destination = resolve(currentDirectory, 'out/main/workbench-mcp')
+      rmSync(destination, { recursive: true, force: true })
+      mkdirSync(destination, { recursive: true })
+      cpSync(source, join(destination, 'stdio.js'))
     },
   }
 }
@@ -63,7 +88,7 @@ function copyMethodologyKnowledge(): Plugin {
 
 export default defineConfig({
   main: {
-    plugins: [copyMigrations(), copyMethodologyKnowledge()],
+    plugins: [copyMigrations(), copyMethodologyKnowledge(), copyWorkbenchMcp()],
     build: {
       externalizeDeps: {
         exclude: internalPackages,
