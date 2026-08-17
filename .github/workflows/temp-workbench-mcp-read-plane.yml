@@ -40,12 +40,33 @@ jobs:
           text = text.replace("readFileSync(serverBundle, 'utf8')", "readFileSync(resolve('packages/workbench-mcp/src/stdio.ts'), 'utf8')")
           integration.write_text(text)
 
+          auth_test = Path('packages/workbench-read-plane/src/auth.test.ts')
+          text = auth_test.read_text()
+          query_marker = "    const serializedLogs = JSON.stringify(logs)"
+          if 'queryScope.status' not in text:
+              query_test = "\n".join([
+                  "    const queryScope = await fetch(`${endpoint}/school_context?schoolId=school-b`, {",
+                  "      method: 'POST',",
+                  "      headers: {",
+                  "        authorization: `Bearer ${valid.token}`,",
+                  "        'content-type': 'application/json',",
+                  "        'x-swb-school-id': 'school-a',",
+                  "        'x-swb-agent-run-id': 'run-a',",
+                  "      },",
+                  "      body: '{}',",
+                  "    })",
+                  "    expect(queryScope.status).toBe(400)",
+                  "    await expect(queryScope.json()).resolves.toMatchObject({ error: { code: 'INPUT_INVALID' } })",
+                  "",
+              ])
+              text = text.replace(query_marker, query_test + query_marker)
+          auth_test.write_text(text)
+
           spec = Path('docs/architecture/SPEC.md')
           text = spec.read_text()
           start_marker = '# 24. Diagnosis 最小 Schema'
+          new_marker = '# 24. Diagnosis strict Assessment Contract'
           end_marker = '默认不返回整本书或整个 Methodology Pack。'
-          start = text.index(start_marker)
-          end = text.index(end_marker, start) + len(end_marker)
           replacement = "\n".join([
               '# 24. Diagnosis strict Assessment Contract',
               '',
@@ -104,7 +125,13 @@ jobs:
               '',
               '默认不返回整本书、PDF 或整个 Methodology Pack。',
           ])
-          spec.write_text(text[:start] + replacement + text[end:])
+          if start_marker in text:
+              start = text.index(start_marker)
+              end = text.index(end_marker, start) + len(end_marker)
+              text = text[:start] + replacement + text[end:]
+          elif new_marker not in text:
+              raise SystemExit('SPEC section 24 marker not found')
+          spec.write_text(text)
           PY
       - name: Install and refresh lockfile
         run: pnpm install --no-frozen-lockfile
