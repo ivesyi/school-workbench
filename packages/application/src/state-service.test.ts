@@ -2,6 +2,7 @@ import type {
   AcceptedJudgment,
   DiagnosisProposal,
   JudgmentRepository,
+  PendingProposalReview,
   School,
   SchoolRepository,
   StageRecommendation,
@@ -103,6 +104,14 @@ class MemoryJudgmentRepository implements JudgmentRepository {
   async saveReviewOutcome(): Promise<void> {}
   async listAcceptedJudgments(schoolId: string): Promise<AcceptedJudgment[]> {
     return this.items.filter((item) => item.schoolId === schoolId)
+  }
+
+  async findPendingProposalReview(): Promise<PendingProposalReview | null> {
+    return null
+  }
+
+  async findLatestProposalIdByAgentRun(): Promise<string | null> {
+    return null
   }
 }
 

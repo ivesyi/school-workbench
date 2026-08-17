@@ -1,13 +1,13 @@
 import { z } from 'zod'
+import { judgmentReviewViewSchema } from './judgments'
 
 /**
  * Agent Run contract crossing the IPC boundary.
  *
- * There is no consultant-facing agent UI in this slice (PRD 15/16 are later),
- * so this surface exists to drive and observe a real Agent Run, not to render
- * one. It deliberately carries no endpoint, capability token, filesystem path
- * or ACP session id: ADR-003 keeps infrastructure names out of the product
- * surface, and a token must never leave the main process.
+ * This is what the workbench UI is allowed to know about a run. It carries no
+ * endpoint, capability token, filesystem path or session identifier: ADR-003
+ * keeps infrastructure names off the product surface, and a token must never
+ * leave the main process.
  */
 export const agentRunStatusSchema = z.enum([
   'queued',
@@ -27,40 +27,70 @@ export const runAgentInputSchema = z
   })
   .strict()
 
+/**
+ * What the run produced, in product terms.
+ *
+ * The assistant's own prose never crosses this boundary. It arrives mixed with
+ * the runtime's notices to itself ("Skill descriptions were shortened…"), and
+ * PRD 16 keeps that class of noise away from the consultant entirely. What the
+ * workbench keeps is the judgement the assistant submitted through the proper
+ * channel, which is reviewable, and nothing else.
+ */
+export const agentRunOutcomeSchema = z.enum([
+  'proposal_ready',
+  'no_new_judgment',
+  'needs_more_evidence',
+  'failed',
+])
+
 export const agentRunViewSchema = z
   .object({
     runId: z.string().min(1),
     status: agentRunStatusSchema,
-    /** What the agent said, if anything. */
-    message: z.string(),
+    outcome: agentRunOutcomeSchema,
+    /** The judgement to review, when the assistant submitted one. */
+    proposal: judgmentReviewViewSchema.nullable(),
     /** True when the agent actually reached the workbench MCP read tools. */
     usedWorkbenchTools: z.boolean(),
     /** `session/update` kinds this build did not understand. Ignored, reported. */
     unrecognisedUpdateKinds: z.array(z.string().min(1)),
     runtimeCompatibility: runtimeCompatibilitySchema,
+    /**
+     * Diagnostics for whoever is maintaining the workbench. Written by the
+     * workbench itself, never by the assistant — and never rendered.
+     */
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
   })
   .strict()
 
+/**
+ * The four steps PRD 16 allows the consultant to see. They are derived from the
+ * workbench tools the assistant actually calls, so the wording follows real
+ * activity rather than a timer, and they only ever move forward.
+ */
+export const agentProgressPhaseSchema = z.enum([
+  'understanding',
+  'gathering',
+  'comparing',
+  'drafting',
+])
+
+export const agentProgressEventSchema = z
+  .object({
+    schoolId: z.string().min(1),
+    phase: agentProgressPhaseSchema,
+  })
+  .strict()
+
 export const agentIpcChannels = {
   run: 'agent:run',
+  progress: 'agent:progress',
 } as const
 
-/**
- * Preload-only bridge.
- *
- * This is deliberately *not* part of `WorkbenchApi`: the renderer has no agent
- * surface in this slice, and adding one to the renderer contract would invite a
- * UI that PRD 15/16 place in a later slice. The bridge exists so the main
- * process path can be driven end to end.
- */
-export type AgentBridge = {
-  agent: {
-    run(input: RunAgentInput): Promise<AgentRunView>
-  }
-}
-
+export type AgentRunOutcomeValue = z.infer<typeof agentRunOutcomeSchema>
+export type AgentProgressPhase = z.infer<typeof agentProgressPhaseSchema>
+export type AgentProgressEvent = z.infer<typeof agentProgressEventSchema>
 export type AgentRunStatusValue = z.infer<typeof agentRunStatusSchema>
 export type RuntimeCompatibilityValue = z.infer<typeof runtimeCompatibilitySchema>
 export type RunAgentInput = z.infer<typeof runAgentInputSchema>

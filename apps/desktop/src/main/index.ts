@@ -7,6 +7,7 @@ import {
 import {
   openWorkbenchDatabase,
   SqliteAgentRuntimeRepository,
+  SqlitePreferencesRepository,
   SqliteJudgmentRepository,
   SqliteSchoolRepository,
   SqliteStageRepository,
@@ -16,7 +17,8 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createAgentIpcHandlers, registerAgentIpc, type AgentRunner } from './agent-ipc'
-import { runAgentOnce } from './agent-runtime'
+import { assistantReadiness, runAgentOnce } from './agent-runtime'
+import { agentIpcChannels, type AgentProgressEvent } from '@school-workbench/shared'
 import { createJudgmentIpcHandlers, registerJudgmentIpc } from './judgment-ipc'
 import { createMethodologyIpcHandlers, registerMethodologyIpc } from './methodology-ipc'
 import {
@@ -26,6 +28,11 @@ import {
 } from './methodology-runtime'
 import { startWorkbenchReadPlane, type ReadPlaneRuntime } from './read-plane-runtime'
 import { createSchoolIpcHandlers, registerSchoolIpc } from './school-ipc'
+import {
+  createSettingsIpcHandlers,
+  registerSettingsIpc,
+  type AssistantReadiness,
+} from './settings-ipc'
 import { createStageIpcHandlers, registerStageIpc } from './stage-ipc'
 import { createStateIpcHandlers, registerStateIpc } from './state-ipc'
 
@@ -107,9 +114,25 @@ app.whenReady().then(() => {
   // only `standards_get` needs methodology content, and the other six read
   // capabilities must not be taken down by an unreadable pack file.
   const agentRuntimeRepository = new SqliteAgentRuntimeRepository(database)
+  const preferencesRepository = new SqlitePreferencesRepository(database)
+
+  function broadcastProgress(event: AgentProgressEvent): void {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(agentIpcChannels.progress, event)
+    }
+  }
+
+  // Whether an assistant could be started at all. It is a question about this
+  // computer, not about a running agent, so it is answered from paths rather
+  // than by starting anything.
+  let readiness: AssistantReadiness = {
+    ready: false,
+    detail: '工作台还在启动，稍等一下再看。',
+  }
   void startWorkbenchReadPlane({ database, methodology: methodologyRuntime })
     .then((runtime) => {
       readPlane = runtime
+      readiness = assistantReadiness(currentDirectory)
       agentRunner = (input) =>
         runAgentOnce(
           {
@@ -117,10 +140,12 @@ app.whenReady().then(() => {
             writeService: runtime.writeService,
             endpoint: runtime.endpoint,
             repository: agentRuntimeRepository,
+            judgments: judgmentService,
             mainDirectory: currentDirectory,
             execPath: process.execPath,
             userDataDirectory: app.getPath('userData'),
             onDiagnostic: (message) => process.stderr.write(`${message}\n`),
+            onProgress: (phase) => broadcastProgress({ schoolId: input.schoolId, phase }),
           },
           input,
         )
@@ -144,6 +169,14 @@ app.whenReady().then(() => {
   registerAgentIpc(
     ipcMain,
     createAgentIpcHandlers(() => agentRunner),
+  )
+  registerSettingsIpc(
+    ipcMain,
+    createSettingsIpcHandlers({
+      read: (key) => preferencesRepository.get(key),
+      write: (key, value) => preferencesRepository.set(key, value),
+      readiness: () => readiness,
+    }),
   )
 
   createMainWindow()

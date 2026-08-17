@@ -41,7 +41,7 @@ Agent Host ── ACP ──> codex-acp ──> Codex
 | **M0 方法论审核反转** | 默认已审核；顾问标「需要修订」即降回 review 且重启不回滚                                                                                    | **✅ 已完成并合并**               | commit `d33ab47`，已 `--no-ff` 合入 main（零冲突）；主会话复跑 45 files/175 tests、e2e 8 passed；真 app 连开两次验证否决不被 `syncRegistry` 推翻                                                                                                                                                                                                                                                                           |
 | **M1 真链路读通**     | `packages/agent-host` + ACP 生命周期 + 三张表六态 + runtime 兼容性判定 + loopback 在 Electron 里启动 + MCP 注入可见性验证 + Agent Bootstrap | **✅ 已完成（含 B1/B2/B3 修复）** | commit `1e68818` + 修复 `f811881`；合并后主会话复跑 **57 files / 269 tests、e2e 11 passed**；**主会话真 Codex 独立验证共 5 次**，含强制冷启动复现 B3 并确认已修；`standards_get` 在 Pack active 后真正返回内容（真 AI 拿到「实践可见性」）                                                                                                                                                                                 |
 | **M2 真链路写通**     | `evidence_register` + `diagnosis_propose` 两个写面 tool（SPEC 22/23/26 要求成对）+ 写 scope + 错误映射 + Workbench 侧组装 `AssessmentInput` | **✅ 已完成**                     | commit `8114f2a`；主会话复跑 **60 files / 300 tests、e2e 12 passed**；**主会话真 Codex 完整走通一轮**：读状态→取准则→主动找反证→登记依据→提交判断，落库 evidence/facts×3/claims×2/proposal(`proposed`)，引用真实准则 `data-wise@3 DW.C2.PRACTICE_VISIBILITY`，自纠 0 轮；Agent 提案**未**变成正式判断；**否决权端到端验证**：界面标「需要修订」→ Codex 拿到 `no_active_pack/persisted_not_active` 后停手、不换准则、不提交 |
-| **M3 产品面**         | PRD 15 设置选默认助手 + PRD 16 高层进度 UI + 工作台触发                                                                                     | **未开始**                        | —                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **M3 产品面**         | PRD 15 设置选默认助手 + PRD 16 高层进度 UI + 工作台触发 + PRD 17 判断确认 + `HOW_TO_RUN.md`                                                 | **待主会话验收**                  | worker 复跑 **68 files / 346 tests、e2e 14 passed**；worker 两次真启动肉眼确认设置页/工作台/进度条/兜底提示与整页无技术词；**真 Codex 未跑**（按前两轮惯例留给主会话）                                                                                                                                                                                                                                                     |
 
 ### 各里程碑的验收线（不许修改）
 
@@ -202,6 +202,7 @@ pnpm typecheck && pnpm lint && pnpm format && pnpm test && pnpm build && pnpm te
 
 ### 10.3 当前进度快照（loop 每轮更新）
 
-- M0 ✅ 已合并 · M1 ✅ 已完成 · M2 ✅ 已完成 · M3 派工中
-- **今天顾问还不能自己跑**：产品里没有 AI 入口，所有验证都是主会话用脚本驱动的
-- `HOW_TO_RUN.md` **尚不存在**
+- M0 ✅ 已合并 · M1 ✅ 已完成 · M2 ✅ 已完成 · M3 已交答卷，**待主会话验收**
+- 产品里现在有 AI 入口了：设置里能选默认助手，工作台打一句话就会触发，跑的时候有高层进度，跑完的判断进既有审核卡片
+- `HOW_TO_RUN.md` **已存在**（白话，扫过工程术语）
+- **10.1 判据 1/2/3/4/6 已由 worker 在真应用里肉眼确认到「不需要真 Codex 也能看见」的程度；判据 5（真 Codex 完整走通并留证据）仍待主会话执行**

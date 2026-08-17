@@ -2,8 +2,12 @@ import {
   acceptedJudgmentListSchema,
   adjustStageInputSchema,
   agentIpcChannels,
+  agentProgressEventSchema,
   agentRunViewSchema,
+  assistantSettingsViewSchema,
+  chooseAssistantInputSchema,
   runAgentInputSchema,
+  settingsIpcChannels,
   adjustStateInputSchema,
   confirmStageInputSchema,
   confirmStateInputSchema,
@@ -24,12 +28,11 @@ import {
   stateIpcChannels,
   stateWorkspaceViewSchema,
   submitSituationInputSchema,
-  type AgentBridge,
   type WorkbenchApi,
 } from '@school-workbench/shared'
 import { contextBridge, ipcRenderer } from 'electron'
 
-const api: WorkbenchApi & AgentBridge = {
+const api: WorkbenchApi = {
   schools: {
     async list() {
       return schoolListSchema.parse(await ipcRenderer.invoke(schoolIpcChannels.list))
@@ -131,6 +134,19 @@ const api: WorkbenchApi & AgentBridge = {
       return packReviewWorkbenchViewSchema.parse(result)
     },
   },
+  settings: {
+    async getAssistant() {
+      const result: unknown = await ipcRenderer.invoke(settingsIpcChannels.getAssistant)
+      return assistantSettingsViewSchema.parse(result)
+    },
+    async chooseAssistant(input) {
+      const result: unknown = await ipcRenderer.invoke(
+        settingsIpcChannels.chooseAssistant,
+        chooseAssistantInputSchema.parse(input),
+      )
+      return assistantSettingsViewSchema.parse(result)
+    },
+  },
   agent: {
     async run(input) {
       const result: unknown = await ipcRenderer.invoke(
@@ -138,6 +154,18 @@ const api: WorkbenchApi & AgentBridge = {
         runAgentInputSchema.parse(input),
       )
       return agentRunViewSchema.parse(result)
+    },
+    onProgress(handler) {
+      // Validated on the way in as well: the renderer only ever sees one of the
+      // four steps the product is allowed to show.
+      const listener = (_event: unknown, payload: unknown): void => {
+        const parsed = agentProgressEventSchema.safeParse(payload)
+        if (parsed.success) handler(parsed.data)
+      }
+      ipcRenderer.on(agentIpcChannels.progress, listener)
+      return () => {
+        ipcRenderer.off(agentIpcChannels.progress, listener)
+      }
     },
   },
 }

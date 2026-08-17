@@ -5,7 +5,8 @@ import { createAgentIpcHandlers } from './agent-ipc'
 const runView: AgentRunView = {
   runId: 'run-1',
   status: 'completed',
-  message: '我看了这所学校的正式状态。',
+  outcome: 'proposal_ready',
+  proposal: null,
   usedWorkbenchTools: true,
   unrecognisedUpdateKinds: [],
   runtimeCompatibility: 'verified',

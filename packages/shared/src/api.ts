@@ -1,3 +1,4 @@
+import type { AgentProgressEvent, AgentRunView, RunAgentInput } from './agent'
 import type {
   AcceptedJudgmentView,
   JudgmentReviewView,
@@ -6,6 +7,7 @@ import type {
   SubmitSituationInput,
 } from './judgments'
 import type { PackReviewWorkbenchView, SignOffPackInput } from './methodology'
+import type { AssistantSettingsView, ChooseAssistantInput } from './preferences'
 import type { CreateSchoolInput, SchoolView } from './schools'
 import type { AdjustStageInput, ConfirmStageInput, StageWorkspaceView } from './stages'
 import type { AdjustStateInput, ConfirmStateInput, StateWorkspaceView } from './states'
@@ -34,5 +36,14 @@ export type WorkbenchApi = {
   methodology: {
     getReviewWorkbench(): Promise<PackReviewWorkbenchView>
     signOff(input: SignOffPackInput): Promise<PackReviewWorkbenchView>
+  }
+  settings: {
+    getAssistant(): Promise<AssistantSettingsView>
+    chooseAssistant(input: ChooseAssistantInput): Promise<AssistantSettingsView>
+  }
+  agent: {
+    run(input: RunAgentInput): Promise<AgentRunView>
+    /** Subscribes to the high-level progress of a running assistant. */
+    onProgress(handler: (event: AgentProgressEvent) => void): () => void
   }
 }

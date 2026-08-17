@@ -5,6 +5,7 @@ export default defineConfig({
   schema: [
     './src/schema.ts',
     './src/agent-runtime-schema.ts',
+    './src/preferences-schema.ts',
     './src/methodology-schema.ts',
     './src/methodology-review-schema.ts',
     './src/diagnosis-schema.ts',

@@ -1,12 +1,16 @@
 import {
   assertReviewDecisionAllowed,
   type AcceptedJudgment,
+  type Claim,
   type DiagnosisProposal,
+  type Evidence,
   type JudgmentRepository,
+  type ObservationFact,
+  type PendingProposalReview,
   type ProposalChain,
   type ReviewOutcome,
 } from '@school-workbench/domain'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import {
   acceptedJudgments,
@@ -142,6 +146,105 @@ export class SqliteJudgmentRepository implements JudgmentRepository {
         tx.insert(diagnosisClaims).values(item).run()
       }
     })
+  }
+
+  /**
+   * Rebuilds a pending proposal and the chain under it.
+   *
+   * Returns null once the proposal has been reviewed: the review surface is for
+   * judgements still waiting on the consultant, and a proposal that already has
+   * a review cannot be decided again.
+   */
+  async findPendingProposalReview(proposalId: string): Promise<PendingProposalReview | null> {
+    const proposal = await this.findProposal(proposalId)
+    if (!proposal) return null
+
+    const reviewed = this.database
+      .select({ id: humanReviews.id })
+      .from(humanReviews)
+      .where(eq(humanReviews.proposalId, proposalId))
+      .get()
+    if (reviewed) return null
+
+    const claimIds = this.database
+      .select({ claimId: diagnosisClaims.claimId })
+      .from(diagnosisClaims)
+      .where(eq(diagnosisClaims.proposalId, proposalId))
+      .all()
+      .map((row) => row.claimId)
+
+    const claimRows: Claim[] =
+      claimIds.length === 0
+        ? []
+        : (this.database.select().from(claims).where(inArray(claims.id, claimIds)).all() as Claim[])
+
+    const links =
+      claimIds.length === 0
+        ? []
+        : this.database
+            .select()
+            .from(claimFacts)
+            .where(inArray(claimFacts.claimId, claimIds))
+            .orderBy(claimFacts.sequence)
+            .all()
+
+    const factIds = [...new Set(links.map((link) => link.factId))]
+    const factRows: ObservationFact[] =
+      factIds.length === 0
+        ? []
+        : (this.database
+            .select()
+            .from(observationFacts)
+            .where(inArray(observationFacts.id, factIds))
+            .all() as ObservationFact[])
+    const factById = new Map(factRows.map((fact) => [fact.id, fact]))
+
+    const pickFacts = (stance: 'supporting' | 'counter'): ObservationFact[] => {
+      const ordered: ObservationFact[] = []
+      const seen = new Set<string>()
+      for (const link of links) {
+        if (link.stance !== stance || seen.has(link.factId)) continue
+        const fact = factById.get(link.factId)
+        if (!fact) continue
+        seen.add(link.factId)
+        ordered.push(fact)
+      }
+      return ordered
+    }
+
+    const evidenceIds = [...new Set(factRows.map((fact) => fact.evidenceId))]
+    const evidenceRows: Evidence[] =
+      evidenceIds.length === 0
+        ? []
+        : (this.database
+            .select()
+            .from(evidence)
+            .where(inArray(evidence.id, evidenceIds))
+            .all() as Evidence[])
+
+    return {
+      proposal,
+      evidence: evidenceRows,
+      supportingFacts: pickFacts('supporting'),
+      counterFacts: pickFacts('counter'),
+      claims: claimRows,
+    }
+  }
+
+  async findLatestProposalIdByAgentRun(agentRunId: string): Promise<string | null> {
+    const row = this.database
+      .select({ id: diagnosisProposals.id })
+      .from(diagnosisProposals)
+      .where(
+        and(
+          eq(diagnosisProposals.agentRunId, agentRunId),
+          isNotNull(diagnosisProposals.agentRunId),
+        ),
+      )
+      .orderBy(desc(diagnosisProposals.createdAt), desc(diagnosisProposals.id))
+      .limit(1)
+      .get()
+    return row?.id ?? null
   }
 
   async findProposal(id: string): Promise<DiagnosisProposal | null> {

@@ -16,6 +16,7 @@ import { verifyWorkbenchMcpTools } from './mcp-visibility'
 import {
   decidePermission,
   isWorkbenchToolCall,
+  workbenchToolName,
   type PermissionOptionLike,
 } from './permission-policy'
 import { AgentRunLifecycle } from './run-status'
@@ -86,6 +87,15 @@ export type AgentHostOptions = Readonly<{
   verifyTools?: typeof verifyWorkbenchMcpTools
   onStatus?: (status: AgentRunStatus) => void
   onDiagnostic?: (message: string) => void
+  /**
+   * Called with the bare workbench tool name each time the agent uses one.
+   *
+   * This is the only honest source for a progress indicator: it follows what
+   * the agent actually did rather than a timer. Tool calls routed through any
+   * other MCP server never reach it, so nothing from outside the workbench can
+   * end up described to the consultant.
+   */
+  onWorkbenchToolCall?: (tool: string) => void
 }>
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -217,7 +227,11 @@ export class AgentHost {
           if (!isRecord(message)) return
           if (message['method'] !== methods.client.session.update) return
           const notification = readSessionNotification(message['params'])
-          if (notification) updates.observe(notification.update)
+          if (!notification) return
+          const seen = updates.observe(notification.update)
+          if (seen.kind !== 'tool_call') return
+          const tool = workbenchToolName(seen.toolCall.title)
+          if (tool) this.options.onWorkbenchToolCall?.(tool)
         })
 
         const outcome = await clientApp.connectWith(observed, async (context: ClientContext) => {

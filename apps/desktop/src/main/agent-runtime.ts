@@ -7,8 +7,14 @@ import {
   resolveWorkbenchMcpEntry,
   type AgentRunOutcome,
 } from '@school-workbench/agent-host'
+import type { JudgmentService } from '@school-workbench/application'
 import type { SqliteAgentRuntimeRepository } from '@school-workbench/db'
-import type { AgentRunView, RunAgentInput } from '@school-workbench/shared'
+import type {
+  AgentProgressPhase,
+  AgentRunOutcomeValue,
+  AgentRunView,
+  RunAgentInput,
+} from '@school-workbench/shared'
 import {
   capabilityScopes,
   type WorkbenchLoopbackReadPlane,
@@ -36,6 +42,52 @@ export const codexRuntimeProfile = Object.freeze({
  */
 const CAPABILITY_TOKEN_TTL_MS = 15 * 60 * 1000
 
+/**
+ * How long one run may take before the workbench stops waiting.
+ *
+ * Observed runs finish between roughly a quarter of a minute and two minutes.
+ * The bound is generous against that, and well inside the capability token's
+ * lifetime, so a runtime that hangs turns into a plain "this did not work"
+ * instead of a consultant watching a spinner forever.
+ */
+const AGENT_RUN_TIMEOUT_MS = 5 * 60 * 1000
+
+/**
+ * PRD 16's four steps, keyed by the workbench tool that reveals them.
+ *
+ * A tool the workbench does not serve never appears here, so nothing the
+ * runtime does on its own can be narrated to the consultant.
+ */
+const PROGRESS_PHASE_BY_TOOL: Readonly<Record<string, AgentProgressPhase>> = Object.freeze({
+  school_context: 'understanding',
+  stage_current: 'understanding',
+  standards_get: 'gathering',
+  evidence_list: 'gathering',
+  diagnosis_list: 'gathering',
+  state_current: 'comparing',
+  state_history: 'comparing',
+  evidence_register: 'drafting',
+  diagnosis_propose: 'drafting',
+})
+
+const PHASE_ORDER: readonly AgentProgressPhase[] = Object.freeze([
+  'understanding',
+  'gathering',
+  'comparing',
+  'drafting',
+])
+
+/** Progress only ever moves forward, so the wording never appears to backtrack. */
+export function nextProgressPhase(
+  current: AgentProgressPhase | null,
+  tool: string,
+): AgentProgressPhase | null {
+  const candidate = PROGRESS_PHASE_BY_TOOL[tool]
+  if (!candidate) return null
+  if (!current) return candidate
+  return PHASE_ORDER.indexOf(candidate) > PHASE_ORDER.indexOf(current) ? candidate : null
+}
+
 export type AgentRuntimeDependencies = Readonly<{
   readPlane: WorkbenchLoopbackReadPlane
   writeService: WorkbenchWriteCapabilityService
@@ -49,7 +101,42 @@ export type AgentRuntimeDependencies = Readonly<{
   userDataDirectory: string
   environment?: NodeJS.ProcessEnv
   onDiagnostic?: (message: string) => void
+  /** Renders a judgement the assistant submitted, for the review surface. */
+  judgments: JudgmentService
+  /** Reports the high-level step the consultant is allowed to see (PRD 16). */
+  onProgress?: (phase: AgentProgressPhase) => void
 }>
+
+/**
+ * Whether an assistant could be started on this computer.
+ *
+ * Answered from what is installed, not by starting anything: the consultant
+ * needs to know before typing whether waiting is worth it. Whether Codex is
+ * signed in cannot be known without asking it, so that surfaces as a failed run
+ * with a plain explanation instead.
+ */
+export function assistantReadiness(
+  mainDirectory: string,
+  environment: NodeJS.ProcessEnv = process.env,
+): Readonly<{ ready: boolean; detail: string | null }> {
+  try {
+    resolveWorkbenchMcpEntry(mainDirectory, environment)
+  } catch {
+    return Object.freeze({
+      ready: false,
+      detail: '这台电脑上的工作台还没准备好，请重新启动一次。',
+    })
+  }
+  try {
+    resolveCodexAcpEntry(mainDirectory, environment)
+  } catch {
+    return Object.freeze({
+      ready: false,
+      detail: '这台电脑上还没有装好 Codex，装好后重新启动工作台即可。',
+    })
+  }
+  return Object.freeze({ ready: true, detail: null })
+}
 
 /**
  * Composition root for one Agent Run.
@@ -79,6 +166,11 @@ export async function runAgentOnce(
     ttlMs: CAPABILITY_TOKEN_TTL_MS,
   })
 
+  let phase: AgentProgressPhase | null = null
+  // Something must be on screen immediately: the first tool call can be a long
+  // way off, and PRD 16 is about the wait, not about the result.
+  dependencies.onProgress?.('understanding')
+
   let outcome: AgentRunOutcome
   try {
     const mcpEntry = resolveWorkbenchMcpEntry(dependencies.mainDirectory, environment)
@@ -100,22 +192,37 @@ export async function runAgentOnce(
         onStatus: (status) => {
           void dependencies.repository.setRunStatus(run.id, status).catch(() => undefined)
         },
+        onWorkbenchToolCall: (tool) => {
+          const next = nextProgressPhase(phase, tool)
+          if (!next) return
+          phase = next
+          dependencies.onProgress?.(next)
+        },
       },
     )
 
-    outcome = await host.run({
-      schoolId: input.schoolId,
-      agentRunId: run.id,
-      consultantMessage: input.message,
-      mcp: {
-        command: dependencies.execPath,
-        entryPath: mcpEntry.path,
-        endpoint: dependencies.endpoint,
-        token: grant.token,
-        extraEnv: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }],
-      },
-      forbiddenWorkspaceRoots: [dependencies.userDataDirectory],
-    })
+    // Stop waiting eventually. The consultant is watching this happen.
+    const deadline = new AbortController()
+    const timer = setTimeout(() => deadline.abort(), AGENT_RUN_TIMEOUT_MS)
+    timer.unref?.()
+    try {
+      outcome = await host.run({
+        schoolId: input.schoolId,
+        agentRunId: run.id,
+        consultantMessage: input.message,
+        mcp: {
+          command: dependencies.execPath,
+          entryPath: mcpEntry.path,
+          endpoint: dependencies.endpoint,
+          token: grant.token,
+          extraEnv: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }],
+        },
+        forbiddenWorkspaceRoots: [dependencies.userDataDirectory],
+        signal: deadline.signal,
+      })
+    } finally {
+      clearTimeout(timer)
+    }
   } catch (error) {
     dependencies.readPlane.revokeToken(grant.token)
     dependencies.writeService.forgetRun(run.id)
@@ -129,7 +236,8 @@ export async function runAgentOnce(
     return Object.freeze({
       runId: run.id,
       status: 'failed' as const,
-      message: '',
+      outcome: 'failed' as const,
+      proposal: null,
       usedWorkbenchTools: false,
       unrecognisedUpdateKinds: [],
       runtimeCompatibility: 'unsupported' as const,
@@ -160,14 +268,40 @@ export async function runAgentOnce(
   await dependencies.repository.attachRunToSession(run.id, sessionId)
   await dependencies.repository.setRunStatus(run.id, outcome.status)
 
+  // What the assistant said is deliberately dropped here. It arrives mixed with
+  // the runtime's own notices ("Skill descriptions were shortened…"), and PRD 16
+  // keeps that class of text away from the consultant. What survives is the
+  // judgement it submitted through the proper channel, which is reviewable.
+  const submitted = await dependencies.judgments
+    .findAgentRunOutcome(input.schoolId, run.id)
+    .catch(() => ({ kind: 'none' }) as const)
+
   return Object.freeze({
     runId: run.id,
     status: outcome.status,
-    message: outcome.text,
+    outcome: describeOutcome(outcome.status, submitted.kind),
+    proposal: submitted.kind === 'proposal' ? submitted.view : null,
     usedWorkbenchTools: outcome.usedWorkbenchTools,
     unrecognisedUpdateKinds: [...outcome.unrecognisedUpdateTags],
     runtimeCompatibility: outcome.compatibility.compatibility,
     failureCode: outcome.failure?.code ?? null,
     failureMessage: outcome.failure?.message ?? null,
   })
+}
+
+/**
+ * What the consultant is told happened.
+ *
+ * "The evidence is not enough yet" is a real and useful answer, distinct from
+ * the assistant having nothing to say and distinct again from it not working.
+ * A run that submitted a judgement counts as a success even if it ended badly
+ * afterwards — the judgement is already safely recorded and reviewable.
+ */
+export function describeOutcome(
+  status: AgentRunOutcome['status'],
+  submitted: 'proposal' | 'insufficient_evidence' | 'none',
+): AgentRunOutcomeValue {
+  if (submitted === 'proposal') return 'proposal_ready'
+  if (submitted === 'insufficient_evidence') return 'needs_more_evidence'
+  return status === 'completed' ? 'no_new_judgment' : 'failed'
 }

@@ -5,6 +5,8 @@ import { createJudgmentIpcHandlers } from './judgment-ipc'
 const reviewView = {
   evidence: [{ id: 'e-1', title: '顾问输入', sourceType: 'pasted_text' }],
   facts: [{ id: 'f-1', text: '新的情况', directness: 'medium' as const }],
+  counterFacts: [],
+  source: 'workbench' as const,
   claims: [{ id: 'c-1', text: '当前有迹象表明：新的情况' }],
   proposal: {
     id: 'd-1',

@@ -319,9 +319,29 @@ export function createReviewOutcome(
   }
 }
 
+/**
+ * A proposal that is still waiting for the consultant, together with the chain
+ * it rests on.
+ *
+ * The workbench needs this to show a judgement an assistant submitted earlier
+ * through its own channel: unlike the deterministic path, that judgement is not
+ * already in hand when the review surface renders it.
+ */
+export type PendingProposalReview = {
+  proposal: DiagnosisProposal
+  evidence: Evidence[]
+  supportingFacts: ObservationFact[]
+  counterFacts: ObservationFact[]
+  claims: Claim[]
+}
+
 export interface JudgmentRepository {
   saveProposalChain(chain: ProposalChain): Promise<void>
   findProposal(id: string): Promise<DiagnosisProposal | null>
   saveReviewOutcome(outcome: ReviewOutcome): Promise<void>
   listAcceptedJudgments(schoolId: string): Promise<AcceptedJudgment[]>
+  /** The pending proposal and its chain, or null once it has been reviewed. */
+  findPendingProposalReview(proposalId: string): Promise<PendingProposalReview | null>
+  /** The newest proposal a given Agent Run submitted, if it submitted one. */
+  findLatestProposalIdByAgentRun(agentRunId: string): Promise<string | null>
 }

@@ -1,0 +1,54 @@
+import { z } from 'zod'
+
+/**
+ * The assistants the consultant can pick between.
+ *
+ * `none` is a real choice, not an error state: a consultant who does not want
+ * to wait for an assistant, or who has not set one up, keeps a workbench that
+ * still records situations and judgements.
+ */
+export const assistantChoiceSchema = z.enum(['codex', 'none'])
+
+export const assistantAvailabilitySchema = z.enum(['ready', 'unavailable'])
+
+export const assistantOptionViewSchema = z.object({
+  key: assistantChoiceSchema,
+  /** What the consultant sees. Never a package name or a protocol. */
+  label: z.string().min(1),
+  availability: assistantAvailabilitySchema,
+  /** One plain sentence about why it cannot be used, when it cannot. */
+  detail: z.string().min(1).nullable(),
+})
+
+export const assistantSettingsViewSchema = z.object({
+  selected: assistantChoiceSchema,
+  options: z.array(assistantOptionViewSchema).min(1),
+})
+
+export const chooseAssistantInputSchema = z
+  .object({
+    assistant: assistantChoiceSchema,
+  })
+  .strict()
+
+export const settingsIpcChannels = {
+  getAssistant: 'settings:get-assistant',
+  chooseAssistant: 'settings:choose-assistant',
+} as const
+
+/**
+ * Preference keys the workbench knows about.
+ *
+ * Frozen on purpose: the store is a general key/value table so that adding a
+ * preference needs no schema change, but adding a *key* is still a deliberate
+ * edit here rather than something any caller can invent.
+ */
+export const preferenceKeys = ['default_assistant'] as const
+
+export const preferenceKeySchema = z.enum(preferenceKeys)
+
+export type AssistantChoice = z.infer<typeof assistantChoiceSchema>
+export type AssistantOptionView = z.infer<typeof assistantOptionViewSchema>
+export type AssistantSettingsView = z.infer<typeof assistantSettingsViewSchema>
+export type ChooseAssistantInput = z.infer<typeof chooseAssistantInputSchema>
+export type PreferenceKey = z.infer<typeof preferenceKeySchema>

@@ -1,8 +1,44 @@
 import { Alert, AlertDescription, AlertTitle, Separator } from '@school-workbench/experience'
+import type { AssistantChoice, AssistantSettingsView } from '@school-workbench/shared'
 import { CheckCircle2, ChevronRight, CircleDashed } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useWorkbenchApi } from '../../lib/workbench-api'
 
 export function SettingsPage(): React.JSX.Element {
+  const api = useWorkbenchApi()
+  const [assistant, setAssistant] = useState<AssistantSettingsView | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let current = true
+    void api.settings
+      .getAssistant()
+      .then((result) => {
+        if (current) setAssistant(result)
+      })
+      .catch(() => {
+        if (current) setError('暂时读不到 AI 助手的设置。')
+      })
+    return () => {
+      current = false
+    }
+  }, [api])
+
+  async function choose(next: AssistantChoice): Promise<void> {
+    if (saving || assistant?.selected === next) return
+    setSaving(true)
+    setError(null)
+    try {
+      setAssistant(await api.settings.chooseAssistant({ assistant: next }))
+    } catch {
+      setError('这次没能保存你的选择，请再试一次。')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-3xl px-10 py-12">
       <p className="mb-2 text-sm font-medium text-primary">应用</p>
@@ -21,15 +57,68 @@ export function SettingsPage(): React.JSX.Element {
           </span>
         </div>
         <Separator />
-        <div className="flex items-center justify-between px-6 py-5">
-          <div>
-            <h2 className="font-medium">AI 助手</h2>
-            <p className="mt-1 text-sm text-muted-foreground">将在后续 Runtime 阶段接入</p>
-          </div>
-          <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-            <CircleDashed className="size-4" />
-            尚未启用
-          </span>
+        <div className="px-6 py-5">
+          <h2 className="font-medium">默认 AI 助手</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            选好以后，日常工作里不会再问你用哪一个。
+          </p>
+
+          {assistant === null ? (
+            <p className="mt-4 text-sm text-muted-foreground">正在读取…</p>
+          ) : (
+            <div className="mt-4 space-y-2" role="radiogroup" aria-label="默认 AI 助手">
+              {assistant.options.map((option) => {
+                const selected = assistant.selected === option.key
+                const unavailable = option.availability === 'unavailable'
+                return (
+                  <label
+                    key={option.key}
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-4 py-3 transition-colors hover:bg-muted"
+                  >
+                    <input
+                      type="radio"
+                      name="default-assistant"
+                      className="mt-1 accent-primary"
+                      checked={selected}
+                      disabled={saving}
+                      onChange={() => void choose(option.key)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{option.label}</span>
+                      {unavailable && option.detail ? (
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          {option.detail}
+                        </span>
+                      ) : null}
+                      {option.key === 'codex' && !unavailable ? (
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          选中后，你在工作台说的每一条情况都会先交给它看一遍。
+                        </span>
+                      ) : null}
+                      {option.key === 'none' ? (
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          工作台照常记录你说的情况，只是不再等 AI。
+                        </span>
+                      ) : null}
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+          )}
+
+          {assistant && assistant.selected === 'none' ? (
+            <p className="mt-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
+              <CircleDashed className="size-4" />
+              目前没有使用 AI 助手
+            </p>
+          ) : null}
+
+          {error ? (
+            <p className="mt-3 text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
       </section>
 
@@ -52,9 +141,9 @@ export function SettingsPage(): React.JSX.Element {
       </details>
 
       <Alert variant="quiet" className="mt-6">
-        <AlertTitle>第一阶段实现</AlertTitle>
+        <AlertTitle>你的判断说了算</AlertTitle>
         <AlertDescription>
-          当前只验证桌面应用、本地数据库、学校空间和安全进程边界。
+          无论是工作台还是 AI 助手整理出来的判断，都要你确认之后才会进入这所学校的正式记录。
         </AlertDescription>
       </Alert>
     </div>

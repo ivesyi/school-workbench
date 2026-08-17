@@ -25,6 +25,8 @@ const reviewView = {
       directness: 'medium' as const,
     },
   ],
+  counterFacts: [],
+  source: 'workbench' as const,
   claims: [{ id: 'c-1', text: '中层当前可能仍依赖校长完成任务拆解。' }],
   proposal: {
     id: 'd-1',
@@ -88,6 +90,20 @@ function baseApi(): WorkbenchApi {
     methodology: {
       getReviewWorkbench: vi.fn(),
       signOff: vi.fn(),
+    },
+    settings: {
+      getAssistant: vi.fn().mockResolvedValue({
+        selected: 'none',
+        options: [
+          { key: 'codex', label: 'Codex', availability: 'ready', detail: null },
+          { key: 'none', label: '暂不使用 AI 助手', availability: 'ready', detail: null },
+        ],
+      }),
+      chooseAssistant: vi.fn(),
+    },
+    agent: {
+      run: vi.fn(),
+      onProgress: vi.fn().mockReturnValue(() => undefined),
     },
   }
 }

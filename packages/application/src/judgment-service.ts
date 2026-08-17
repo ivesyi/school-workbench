@@ -3,6 +3,7 @@ import {
   createReviewOutcome,
   type AssessmentDraft,
   type JudgmentRepository,
+  type PendingProposalReview,
   type ProposalChain,
   type SchoolRepository,
 } from '@school-workbench/domain'
@@ -62,6 +63,8 @@ function toReviewView(chain: ProposalChain): JudgmentReviewView {
       text: item.text,
       directness: item.directness,
     })),
+    counterFacts: [],
+    source: 'workbench',
     claims: chain.claims.map((item) => ({
       id: item.id,
       text: item.statement,
@@ -81,6 +84,63 @@ function toReviewView(chain: ProposalChain): JudgmentReviewView {
       evidenceCount: chain.evidence.length,
       status: 'proposed',
       createdAt: chain.proposal.createdAt,
+    },
+  }
+}
+
+export type AgentRunJudgmentOutcome =
+  | Readonly<{ kind: 'proposal'; view: JudgmentReviewView }>
+  | Readonly<{
+      kind: 'insufficient_evidence'
+      unresolvedQuestions: readonly string[]
+      nextObservations: readonly string[]
+    }>
+  | Readonly<{ kind: 'none' }>
+
+/**
+ * Renders a judgement an assistant submitted earlier into the same shape the
+ * workbench's own judgements use, so both reach the consultant through one
+ * review surface rather than two.
+ */
+function toAssistantReviewView(review: PendingProposalReview): JudgmentReviewView | null {
+  const { proposal } = review
+  // An abstention has nothing to accept — the domain forbids turning it into a
+  // judgement — so it never reaches the review surface.
+  if (proposal.status !== 'proposed' || !proposal.provisionalJudgment) return null
+
+  return {
+    evidence: review.evidence.map((item) => ({
+      id: item.id,
+      title: item.title,
+      sourceType: item.sourceType,
+    })),
+    facts: review.supportingFacts.map((item) => ({
+      id: item.id,
+      text: item.text,
+      directness: item.directness,
+    })),
+    counterFacts: review.counterFacts.map((item) => ({
+      id: item.id,
+      text: item.text,
+      directness: item.directness,
+    })),
+    source: 'assistant',
+    claims: review.claims.map((item) => ({ id: item.id, text: item.statement })),
+    proposal: {
+      id: proposal.id,
+      title: proposal.title,
+      interpretations: proposal.interpretations,
+      provisionalJudgment: proposal.provisionalJudgment,
+      alternativeHypotheses: proposal.alternativeHypotheses,
+      unresolvedQuestions: proposal.unresolvedQuestions,
+      proposedActions: proposal.recommendedActions,
+      recommendedObservations: proposal.nextObservations,
+      impactMeasures: proposal.impactEvidencePlan,
+      evidenceQuality: proposal.evidenceQuality,
+      confidence: proposal.confidence,
+      evidenceCount: review.evidence.length,
+      status: 'proposed',
+      createdAt: proposal.createdAt,
     },
   }
 }
@@ -128,6 +188,33 @@ export class JudgmentService {
           }
         : null,
     }
+  }
+
+  /**
+   * What a given Agent Run left for the consultant.
+   *
+   * The three answers are genuinely different things: a judgement to decide on,
+   * an explicit "the evidence is not enough yet", and nothing at all. Collapsing
+   * the middle one into "nothing" would hide the most professionally useful
+   * thing an assistant can say.
+   */
+  async findAgentRunOutcome(
+    schoolId: string,
+    agentRunId: string,
+  ): Promise<AgentRunJudgmentOutcome> {
+    const proposalId = await this.judgmentRepository.findLatestProposalIdByAgentRun(agentRunId)
+    if (!proposalId) return { kind: 'none' }
+    const review = await this.judgmentRepository.findPendingProposalReview(proposalId)
+    if (!review || review.proposal.schoolId !== schoolId) return { kind: 'none' }
+    if (review.proposal.status === 'insufficient_evidence') {
+      return {
+        kind: 'insufficient_evidence',
+        unresolvedQuestions: [...review.proposal.unresolvedQuestions],
+        nextObservations: [...review.proposal.nextObservations],
+      }
+    }
+    const view = toAssistantReviewView(review)
+    return view ? { kind: 'proposal', view } : { kind: 'none' }
   }
 
   async listAccepted(schoolId: string): Promise<AcceptedJudgmentView[]> {

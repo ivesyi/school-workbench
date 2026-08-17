@@ -27,6 +27,22 @@ export function isWorkbenchToolCall(title: string | null | undefined): boolean {
   )
 }
 
+/**
+ * The bare workbench tool name behind an agent's tool call title, or null when
+ * the call did not go through the workbench MCP server.
+ *
+ * Startup diagnostics are not tool calls the agent made, so they are excluded.
+ */
+export function workbenchToolName(title: string | null | undefined): string | null {
+  if (!isWorkbenchToolCall(title) || !title) return null
+  const separator = title.startsWith(`mcp.${workbenchMcpServerName}.`) ? '.' : '__'
+  const prefix =
+    separator === '.' ? `mcp.${workbenchMcpServerName}.` : `mcp__${workbenchMcpServerName}__`
+  const tool = title.slice(prefix.length)
+  if (!tool || tool === 'startup') return null
+  return tool
+}
+
 function findKind(
   options: readonly PermissionOptionLike[],
   kinds: readonly string[],

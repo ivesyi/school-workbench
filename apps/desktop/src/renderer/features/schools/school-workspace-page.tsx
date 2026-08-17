@@ -8,15 +8,18 @@ import {
 } from '@school-workbench/experience'
 import type {
   AcceptedJudgmentView,
+  AgentProgressPhase,
+  AssistantSettingsView,
   JudgmentReviewView,
   ReviewDiagnosisInput,
   SchoolView,
   StageWorkspaceView,
 } from '@school-workbench/shared'
-import { ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useWorkbenchApi } from '../../lib/workbench-api'
+import { assistantNote, progressLabel, shouldAskAssistant } from './assistant-flow'
 
 export function SchoolWorkspacePage(): React.JSX.Element {
   const { schoolId = '' } = useParams()
@@ -37,6 +40,9 @@ export function SchoolWorkspacePage(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [stageError, setStageError] = useState<string | null>(null)
   const [resultMessage, setResultMessage] = useState<string | null>(null)
+  const [assistant, setAssistant] = useState<AssistantSettingsView | null>(null)
+  const [phase, setPhase] = useState<AgentProgressPhase | null>(null)
+  const [note, setNote] = useState<string | null>(null)
 
   useEffect(() => {
     let current = true
@@ -67,8 +73,22 @@ export function SchoolWorkspacePage(): React.JSX.Element {
         }
       })
 
+    void api.settings
+      .getAssistant()
+      .then((result) => {
+        if (current) setAssistant(result)
+      })
+      .catch(() => undefined)
+
+    // The four steps PRD 16 allows are pushed while the assistant works; the
+    // page only listens for the school it is showing.
+    const unsubscribe = api.agent.onProgress((event) => {
+      if (event.schoolId === schoolId) setPhase(event.phase)
+    })
+
     return () => {
       current = false
+      unsubscribe()
     }
   }, [api, schoolId])
 
@@ -81,13 +101,44 @@ export function SchoolWorkspacePage(): React.JSX.Element {
     }
   }
 
+  /**
+   * One sentence in, one judgement to confirm out.
+   *
+   * When the consultant has chosen an assistant, it gets the sentence first and
+   * may come back with a grounded judgement. When it comes back with nothing —
+   * or does not come back at all — the workbench still records what was said,
+   * so a sentence is never lost and the page is never stuck waiting on
+   * something that failed.
+   */
   async function submitSituation(): Promise<void> {
-    if (!message.trim()) return
+    const text = message.trim()
+    if (!text) return
     setSubmitting(true)
     setError(null)
     setResultMessage(null)
+    setNote(null)
+
     try {
-      const result = await api.judgments.submitSituation({ schoolId, text: message })
+      if (shouldAskAssistant(assistant)) {
+        setPhase('understanding')
+        try {
+          const run = await api.agent.run({ schoolId, message: text })
+          if (run.proposal) {
+            setProposal(run.proposal)
+            setEditedJudgment(run.proposal.proposal.provisionalJudgment)
+            setEditing(false)
+            setMessage('')
+            return
+          }
+          setNote(assistantNote(run))
+        } catch {
+          setNote('AI 助手这次没能完成。我先把你说的这条记下来了，可以过一会儿再试。')
+        } finally {
+          setPhase(null)
+        }
+      }
+
+      const result = await api.judgments.submitSituation({ schoolId, text })
       setProposal(result)
       setEditedJudgment(result.proposal.provisionalJudgment)
       setEditing(false)
@@ -95,6 +146,7 @@ export function SchoolWorkspacePage(): React.JSX.Element {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '暂时没能整理这条情况')
     } finally {
+      setPhase(null)
       setSubmitting(false)
     }
   }
@@ -227,7 +279,12 @@ export function SchoolWorkspacePage(): React.JSX.Element {
           onChange={(event) => setMessage(event.target.value)}
           placeholder="例如：今天的中层会议里，任务拆解还是主要由校长完成……"
         />
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground">
+            {shouldAskAssistant(assistant)
+              ? 'AI 助手会先看一遍这所学校的情况，可能需要一会儿。'
+              : '你可以在设置里让 AI 助手参与进来。'}
+          </p>
           <Button
             type="button"
             disabled={submitting || message.trim().length === 0}
@@ -237,6 +294,23 @@ export function SchoolWorkspacePage(): React.JSX.Element {
           </Button>
         </div>
       </section>
+
+      {phase ? (
+        <section
+          className="mt-5 flex items-center gap-3 rounded-xl border border-border bg-surface px-6 py-5"
+          aria-live="polite"
+        >
+          <Sparkles className="size-4 shrink-0 text-primary" />
+          <p className="text-sm text-muted-foreground">{progressLabel(phase)}</p>
+        </section>
+      ) : null}
+
+      {note ? (
+        <Alert variant="quiet" className="mt-5">
+          <AlertTitle>AI 助手</AlertTitle>
+          <AlertDescription>{note}</AlertDescription>
+        </Alert>
+      ) : null}
 
       {error ? (
         <Alert variant="destructive" className="mt-5">
@@ -265,8 +339,16 @@ export function SchoolWorkspacePage(): React.JSX.Element {
           <p className="text-sm font-medium text-primary">我发现一个新的情况，想让你确认</p>
           <h2 className="mt-2 text-xl font-semibold">{proposal.proposal.provisionalJudgment}</h2>
           <p className="mt-4 text-sm text-muted-foreground">
-            依据 {proposal.proposal.evidenceCount} 条 · 当前还需要更多观察
+            依据 {proposal.proposal.evidenceCount} 条
+            {proposal.counterFacts.length > 0
+              ? ` · 有 ${proposal.counterFacts.length} 条相反迹象`
+              : ' · 当前还需要更多观察'}
           </p>
+          {proposal.source === 'assistant' ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              这条是 AI 助手看过这所学校的情况后整理的，仍然要你确认才算数。
+            </p>
+          ) : null}
 
           <details className="mt-5 rounded-lg border border-border px-4 py-3 text-sm">
             <summary className="cursor-pointer font-medium">为什么这样判断？</summary>
@@ -283,6 +365,14 @@ export function SchoolWorkspacePage(): React.JSX.Element {
                   <p key={item}>{item}</p>
                 ))}
               </div>
+              {proposal.counterFacts.length > 0 ? (
+                <div>
+                  <p className="font-medium text-foreground">与这个判断不一致的依据</p>
+                  {proposal.counterFacts.map((fact) => (
+                    <p key={fact.id}>{fact.text}</p>
+                  ))}
+                </div>
+              ) : null}
               {proposal.proposal.alternativeHypotheses.length > 0 ? (
                 <div>
                   <p className="font-medium text-foreground">也可能是</p>

@@ -105,6 +105,8 @@ function judgmentRepository(
     findProposal: vi.fn<(id: string) => Promise<DiagnosisProposal | null>>(),
     saveReviewOutcome: vi.fn<(outcome: ReviewOutcome) => Promise<void>>(),
     listAcceptedJudgments: vi.fn().mockImplementation(async () => [...current()]),
+    findPendingProposalReview: vi.fn().mockResolvedValue(null),
+    findLatestProposalIdByAgentRun: vi.fn().mockResolvedValue(null),
   }
 }
 

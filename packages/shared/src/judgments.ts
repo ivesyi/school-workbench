@@ -46,11 +46,22 @@ export const diagnosisProposalViewSchema = z.object({
   createdAt: z.string().datetime(),
 })
 
+/**
+ * Who produced this pending judgement.
+ *
+ * Product language, not plumbing: the consultant is told an assistant looked at
+ * the school, never which protocol carried the answer.
+ */
+export const judgmentSourceSchema = z.enum(['workbench', 'assistant'])
+
 export const judgmentReviewViewSchema = z.object({
   evidence: z.array(evidenceReferenceViewSchema),
   facts: z.array(observationFactViewSchema),
+  /** Facts that point the other way. PRD 17 shows these next to the judgement. */
+  counterFacts: z.array(observationFactViewSchema).default([]),
   claims: z.array(claimViewSchema),
   proposal: diagnosisProposalViewSchema,
+  source: judgmentSourceSchema.default('workbench'),
 })
 
 const reviewDecisions = ['accepted', 'modified', 'rejected', 'needs_more_evidence'] as const
@@ -89,6 +100,7 @@ export const reviewOutcomeViewSchema = z.object({
 
 export const acceptedJudgmentListSchema = z.array(acceptedJudgmentViewSchema)
 
+export type JudgmentSource = z.infer<typeof judgmentSourceSchema>
 export type SubmitSituationInput = z.infer<typeof submitSituationInputSchema>
 export type JudgmentReviewView = z.infer<typeof judgmentReviewViewSchema>
 export type ReviewDiagnosisInput = z.infer<typeof reviewDiagnosisInputSchema>
