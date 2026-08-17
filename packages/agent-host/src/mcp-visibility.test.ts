@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { forbiddenAgentToolNames, workbenchReadToolNames } from './contracts'
+import { forbiddenAgentToolNames, workbenchToolNames } from './contracts'
 import { buildWorkbenchMcpDescriptor } from './mcp-descriptor'
 import { verifyWorkbenchMcpTools } from './mcp-visibility'
 
@@ -69,7 +69,7 @@ async function withLoopback<T>(
 }
 
 describe('workbench MCP tool visibility', () => {
-  it('runs the exact descriptor and confirms the frozen read tools are served', async () => {
+  it('runs the exact descriptor and confirms the frozen tool surface is served', async () => {
     const visibility = await withLoopback(async ({ endpoint, token }) =>
       verifyWorkbenchMcpTools(
         buildWorkbenchMcpDescriptor({
@@ -83,7 +83,7 @@ describe('workbench MCP tool visibility', () => {
       ),
     )
 
-    expect(visibility.visibleTools).toEqual([...workbenchReadToolNames].sort())
+    expect(visibility.visibleTools).toEqual([...workbenchToolNames].sort())
     expect(visibility.missingTools).toEqual([])
     expect(visibility.forbiddenTools).toEqual([])
   }, 30_000)
@@ -105,9 +105,11 @@ describe('workbench MCP tool visibility', () => {
     for (const forbidden of forbiddenAgentToolNames) {
       expect(visibility.visibleTools).not.toContain(forbidden)
     }
-    // The write plane is M2; it must not be reachable yet either.
-    expect(visibility.visibleTools).not.toContain('evidence_register')
-    expect(visibility.visibleTools).not.toContain('diagnosis_propose')
+    // The two SPEC 18 write tools are part of the surface now; the four SPEC 25
+    // capabilities never are.
+    expect(visibility.visibleTools).toContain('evidence_register')
+    expect(visibility.visibleTools).toContain('diagnosis_propose')
+    expect(visibility.visibleTools).not.toContain('feishu_ensure_ready')
   }, 30_000)
 
   it('reports invisible tools rather than letting a run continue', async () => {

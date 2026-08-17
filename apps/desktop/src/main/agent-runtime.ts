@@ -9,7 +9,11 @@ import {
 } from '@school-workbench/agent-host'
 import type { SqliteAgentRuntimeRepository } from '@school-workbench/db'
 import type { AgentRunView, RunAgentInput } from '@school-workbench/shared'
-import { readScopes, type WorkbenchLoopbackReadPlane } from '@school-workbench/workbench-read-plane'
+import {
+  capabilityScopes,
+  type WorkbenchLoopbackReadPlane,
+  type WorkbenchWriteCapabilityService,
+} from '@school-workbench/workbench-read-plane'
 import { randomUUID } from 'node:crypto'
 
 /**
@@ -34,6 +38,7 @@ const CAPABILITY_TOKEN_TTL_MS = 15 * 60 * 1000
 
 export type AgentRuntimeDependencies = Readonly<{
   readPlane: WorkbenchLoopbackReadPlane
+  writeService: WorkbenchWriteCapabilityService
   endpoint: string
   repository: SqliteAgentRuntimeRepository
   /** Directory the main bundle lives in, used to locate spawned artifacts. */
@@ -64,10 +69,13 @@ export async function runAgentOnce(
     runId: randomUUID(),
   })
 
+  // SPEC 17's full allow list: six read scopes plus `evidence.register` and
+  // `diagnosis.propose`. The four capabilities SPEC 25 forbids have no scope at
+  // all and no route, so no token can reach them.
   const grant = dependencies.readPlane.issueToken({
     schoolId: input.schoolId,
     agentRunId: run.id,
-    scopes: readScopes,
+    scopes: capabilityScopes,
     ttlMs: CAPABILITY_TOKEN_TTL_MS,
   })
 
@@ -110,6 +118,7 @@ export async function runAgentOnce(
     })
   } catch (error) {
     dependencies.readPlane.revokeToken(grant.token)
+    dependencies.writeService.forgetRun(run.id)
     await dependencies.repository.setRunStatus(run.id, 'failed')
     const message = error instanceof Error ? error.message : String(error)
     // Keep the host's own error code. Collapsing every pre-flight failure into
@@ -131,6 +140,11 @@ export async function runAgentOnce(
 
   // The token dies with the run, not with its TTL.
   dependencies.readPlane.revokeToken(grant.token)
+
+  // Decision L5: record how many refused candidates this run worked through.
+  const selfCorrectionRounds = dependencies.writeService.selfCorrectionRounds(run.id)
+  await dependencies.repository.setSelfCorrectionRounds(run.id, selfCorrectionRounds)
+  dependencies.writeService.forgetRun(run.id)
 
   const sessionId = await dependencies.repository.recordSession({
     schoolId: input.schoolId,

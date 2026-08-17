@@ -16,6 +16,8 @@ export type GroundedDiagnosisRecord = Readonly<{
 }>
 
 export type GroundedDiagnosisDraft = Readonly<{
+  /** The Agent Run that produced this proposal, when one did. */
+  agentRunId?: string | null
   interpretations: readonly string[]
   provisionalJudgment: string | null
   mechanism: string | null
@@ -56,7 +58,7 @@ export function createGroundedDiagnosisProposal(
   return {
     id: dependencies.createId(),
     schoolId,
-    agentRunId: null,
+    agentRunId: draft.agentRunId ?? null,
     type,
     title: title.trim(),
     scopeJson: JSON.stringify({ kind: 'school', schoolId }),

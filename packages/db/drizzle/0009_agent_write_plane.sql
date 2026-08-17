@@ -1,0 +1,2 @@
+ALTER TABLE `agent_runs` ADD `self_correction_rounds` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `evidence_school_content_hash_unique` ON `evidence` (`school_id`,`content_hash`);

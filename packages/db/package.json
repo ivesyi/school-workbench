@@ -17,11 +17,14 @@
     "@school-workbench/methodology": "workspace:*",
     "@school-workbench/workbench-read-plane": "workspace:*",
     "better-sqlite3": "13.0.3",
-    "drizzle-orm": "0.45.2"
+    "drizzle-orm": "0.45.2",
+    "ulid": "3.0.2"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
     "@types/better-sqlite3": "9.6.0",
     "drizzle-kit": "0.31.10",
+    "esbuild": "0.25.12",
     "typescript": "5.9.3"
   }
 }

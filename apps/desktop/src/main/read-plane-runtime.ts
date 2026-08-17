@@ -1,4 +1,10 @@
-import { SqliteReadPlaneRepository, type WorkbenchDatabase } from '@school-workbench/db'
+import { GroundedDiagnosisService } from '@school-workbench/application'
+import {
+  SqliteGroundedDiagnosisRepository,
+  SqliteReadPlaneRepository,
+  SqliteWritePlaneRepository,
+  type WorkbenchDatabase,
+} from '@school-workbench/db'
 import {
   MethodologyRegistry,
   type CriterionFilter,
@@ -11,6 +17,7 @@ import {
   createWorkbenchReadPlaneBootstrap,
   ReadPlaneError,
   WorkbenchReadCapabilityService,
+  WorkbenchWriteCapabilityService,
   type SafeReadPlaneLogger,
   type WorkbenchLoopbackReadPlane,
 } from '@school-workbench/workbench-read-plane'
@@ -119,6 +126,7 @@ class DeferredMethodologyRepository implements MethodologyRepository {
 
 export type ReadPlaneRuntime = Readonly<{
   plane: WorkbenchLoopbackReadPlane
+  writeService: WorkbenchWriteCapabilityService
   endpoint: string
   /** True once methodology content has been adopted, so `standards_get` works. */
   isMethodologyAvailable(): boolean
@@ -159,13 +167,26 @@ export async function startWorkbenchReadPlane(
     repository.adopt(runtime.repository)
   })
 
+  // The write plane shares the deferred methodology seam on purpose: a pack the
+  // consultant sent back for revision is not active, so `diagnosis_propose`
+  // stops producing proposals from it without any separate switch.
+  const writeService = new WorkbenchWriteCapabilityService(
+    new SqliteWritePlaneRepository(input.database, registry),
+    new GroundedDiagnosisService(
+      registry,
+      new SqliteGroundedDiagnosisRepository(input.database.db),
+    ),
+  )
+
   const plane = createWorkbenchReadPlaneBootstrap(service, {
     ...(input.safeLog ? { safeLog: input.safeLog } : {}),
+    writeService,
   })
   const endpoint = await plane.start()
 
   return Object.freeze({
     plane,
+    writeService,
     endpoint,
     isMethodologyAvailable: () => registry.isAvailable,
     stop: () => plane.stop(),

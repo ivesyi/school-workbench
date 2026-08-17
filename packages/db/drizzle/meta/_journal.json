@@ -64,6 +64,13 @@
       "when": 1786961914727,
       "tag": "0008_agent_runtime_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1786993632350,
+      "tag": "0009_agent_write_plane",
+      "breakpoints": true
     }
   ]
 }

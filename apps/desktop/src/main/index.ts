@@ -114,6 +114,7 @@ app.whenReady().then(() => {
         runAgentOnce(
           {
             readPlane: runtime.plane,
+            writeService: runtime.writeService,
             endpoint: runtime.endpoint,
             repository: agentRuntimeRepository,
             mainDirectory: currentDirectory,

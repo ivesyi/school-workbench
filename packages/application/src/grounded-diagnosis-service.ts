@@ -57,6 +57,12 @@ export type CreateGroundedDiagnosisInput = Readonly<{
   title: string
   rawAssessmentInput: unknown
   rawAssessmentCandidate: unknown
+  /**
+   * Provenance for a proposal an Agent produced. `diagnosis_proposals` has
+   * carried this column since the first schema; the write plane is the first
+   * caller able to fill it.
+   */
+  agentRunId?: string | null
 }>
 
 function evidenceQuality(candidate: AssessmentCandidate): DiagnosisProposal['evidenceQuality'] {
@@ -150,6 +156,7 @@ export class GroundedDiagnosisService {
       input.type,
       input.title,
       {
+        agentRunId: input.agentRunId ?? null,
         interpretations: candidate.interpretations.map((item) => item.summary),
         provisionalJudgment: candidate.provisionalJudgment,
         mechanism: candidate.mechanism,

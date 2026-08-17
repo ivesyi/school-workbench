@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { readScopes, type ReadScope } from './contracts'
+import { capabilityScopes, type CapabilityScope } from './contracts'
 
 export const capabilityAuthErrorCodes = [
   'AUTH_MISSING',
@@ -26,7 +26,7 @@ export class CapabilityAuthError extends Error {
 export type CapabilityTokenClaims = Readonly<{
   agentRunId: string
   schoolId: string
-  scopes: readonly ReadScope[]
+  scopes: readonly CapabilityScope[]
   issuedAt: string
   expiresAt: string
   revokedAt: string | null
@@ -40,13 +40,19 @@ export type CapabilityTokenGrant = Readonly<{
 type StoredGrant = {
   agentRunId: string
   schoolId: string
-  scopes: readonly ReadScope[]
+  scopes: readonly CapabilityScope[]
   issuedAtMs: number
   expiresAtMs: number
   revokedAtMs: number | null
 }
 
-const READ_SCOPE_SET = new Set<string>(readScopes)
+/**
+ * SPEC 17 lists the scopes a capability token may carry. The read slice only
+ * ever issued the six read scopes; the write plane adds the two SPEC 17 write
+ * scopes. Nothing outside this frozen list can be issued, and SPEC 25's four
+ * forbidden capabilities have no scope at all — see `forbiddenCapabilityNames`.
+ */
+const ISSUABLE_SCOPE_SET = new Set<string>(capabilityScopes)
 const DEFAULT_TTL_MS = 5 * 60 * 1000
 const MAX_TTL_MS = 15 * 60 * 1000
 
@@ -98,8 +104,8 @@ export class CapabilityTokenStore {
     if (input.scopes.length === 0 || new Set(input.scopes).size !== input.scopes.length) {
       throw new Error('Capability scopes must be non-empty and unique')
     }
-    if (input.scopes.some((scope) => !READ_SCOPE_SET.has(scope))) {
-      throw new Error('Only frozen read scopes can be issued in this slice')
+    if (input.scopes.some((scope) => !ISSUABLE_SCOPE_SET.has(scope))) {
+      throw new Error('Only the frozen SPEC 17 capability scopes can be issued')
     }
 
     const ttlMs = input.ttlMs ?? DEFAULT_TTL_MS
@@ -112,7 +118,7 @@ export class CapabilityTokenStore {
     const record: StoredGrant = {
       agentRunId,
       schoolId,
-      scopes: Object.freeze([...input.scopes] as ReadScope[]),
+      scopes: Object.freeze([...input.scopes] as CapabilityScope[]),
       issuedAtMs,
       expiresAtMs: issuedAtMs + ttlMs,
       revokedAtMs: null,
@@ -130,7 +136,7 @@ export class CapabilityTokenStore {
 
   authenticate(
     authorization: string | undefined,
-    requiredScope: ReadScope,
+    requiredScope: CapabilityScope,
     context: Readonly<{ schoolId: string; agentRunId: string }>,
   ): CapabilityTokenClaims {
     const rawToken = parseBearer(authorization)

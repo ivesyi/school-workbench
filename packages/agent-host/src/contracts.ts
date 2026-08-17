@@ -46,6 +46,19 @@ export const workbenchReadToolNames = [
 export type WorkbenchReadToolName = (typeof workbenchReadToolNames)[number]
 
 /**
+ * SPEC 18's two write tools. `feishu_ensure_ready` is the tenth and belongs to
+ * the Feishu slice, so it is deliberately absent.
+ */
+export const workbenchWriteToolNames = ['evidence_register', 'diagnosis_propose'] as const
+
+export type WorkbenchWriteToolName = (typeof workbenchWriteToolNames)[number]
+
+/** Every tool the workbench MCP server is expected to serve today. */
+export const workbenchToolNames = [...workbenchReadToolNames, ...workbenchWriteToolNames] as const
+
+export type WorkbenchToolName = WorkbenchReadToolName | WorkbenchWriteToolName
+
+/**
  * SPEC 25. These must never be reachable by an agent. They are declared as an
  * explicit negative list rather than being "protected" by not existing yet, so
  * that a contract test fails the moment one of them shows up on the MCP surface.

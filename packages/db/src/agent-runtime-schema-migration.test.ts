@@ -222,7 +222,12 @@ describe('agent runtime repository', () => {
         'updated_at',
         'started_at',
         'ended_at',
+        // Added by the write-plane migration. A count of refused candidates,
+        // never a reason (SPEC 39).
+        'self_correction_rounds',
       ])
+      expect(columns).not.toContain('reason')
+      expect(columns).not.toContain('detail')
     } finally {
       database.close()
     }

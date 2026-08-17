@@ -3,14 +3,22 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio'
 import {
   diagnosisListInputSchema,
   evidenceListInputSchema,
+  forbiddenCapabilityNames,
   readCapabilityNames,
   schoolContextInputSchema,
   stageCurrentInputSchema,
   standardsGetInputSchema,
   stateCurrentInputSchema,
   stateHistoryInputSchema,
+  writeCapabilityNames,
+  type CapabilityName,
   type ReadCapabilityName,
+  type WriteCapabilityName,
 } from '@school-workbench/workbench-read-plane/contracts'
+import {
+  diagnosisProposeInputSchema,
+  evidenceRegisterInputSchema,
+} from '@school-workbench/workbench-read-plane/write-contracts'
 
 const ENV_KEYS = ['SWB_ENDPOINT', 'SWB_TOKEN', 'SWB_SCHOOL_ID', 'SWB_AGENT_RUN_ID'] as const
 
@@ -27,6 +35,26 @@ const TOOL_DESCRIPTIONS: Readonly<Record<ReadCapabilityName, string>> = Object.f
     'Read a bounded page of immutable DiagnosisProposal metadata and provenance refs.',
   standards_get:
     'Read a bounded, filtered projection of an exactly matched active methodology pack.',
+})
+
+const WRITE_TOOL_DESCRIPTIONS: Readonly<Record<WriteCapabilityName, string>> = Object.freeze({
+  evidence_register:
+    'Record a piece of material you actually used, the observations you read off it, and the claims those observations support or contradict. Returns the identifiers to cite later. Registering the same material again returns the identifiers it already has.',
+  diagnosis_propose:
+    'Submit one structured professional judgement for the consultant to review. Cite only identifiers returned by evidence_register or read from this workbench. Rejections come back as a list of specific findings you can correct and resubmit.',
+})
+
+/**
+ * SPEC 25. These are never registered. The list is stated rather than implied so
+ * a contract test fails the moment one of them appears on the tool surface.
+ */
+const FORBIDDEN_TOOL_NAMES: readonly string[] = forbiddenCapabilityNames
+
+const WRITE_ANNOTATIONS = Object.freeze({
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false,
 })
 
 const READ_ONLY_ANNOTATIONS = Object.freeze({
@@ -51,6 +79,11 @@ class LocalApiError extends Error {
   constructor(
     readonly code: string,
     message: string,
+    /**
+     * The assessment protocol's own findings. Decision L5 keeps them intact all
+     * the way to the Agent, because they are what makes a refusal correctable.
+     */
+    readonly details?: readonly unknown[],
   ) {
     super(message)
     this.name = 'LocalApiError'
@@ -140,12 +173,13 @@ function parseApiEnvelope(value: unknown): unknown {
       'Internal Local API returned an invalid error',
     )
   }
-  throw new LocalApiError(error.code, error.message)
+  const details = Array.isArray(value.errors) ? (value.errors as readonly unknown[]) : undefined
+  throw new LocalApiError(error.code, error.message, details)
 }
 
 async function callLocalApi(
   config: BootstrapConfig,
-  capability: ReadCapabilityName,
+  capability: CapabilityName,
   input: unknown,
 ): Promise<unknown> {
   let response: Response
@@ -184,8 +218,9 @@ function successResult(data: unknown) {
 
 function errorResult(error: unknown) {
   const code = error instanceof LocalApiError ? error.code : 'MCP_INTERNAL'
-  const message = error instanceof LocalApiError ? error.message : 'Workbench MCP read failed'
-  const payload = { code, message }
+  const message = error instanceof LocalApiError ? error.message : 'Workbench MCP call failed'
+  const details = error instanceof LocalApiError ? error.details : undefined
+  const payload = details ? { code, message, errors: details } : { code, message }
   return {
     isError: true,
     content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
@@ -195,7 +230,7 @@ function errorResult(error: unknown) {
 
 function createServer(config: BootstrapConfig): McpServer {
   const server = new McpServer({ name: 'school-workbench-read-plane', version: '0.1.0' })
-  const handler = (capability: ReadCapabilityName) => async (input: unknown) => {
+  const handler = (capability: CapabilityName) => async (input: unknown) => {
     try {
       return successResult(await callLocalApi(config, capability, input))
     } catch (error) {
@@ -266,6 +301,24 @@ function createServer(config: BootstrapConfig): McpServer {
     },
     handler('standards_get'),
   )
+  server.registerTool(
+    'evidence_register',
+    {
+      description: WRITE_TOOL_DESCRIPTIONS.evidence_register,
+      inputSchema: evidenceRegisterInputSchema,
+      annotations: WRITE_ANNOTATIONS,
+    },
+    handler('evidence_register'),
+  )
+  server.registerTool(
+    'diagnosis_propose',
+    {
+      description: WRITE_TOOL_DESCRIPTIONS.diagnosis_propose,
+      inputSchema: diagnosisProposeInputSchema,
+      annotations: WRITE_ANNOTATIONS,
+    },
+    handler('diagnosis_propose'),
+  )
 
   return server
 }
@@ -299,4 +352,10 @@ if (process.exitCode !== 1) {
   process.stdin.once('end', close)
 }
 
-export { createServer, readBootstrapConfig, readCapabilityNames }
+export {
+  createServer,
+  readBootstrapConfig,
+  readCapabilityNames,
+  writeCapabilityNames,
+  FORBIDDEN_TOOL_NAMES,
+}

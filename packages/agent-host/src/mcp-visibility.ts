@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/client'
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/client/stdio'
-import { AgentHostError, forbiddenAgentToolNames, workbenchReadToolNames } from './contracts'
+import { AgentHostError, forbiddenAgentToolNames, workbenchToolNames } from './contracts'
 import { descriptorEnvRecord, type WorkbenchMcpServerDescriptor } from './mcp-descriptor'
 
 export type WorkbenchMcpVisibility = Readonly<{
@@ -53,7 +53,7 @@ export async function verifyWorkbenchMcpTools(
     await client.close().catch(() => undefined)
   }
 
-  const missingTools = workbenchReadToolNames.filter((name) => !visibleTools.includes(name))
+  const missingTools = workbenchToolNames.filter((name) => !visibleTools.includes(name))
   const forbiddenTools = forbiddenAgentToolNames.filter((name) => visibleTools.includes(name))
 
   if (missingTools.length > 0) {

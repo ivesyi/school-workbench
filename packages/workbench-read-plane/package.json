@@ -5,12 +5,14 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./contracts": "./src/contracts.ts"
+    "./contracts": "./src/contracts.ts",
+    "./write-contracts": "./src/write-contracts.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@school-workbench/assessment": "workspace:*",
     "@school-workbench/methodology": "workspace:*",
     "fastify": "5.11.0",
     "zod": "4.4.3"

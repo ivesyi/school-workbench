@@ -15,22 +15,31 @@ export const schools = sqliteTable('schools', {
   archivedAt: text('archived_at'),
 })
 
-export const evidence = sqliteTable('evidence', {
-  id: text('id').primaryKey(),
-  schoolId: text('school_id')
-    .notNull()
-    .references(() => schools.id, { onDelete: 'cascade' }),
-  sourceType: text('source_type').notNull(),
-  uri: text('uri'),
-  inlineText: text('inline_text'),
-  title: text('title').notNull(),
-  locatorJson: text('locator_json'),
-  contentHash: text('content_hash'),
-  capturedAt: text('captured_at'),
-  registeredBy: text('registered_by').notNull(),
-  agentRunId: text('agent_run_id'),
-  createdAt: text('created_at').notNull(),
-})
+export const evidence = sqliteTable(
+  'evidence',
+  {
+    id: text('id').primaryKey(),
+    schoolId: text('school_id')
+      .notNull()
+      .references(() => schools.id, { onDelete: 'cascade' }),
+    sourceType: text('source_type').notNull(),
+    uri: text('uri'),
+    inlineText: text('inline_text'),
+    title: text('title').notNull(),
+    locatorJson: text('locator_json'),
+    contentHash: text('content_hash'),
+    capturedAt: text('captured_at'),
+    registeredBy: text('registered_by').notNull(),
+    agentRunId: text('agent_run_id'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    // Decision L7: the same material registered twice in one school is one
+    // Evidence. Rows written before content hashing keep a NULL hash, and
+    // SQLite treats NULLs as distinct, so they are unaffected.
+    uniqueIndex('evidence_school_content_hash_unique').on(table.schoolId, table.contentHash),
+  ],
+)
 
 export const observationFacts = sqliteTable('observation_facts', {
   id: text('id').primaryKey(),

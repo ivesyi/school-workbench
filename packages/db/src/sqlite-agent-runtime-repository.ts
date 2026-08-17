@@ -114,6 +114,13 @@ export class SqliteAgentRuntimeRepository {
     return id
   }
 
+  /** Decision L5: how many refused candidates this run worked through. */
+  async setSelfCorrectionRounds(runId: string, rounds: number): Promise<void> {
+    this.database.client
+      .prepare('UPDATE agent_runs SET self_correction_rounds = ?, updated_at = ? WHERE id = ?')
+      .run(Math.max(0, Math.trunc(rounds)), this.now(), runId)
+  }
+
   async attachRunToSession(runId: string, sessionId: string): Promise<void> {
     this.database.client
       .prepare('UPDATE agent_runs SET session_id = ?, updated_at = ? WHERE id = ?')
@@ -174,6 +181,7 @@ function toAgentRunRow(row: Record<string, unknown>): unknown {
     sessionId: row['session_id'],
     schoolId: row['school_id'],
     status: row['status'],
+    selfCorrectionRounds: row['self_correction_rounds'],
     createdAt: row['created_at'],
     updatedAt: row['updated_at'],
     startedAt: row['started_at'],

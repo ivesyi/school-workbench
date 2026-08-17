@@ -1,9 +1,12 @@
 import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/client/stdio'
 import {
+  capabilityNames,
   createWorkbenchReadPlaneBootstrap,
+  forbiddenCapabilityNames,
   readCapabilityNames,
   readScopes,
+  writeCapabilityNames,
   type WorkbenchReadCapabilityService,
 } from '@school-workbench/workbench-read-plane'
 import { build } from 'esbuild'
@@ -118,7 +121,7 @@ function waitForExit(child: ReturnType<typeof spawn>, timeoutMs = 5_000) {
 }
 
 describe('workbench-mcp stdio process', () => {
-  it('initializes with the official SDK client, exposes exactly seven read tools, and calls every tool', async () => {
+  it('initializes with the official SDK client, exposes the frozen tool surface, and calls every read tool', async () => {
     const loopback = createWorkbenchReadPlaneBootstrap(fakeService())
     const endpoint = await loopback.start()
     const grant = loopback.issueToken({
@@ -130,9 +133,33 @@ describe('workbench-mcp stdio process', () => {
 
     try {
       const listed = await client.listTools()
-      expect(listed.tools.map((tool) => tool.name).sort()).toEqual([...readCapabilityNames].sort())
-      expect(listed.tools).toHaveLength(7)
-      expect(listed.tools.every((tool) => tool.annotations?.readOnlyHint === true)).toBe(true)
+      const toolNames = listed.tools.map((tool) => tool.name)
+      expect(toolNames.sort()).toEqual([...capabilityNames].sort())
+      expect(listed.tools).toHaveLength(9)
+
+      // Reads are annotated read-only; the two write tools must not be, or a
+      // runtime is entitled to treat them as free of consequences.
+      for (const tool of listed.tools) {
+        const expectedReadOnly = (readCapabilityNames as readonly string[]).includes(tool.name)
+        expect(tool.annotations?.readOnlyHint, tool.name).toBe(expectedReadOnly)
+        expect(tool.annotations?.destructiveHint, tool.name).toBe(false)
+      }
+      expect(writeCapabilityNames.every((name) => toolNames.includes(name))).toBe(true)
+
+      // SPEC 25: never on the surface, whatever else changes.
+      for (const forbidden of forbiddenCapabilityNames) {
+        expect(toolNames).not.toContain(forbidden)
+      }
+
+      // The assessment contracts fail closed on scoring vocabulary, so a
+      // description that invites a model to "score" or "rate" something is a
+      // description that produces rejected submissions.
+      const scoringWords = /score|scoring|rating|rate |weight|rank|打分|评分|置信度分/iu
+      for (const name of writeCapabilityNames) {
+        const description = listed.tools.find((tool) => tool.name === name)?.description ?? ''
+        expect(description.length, name).toBeGreaterThan(0)
+        expect(description, name).not.toMatch(scoringWords)
+      }
 
       const calls = [
         ['school_context', {}],

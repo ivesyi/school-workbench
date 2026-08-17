@@ -24,7 +24,54 @@ export const readScopes = [
 
 export type ReadScope = (typeof readScopes)[number]
 
-export const capabilityScope: Readonly<Record<ReadCapabilityName, ReadScope>> = Object.freeze({
+/**
+ * SPEC 18 freezes the Workbench MCP tool list. These are the two write tools;
+ * `feishu_ensure_ready` is the tenth and belongs to the Feishu slice.
+ */
+export const writeCapabilityNames = ['evidence_register', 'diagnosis_propose'] as const
+
+export type WriteCapabilityName = (typeof writeCapabilityNames)[number]
+
+/** SPEC 17 write scopes. Listed in the SPEC's allow list from the start. */
+export const writeScopes = ['evidence.register', 'diagnosis.propose'] as const
+
+export type WriteScope = (typeof writeScopes)[number]
+
+/**
+ * SPEC 25. The Workbench MCP surface must never expose a way for an Agent to
+ * confirm formal state. Once write scopes exist, "read only" is no longer
+ * guaranteed by the type system, so the prohibition is stated as an explicit
+ * negative list with a contract test rather than being implied by absence.
+ */
+export const forbiddenCapabilityNames = [
+  'diagnosis_accept',
+  'diagnosis_reject',
+  'state_commit',
+  'stage_activate',
+] as const
+
+export type ForbiddenCapabilityName = (typeof forbiddenCapabilityNames)[number]
+
+/** Scopes SPEC 25 forbids; no capability may ever map to one of these. */
+export const forbiddenScopes = [
+  'diagnosis.approve',
+  'diagnosis.reject',
+  'state.commit',
+  'stage.activate',
+  'human.review',
+] as const
+
+export type ForbiddenScope = (typeof forbiddenScopes)[number]
+
+export const capabilityNames = [...readCapabilityNames, ...writeCapabilityNames] as const
+
+export type CapabilityName = ReadCapabilityName | WriteCapabilityName
+
+export const capabilityScopes = [...readScopes, ...writeScopes] as const
+
+export type CapabilityScope = ReadScope | WriteScope
+
+export const capabilityScope: Readonly<Record<CapabilityName, CapabilityScope>> = Object.freeze({
   school_context: 'school.read',
   stage_current: 'stage.read',
   state_current: 'state.read',
@@ -32,7 +79,17 @@ export const capabilityScope: Readonly<Record<ReadCapabilityName, ReadScope>> = 
   evidence_list: 'evidence.read',
   diagnosis_list: 'diagnosis.read',
   standards_get: 'standards.read',
+  evidence_register: 'evidence.register',
+  diagnosis_propose: 'diagnosis.propose',
 })
+
+export function isReadCapabilityName(value: string): value is ReadCapabilityName {
+  return (readCapabilityNames as readonly string[]).includes(value)
+}
+
+export function isWriteCapabilityName(value: string): value is WriteCapabilityName {
+  return (writeCapabilityNames as readonly string[]).includes(value)
+}
 
 const scopedSchoolIdSchema = z.string().trim().min(1).max(128)
 const cursorSchema = z.string().trim().min(1).max(512)

@@ -99,6 +99,13 @@ export const agentRuns = sqliteTable(
       .notNull()
       .references(() => schools.id, { onDelete: 'cascade' }),
     status: text('status').notNull(),
+    /**
+     * How many times the assessment protocol refused a candidate in this run
+     * before it either succeeded or gave up (decision L5). A count, not a
+     * reason: why a candidate was refused stays in the structured errors the
+     * Agent already received.
+     */
+    selfCorrectionRounds: integer('self_correction_rounds').notNull().default(0),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
     startedAt: text('started_at'),

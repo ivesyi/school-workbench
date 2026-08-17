@@ -1,16 +1,25 @@
+import type { AssessmentProtocolError } from '@school-workbench/assessment'
 import type { AddressInfo } from 'node:net'
 import Fastify, { type FastifyInstance } from 'fastify'
 import {
   capabilityScope,
-  readCapabilityNames,
+  isReadCapabilityName,
+  isWriteCapabilityName,
   ReadPlaneError,
+  type CapabilityName,
   type ReadCapabilityName,
+  type WriteCapabilityName,
 } from './contracts'
 import { CapabilityAuthError, CapabilityTokenStore, type CapabilityTokenGrant } from './auth'
 import type { WorkbenchReadCapabilityService } from './service'
+import { WritePlaneProtocolError, type WorkbenchWriteCapabilityService } from './write-service'
 
 export type ReadPlaneApiErrorCode =
-  CapabilityAuthError['code'] | ReadPlaneError['code'] | 'CAPABILITY_NOT_FOUND'
+  | CapabilityAuthError['code']
+  | ReadPlaneError['code']
+  | WritePlaneProtocolError['code']
+  | 'CAPABILITY_NOT_FOUND'
+  | 'CAPABILITY_NOT_AVAILABLE'
 
 export type ReadPlaneApiErrorEnvelope = Readonly<{
   ok: false
@@ -18,6 +27,11 @@ export type ReadPlaneApiErrorEnvelope = Readonly<{
     code: ReadPlaneApiErrorCode
     message: string
   }>
+  /**
+   * The assessment protocol's own findings, passed through unchanged so an
+   * Agent can correct a specific field instead of guessing (decision L5).
+   */
+  errors?: readonly AssessmentProtocolError[]
 }>
 
 export type SafeReadPlaneLogEvent = Readonly<{
@@ -32,23 +46,53 @@ function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value
 }
 
-function statusFor(error: CapabilityAuthError | ReadPlaneError): number {
+function statusFor(error: CapabilityAuthError | ReadPlaneError | WritePlaneProtocolError): number {
   if (error instanceof CapabilityAuthError) {
     if (error.code === 'AUTH_SCOPE_DENIED' || error.code.endsWith('_MISMATCH')) return 403
     return 401
   }
+  // A refused candidate is a well-formed request the domain declined, and the
+  // Agent is expected to correct and resubmit it.
+  if (error instanceof WritePlaneProtocolError) return 422
   if (error.code === 'INPUT_INVALID') return 400
   if (error.code === 'SCHOOL_NOT_FOUND') return 404
   if (error.code === 'READ_STALE' || error.code === 'STANDARDS_DRIFT') return 409
   return 500
 }
 
-function errorEnvelope(code: ReadPlaneApiErrorCode, message: string): ReadPlaneApiErrorEnvelope {
-  return Object.freeze({ ok: false, error: Object.freeze({ code, message }) })
+function errorEnvelope(
+  code: ReadPlaneApiErrorCode,
+  message: string,
+  errors?: readonly AssessmentProtocolError[],
+): ReadPlaneApiErrorEnvelope {
+  return Object.freeze({
+    ok: false,
+    error: Object.freeze({ code, message }),
+    ...(errors ? { errors: Object.freeze([...errors]) } : {}),
+  })
 }
 
 function hasQueryParameters(query: unknown): boolean {
   return query !== null && typeof query === 'object' && Object.keys(query).length > 0
+}
+
+async function dispatchWrite(
+  service: WorkbenchWriteCapabilityService | undefined,
+  capability: WriteCapabilityName,
+  context: Readonly<{ schoolId: string; agentRunId: string }>,
+  input: unknown,
+): Promise<unknown> {
+  if (!service) {
+    // The write plane is optional so a workbench whose write side is not wired
+    // refuses cleanly instead of half-answering.
+    throw new ReadPlaneError('INTERNAL', 'The write plane is not available')
+  }
+  switch (capability) {
+    case 'evidence_register':
+      return service.evidenceRegister(context, input)
+    case 'diagnosis_propose':
+      return service.diagnosisPropose(context, input)
+  }
 }
 
 async function dispatch(
@@ -83,6 +127,7 @@ export class WorkbenchLoopbackReadPlane {
     private readonly service: WorkbenchReadCapabilityService,
     readonly tokens: CapabilityTokenStore = new CapabilityTokenStore(),
     private readonly safeLog: SafeReadPlaneLogger = () => undefined,
+    private readonly writeService?: WorkbenchWriteCapabilityService,
   ) {
     this.#server = Fastify({
       logger: false,
@@ -91,14 +136,17 @@ export class WorkbenchLoopbackReadPlane {
 
     this.#server.post('/internal/v1/:capability', async (request, reply) => {
       const capability = (request.params as { capability?: string }).capability ?? ''
-      if (!readCapabilityNames.includes(capability as ReadCapabilityName)) {
+      // SPEC 25's forbidden capabilities are not merely unimplemented: they are
+      // not routable, and asking for one is indistinguishable from asking for a
+      // capability that never existed.
+      if (!isReadCapabilityName(capability) && !isWriteCapabilityName(capability)) {
         this.safeLog({ level: 'warn', capability, code: 'CAPABILITY_NOT_FOUND' })
         return reply
           .code(404)
-          .send(errorEnvelope('CAPABILITY_NOT_FOUND', 'Read capability not found'))
+          .send(errorEnvelope('CAPABILITY_NOT_FOUND', 'Workbench capability not found'))
       }
 
-      const typedCapability = capability as ReadCapabilityName
+      const typedCapability: CapabilityName = capability
       try {
         const schoolId = firstHeader(request.headers['x-swb-school-id'])
         const agentRunId = firstHeader(request.headers['x-swb-agent-run-id'])
@@ -118,9 +166,22 @@ export class WorkbenchLoopbackReadPlane {
             'Query parameters are not accepted by the read plane',
           )
         }
-        const data = await dispatch(this.service, typedCapability, schoolId, request.body ?? {})
+        const data = isWriteCapabilityName(typedCapability)
+          ? await dispatchWrite(
+              this.writeService,
+              typedCapability,
+              { schoolId, agentRunId },
+              request.body ?? {},
+            )
+          : await dispatch(this.service, typedCapability, schoolId, request.body ?? {})
         return reply.code(200).send({ ok: true, data })
       } catch (error) {
+        if (error instanceof WritePlaneProtocolError) {
+          this.safeLog({ level: 'warn', capability, code: error.code })
+          return reply
+            .code(statusFor(error))
+            .send(errorEnvelope(error.code, error.message, error.errors))
+        }
         if (error instanceof CapabilityAuthError || error instanceof ReadPlaneError) {
           this.safeLog({
             level: statusFor(error) >= 500 ? 'error' : 'warn',
@@ -183,7 +244,13 @@ export function createWorkbenchReadPlaneBootstrap(
   options: Readonly<{
     tokenStore?: CapabilityTokenStore
     safeLog?: SafeReadPlaneLogger
+    writeService?: WorkbenchWriteCapabilityService
   }> = {},
 ): WorkbenchLoopbackReadPlane {
-  return new WorkbenchLoopbackReadPlane(service, options.tokenStore, options.safeLog)
+  return new WorkbenchLoopbackReadPlane(
+    service,
+    options.tokenStore,
+    options.safeLog,
+    options.writeService,
+  )
 }
