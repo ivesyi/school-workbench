@@ -1,0 +1,52 @@
+name: Validated Diagnosis Seam
+
+on:
+  push:
+    branches:
+      - validated-diagnosis-seam-20260817
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: ${{ !contains(github.event.head_commit.message, '[generated]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: validated-diagnosis-seam-20260817
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install and refresh lockfile
+        run: pnpm install --no-frozen-lockfile
+      - name: Generate Drizzle migration
+        run: pnpm db:generate
+      - name: Format generated and changed files
+        run: pnpm format:write
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Test
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+      - name: E2E
+        run: pnpm test:e2e
+      - name: Commit generated artifacts
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(db): generate grounded diagnosis migration [generated]"
+            git push origin HEAD:validated-diagnosis-seam-20260817
+          fi
