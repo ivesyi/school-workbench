@@ -257,8 +257,10 @@ function resolveCriterion(
     .get()
   if (
     !pack ||
+    pack.id !== expectation.packId ||
     pack.status !== 'active' ||
-    pack.contentHash !== expectation.packContentHash
+    pack.contentHash !== expectation.packContentHash ||
+    pack.sourceFingerprint !== expectation.packSourceFingerprint
   ) {
     fail(
       'ASSESSMENT_METHODOLOGY_PERSISTENCE_MISMATCH',
@@ -273,15 +275,33 @@ function resolveCriterion(
     .where(
       and(
         eq(methodologyCriteria.packId, pack.id),
-        eq(methodologyCriteria.stableKey, expectation.criterionStableKey),
+        eq(methodologyCriteria.stableKey, expectation.criterion.stableKey),
       ),
     )
     .get()
-  if (!criterion || criterion.id !== expectation.criterionRowId) {
+  const expected = expectation.criterion
+  const criterionMatches =
+    criterion?.id === expected.id &&
+    criterion.parentId === expectation.expectedParentRowId &&
+    criterion.constructKey === expected.constructKey &&
+    criterion.dimensionKey === expected.dimensionKey &&
+    criterion.practiceType === expected.practiceType &&
+    criterion.title === expected.title &&
+    criterion.description === expected.description &&
+    criterion.evidenceGuidanceJson === JSON.stringify(expected.evidenceGuidance) &&
+    criterion.counterIndicatorsJson === JSON.stringify(expected.counterIndicators) &&
+    criterion.guardrailsJson ===
+      JSON.stringify({
+        applicability: expected.applicability,
+        inferenceGuardrails: expected.guardrails,
+      }) &&
+    criterion.sourceLocatorJson === JSON.stringify(expected.sourceLocator) &&
+    criterion.sequence === expected.sequence
+  if (!criterion || !criterionMatches) {
     fail(
       'ASSESSMENT_METHODOLOGY_PERSISTENCE_MISMATCH',
       '$.candidate.criterionMappings',
-      `Persisted criterion ${expectation.criterionStableKey} does not match the active file registry.`,
+      `Persisted criterion ${expected.stableKey} does not match the active file registry.`,
     )
   }
   return criterion.id
@@ -289,7 +309,16 @@ function resolveCriterion(
 
 function immutableRecord(record: GroundedDiagnosisRecord): GroundedDiagnosisRecord {
   return Object.freeze({
-    proposal: Object.freeze({ ...record.proposal }),
+    proposal: Object.freeze({
+      ...record.proposal,
+      interpretations: Object.freeze([...record.proposal.interpretations]),
+      alternativeHypotheses: Object.freeze([...record.proposal.alternativeHypotheses]),
+      unresolvedQuestions: Object.freeze([...record.proposal.unresolvedQuestions]),
+      recommendedActions: Object.freeze([...record.proposal.recommendedActions]),
+      nextObservations: Object.freeze([...record.proposal.nextObservations]),
+      impactEvidencePlan: Object.freeze([...record.proposal.impactEvidencePlan]),
+      evidenceQuality: Object.freeze({ ...record.proposal.evidenceQuality }),
+    }),
     claimIds: Object.freeze([...record.claimIds]),
     criteria: Object.freeze(record.criteria.map((criterion) => Object.freeze({ ...criterion }))),
     stageTargetIds: Object.freeze([...record.stageTargetIds]),
