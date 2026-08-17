@@ -53,7 +53,9 @@ describe('validated diagnosis persistence migration', () => {
         ]),
       )
 
-      const targetFks = database.client.pragma('foreign_key_list(diagnosis_stage_targets)') as Array<{
+      const targetFks = database.client.pragma(
+        'foreign_key_list(diagnosis_stage_targets)',
+      ) as Array<{
         table: string
         from: string
         to: string
@@ -102,13 +104,19 @@ describe('validated diagnosis persistence migration', () => {
 
       runMigration(client, diagnosisMigrationPath())
 
-      expect(client.prepare('SELECT title FROM diagnosis_proposals WHERE id = ?').get('proposal-1')).toEqual({
+      expect(
+        client.prepare('SELECT title FROM diagnosis_proposals WHERE id = ?').get('proposal-1'),
+      ).toEqual({
         title: 'existing proposal',
       })
       expect(
-        client.prepare('SELECT stable_key AS stableKey FROM methodology_criteria WHERE id = ?').get('criterion-1'),
+        client
+          .prepare('SELECT stable_key AS stableKey FROM methodology_criteria WHERE id = ?')
+          .get('criterion-1'),
       ).toEqual({ stableKey: 'SBD.C4.SYSTEM_ALIGNMENT' })
-      expect(client.prepare('SELECT title FROM stage_targets WHERE id = ?').get('target-1')).toEqual({
+      expect(
+        client.prepare('SELECT title FROM stage_targets WHERE id = ?').get('target-1'),
+      ).toEqual({
         title: 'existing target',
       })
 
