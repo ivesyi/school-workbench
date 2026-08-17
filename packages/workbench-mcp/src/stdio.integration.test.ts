@@ -106,13 +106,15 @@ function textResult(result: Awaited<ReturnType<Client['callTool']>>): string {
 }
 
 function waitForExit(child: ReturnType<typeof spawn>, timeoutMs = 5_000) {
-  return new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolvePromise, reject) => {
-    const timer = setTimeout(() => reject(new Error('child did not exit cleanly')), timeoutMs)
-    child.once('exit', (code, signal) => {
-      clearTimeout(timer)
-      resolvePromise({ code, signal })
-    })
-  })
+  return new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+    (resolvePromise, reject) => {
+      const timer = setTimeout(() => reject(new Error('child did not exit cleanly')), timeoutMs)
+      child.once('exit', (code, signal) => {
+        clearTimeout(timer)
+        resolvePromise({ code, signal })
+      })
+    },
+  )
 }
 
 describe('workbench-mcp stdio process', () => {
@@ -139,10 +141,7 @@ describe('workbench-mcp stdio process', () => {
         ['state_history', { limit: 1 }],
         ['evidence_list', { limit: 1 }],
         ['diagnosis_list', { limit: 1 }],
-        [
-          'standards_get',
-          { packKey: 'fixture', version: '1', criterionRefs: ['FIX.C1'] },
-        ],
+        ['standards_get', { packKey: 'fixture', version: '1', criterionRefs: ['FIX.C1'] }],
       ] as const
 
       for (const [name, args] of calls) {
@@ -179,39 +178,42 @@ describe('workbench-mcp stdio process', () => {
     }
   })
 
-  it.each(['eof', 'sigterm'] as const)('exits cleanly on %s without stdout pollution', async (mode) => {
-    const loopback = createWorkbenchReadPlaneBootstrap(fakeService())
-    const endpoint = await loopback.start()
-    const grant = loopback.issueToken({
-      schoolId: 'school-a',
-      agentRunId: 'run-a',
-      scopes: readScopes,
-    })
-    const child = spawn(process.execPath, [serverBundle], {
-      env: { ...process.env, ...mcpEnv(endpoint, grant.token) },
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
-    let stdout = ''
-    let stderr = ''
-    child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
-      stdout += chunk
-    })
-    child.stderr.setEncoding('utf8').on('data', (chunk: string) => {
-      stderr += chunk
-    })
+  it.each(['eof', 'sigterm'] as const)(
+    'exits cleanly on %s without stdout pollution',
+    async (mode) => {
+      const loopback = createWorkbenchReadPlaneBootstrap(fakeService())
+      const endpoint = await loopback.start()
+      const grant = loopback.issueToken({
+        schoolId: 'school-a',
+        agentRunId: 'run-a',
+        scopes: readScopes,
+      })
+      const child = spawn(process.execPath, [serverBundle], {
+        env: { ...process.env, ...mcpEnv(endpoint, grant.token) },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+      let stdout = ''
+      let stderr = ''
+      child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
+        stdout += chunk
+      })
+      child.stderr.setEncoding('utf8').on('data', (chunk: string) => {
+        stderr += chunk
+      })
 
-    if (mode === 'eof') child.stdin.end()
-    else {
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 100))
-      child.kill('SIGTERM')
-    }
-    const exited = await waitForExit(child)
-    await loopback.stop()
+      if (mode === 'eof') child.stdin.end()
+      else {
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 100))
+        child.kill('SIGTERM')
+      }
+      const exited = await waitForExit(child)
+      await loopback.stop()
 
-    expect(exited.code === 0 || exited.signal === 'SIGTERM').toBe(true)
-    expect(stdout).toBe('')
-    expect(stderr).not.toContain(grant.token)
-  })
+      expect(exited.code === 0 || exited.signal === 'SIGTERM').toBe(true)
+      expect(stdout).toBe('')
+      expect(stderr).not.toContain(grant.token)
+    },
+  )
 
   it('fails before serving when required bootstrap env is missing and never echoes supplied secrets', async () => {
     const secret = 's'.repeat(43)
