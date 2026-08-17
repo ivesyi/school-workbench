@@ -303,7 +303,15 @@ export class WorkbenchReadCapabilityService {
         sourceFingerprint: filePack.sourceFingerprint.value,
         contentHash: filePack.canonicalContentHash.value,
       },
-      constructs: filePack.constructs.filter((construct) => constructIds.has(construct.id)),
+      constructs: filePack.constructs
+        .filter((construct) => constructIds.has(construct.id))
+        .map((construct) => ({
+          id: construct.id,
+          title: construct.title,
+          assessmentQuestion: construct.assessmentQuestion,
+          ...(construct.parentId ? { parentId: construct.parentId } : {}),
+          sourceLocator: construct.sourceLocator,
+        })),
       criteria: selected.map((criterion) => {
         const evidenceGuidance = guidanceByCriterion.get(criterion.id)
         if (!evidenceGuidance) {
