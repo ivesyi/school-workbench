@@ -83,7 +83,7 @@ function sameScopeJson(value: string, schoolId: string): boolean {
   try {
     const parsed = JSON.parse(value) as unknown
     return (
-      Boolean(parsed) &&
+      parsed !== null &&
       typeof parsed === 'object' &&
       !Array.isArray(parsed) &&
       Reflect.get(parsed, 'kind') === 'school' &&
@@ -319,7 +319,7 @@ function immutableRecord(record: GroundedDiagnosisRecord): GroundedDiagnosisReco
     claimIds: Object.freeze([...record.claimIds]),
     criteria: Object.freeze(record.criteria.map((criterion) => Object.freeze({ ...criterion }))),
     stageTargetIds: Object.freeze([...record.stageTargetIds]),
-  })
+  }) as unknown as GroundedDiagnosisRecord
 }
 
 export class SqliteGroundedDiagnosisRepository implements GroundedDiagnosisRepository {
