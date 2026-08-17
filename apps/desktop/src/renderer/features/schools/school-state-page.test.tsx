@@ -146,6 +146,10 @@ function baseApi(stateView: StateWorkspaceView = draft): WorkbenchApi {
       adjust: vi.fn(),
       confirm: vi.fn(),
     },
+    methodology: {
+      getReviewWorkbench: vi.fn(),
+      signOff: vi.fn(),
+    },
   }
 }
 

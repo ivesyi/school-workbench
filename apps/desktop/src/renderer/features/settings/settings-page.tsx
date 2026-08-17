@@ -1,5 +1,6 @@
 import { Alert, AlertDescription, AlertTitle, Separator } from '@school-workbench/experience'
-import { CheckCircle2, CircleDashed } from 'lucide-react'
+import { CheckCircle2, ChevronRight, CircleDashed } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export function SettingsPage(): React.JSX.Element {
   return (
@@ -31,6 +32,24 @@ export function SettingsPage(): React.JSX.Element {
           </span>
         </div>
       </section>
+
+      <details className="mt-6 rounded-xl border border-border bg-surface px-6 py-5">
+        <summary className="cursor-pointer text-sm font-medium">高级设置</summary>
+        <div className="mt-4">
+          <Link
+            to="/settings/methodology-review"
+            className="flex items-center justify-between gap-4 rounded-lg px-3 py-3 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span>
+              <span className="block font-medium">方法论内容审核</span>
+              <span className="mt-1 block text-sm text-muted-foreground">
+                逐条确认这些判断标准是否可以用来约束正式判断
+              </span>
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </Link>
+        </div>
+      </details>
 
       <Alert variant="quiet" className="mt-6">
         <AlertTitle>第一阶段实现</AlertTitle>

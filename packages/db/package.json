@@ -8,7 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "db:generate": "drizzle-kit generate --config drizzle.config.ts"
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+    "build:methodology-cli": "esbuild src/activate-methodology-pack-main.ts --bundle --platform=node --format=esm --outfile=dist/activate-methodology-pack.mjs --external:better-sqlite3"
   },
   "dependencies": {
     "@school-workbench/application": "workspace:*",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",
     "drizzle-kit": "0.31.10",
+    "esbuild": "0.25.12",
     "typescript": "5.9.3"
   }
 }

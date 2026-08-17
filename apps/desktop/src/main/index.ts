@@ -15,6 +15,12 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createJudgmentIpcHandlers, registerJudgmentIpc } from './judgment-ipc'
+import { createMethodologyIpcHandlers, registerMethodologyIpc } from './methodology-ipc'
+import {
+  createMethodologyRuntime,
+  resolveMethodologyPaths,
+  type MethodologyRuntime,
+} from './methodology-runtime'
 import { createSchoolIpcHandlers, registerSchoolIpc } from './school-ipc'
 import { createStageIpcHandlers, registerStageIpc } from './stage-ipc'
 import { createStateIpcHandlers, registerStateIpc } from './state-ipc'
@@ -81,10 +87,23 @@ app.whenReady().then(() => {
     stateRepository,
   )
 
+  // Methodology content is a read-only build input. Loading it must never block
+  // or break the workbench, so the runtime is prepared off the startup path and
+  // any failure resolves to a quiet unavailable state.
+  const methodologyRuntime: Promise<MethodologyRuntime> = createMethodologyRuntime({
+    database,
+    paths: resolveMethodologyPaths(currentDirectory),
+    onError: (message) => process.stderr.write(`${message}\n`),
+  })
+
   registerSchoolIpc(ipcMain, createSchoolIpcHandlers(schoolService))
   registerJudgmentIpc(ipcMain, createJudgmentIpcHandlers(judgmentService))
   registerStageIpc(ipcMain, createStageIpcHandlers(stageService))
   registerStateIpc(ipcMain, createStateIpcHandlers(stateService))
+  registerMethodologyIpc(
+    ipcMain,
+    createMethodologyIpcHandlers(() => methodologyRuntime),
+  )
 
   createMainWindow()
 

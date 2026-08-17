@@ -1,5 +1,6 @@
 export * from './grounded-diagnosis-service'
 export * from './judgment-service'
+export * from './methodology-review-service'
 export * from './school-service'
 export * from './stage-service'
 export * from './state-service'

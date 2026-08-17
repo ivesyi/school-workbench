@@ -7,12 +7,15 @@ import {
   createSchoolInputSchema,
   judgmentIpcChannels,
   judgmentReviewViewSchema,
+  methodologyIpcChannels,
+  packReviewWorkbenchViewSchema,
   reviewDiagnosisInputSchema,
   reviewOutcomeViewSchema,
   schoolIdSchema,
   schoolIpcChannels,
   schoolListSchema,
   schoolViewSchema,
+  signOffPackInputSchema,
   stageIpcChannels,
   stageWorkspaceViewSchema,
   stateIpcChannels,
@@ -109,6 +112,19 @@ const api: WorkbenchApi = {
         confirmStateInputSchema.parse(input),
       )
       return stateWorkspaceViewSchema.parse(result)
+    },
+  },
+  methodology: {
+    async getReviewWorkbench() {
+      const result: unknown = await ipcRenderer.invoke(methodologyIpcChannels.getReviewWorkbench)
+      return packReviewWorkbenchViewSchema.parse(result)
+    },
+    async signOff(input) {
+      const result: unknown = await ipcRenderer.invoke(
+        methodologyIpcChannels.signOff,
+        signOffPackInputSchema.parse(input),
+      )
+      return packReviewWorkbenchViewSchema.parse(result)
     },
   },
 }

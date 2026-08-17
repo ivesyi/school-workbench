@@ -13,7 +13,8 @@
     "@school-workbench/assessment": "workspace:*",
     "@school-workbench/domain": "workspace:*",
     "@school-workbench/methodology": "workspace:*",
-    "@school-workbench/shared": "workspace:*"
+    "@school-workbench/shared": "workspace:*",
+    "ulid": "3.0.2"
   },
   "devDependencies": {
     "typescript": "5.9.3"

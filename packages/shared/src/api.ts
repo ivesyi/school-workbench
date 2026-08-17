@@ -5,6 +5,7 @@ import type {
   ReviewOutcomeView,
   SubmitSituationInput,
 } from './judgments'
+import type { PackReviewWorkbenchView, SignOffPackInput } from './methodology'
 import type { CreateSchoolInput, SchoolView } from './schools'
 import type { AdjustStageInput, ConfirmStageInput, StageWorkspaceView } from './stages'
 import type { AdjustStateInput, ConfirmStateInput, StateWorkspaceView } from './states'
@@ -29,5 +30,9 @@ export type WorkbenchApi = {
     getWorkspace(schoolId: string): Promise<StateWorkspaceView>
     adjust(input: AdjustStateInput): Promise<StateWorkspaceView>
     confirm(input: ConfirmStateInput): Promise<StateWorkspaceView>
+  }
+  methodology: {
+    getReviewWorkbench(): Promise<PackReviewWorkbenchView>
+    signOff(input: SignOffPackInput): Promise<PackReviewWorkbenchView>
   }
 }

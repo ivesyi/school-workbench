@@ -1,5 +1,6 @@
 export * from './api'
 export * from './judgments'
+export * from './methodology'
 export * from './schools'
 export * from './stages'
 export * from './states'

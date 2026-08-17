@@ -142,6 +142,24 @@ describe('SqliteMethodologyRepository', () => {
     ).rejects.toThrow(/active -> review/)
   })
 
+  it('refuses to revive a retired pack', async () => {
+    await repository.syncRegistry(registry)
+    const original = registry.getPack('schooling-by-design', '1')
+    if (!original) throw new Error('missing SBD pack')
+
+    await repository.syncRegistry(new MethodologyRegistry([packWithStatus(original, 'active')]))
+    await repository.syncRegistry(new MethodologyRegistry([packWithStatus(original, 'retired')]))
+    expect((await repository.getPack('schooling-by-design', '1'))?.status).toBe('retired')
+
+    await expect(
+      repository.syncRegistry(new MethodologyRegistry([packWithStatus(original, 'active')])),
+    ).rejects.toThrow(/retired -> active/)
+    await expect(
+      repository.syncRegistry(new MethodologyRegistry([packWithStatus(original, 'review')])),
+    ).rejects.toThrow(/retired -> review/)
+    expect((await repository.getPack('schooling-by-design', '1'))?.status).toBe('retired')
+  })
+
   it('refuses to overwrite a key+version when canonical content changes', async () => {
     await repository.syncRegistry(registry)
     const original = registry.getPack('schooling-by-design', '1')

@@ -4,6 +4,7 @@ import { AppLayout } from './app-layout'
 import { SchoolListPage } from './features/schools/school-list-page'
 import { SchoolStatePage } from './features/schools/school-state-page'
 import { SchoolWorkspacePage } from './features/schools/school-workspace-page'
+import { MethodologyReviewPage } from './features/settings/methodology-review-page'
 import { SettingsPage } from './features/settings/settings-page'
 import { WorkbenchApiProvider } from './lib/workbench-api'
 
@@ -17,6 +18,7 @@ export function App({ api }: { api: WorkbenchApi }): React.JSX.Element {
             <Route path="schools/:schoolId" element={<SchoolWorkspacePage />} />
             <Route path="schools/:schoolId/state" element={<SchoolStatePage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="settings/methodology-review" element={<MethodologyReviewPage />} />
           </Route>
         </Routes>
       </HashRouter>

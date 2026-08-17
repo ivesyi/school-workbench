@@ -38,6 +38,10 @@ describe('SchoolListPage', () => {
         adjust: vi.fn(),
         confirm: vi.fn(),
       },
+      methodology: {
+        getReviewWorkbench: vi.fn(),
+        signOff: vi.fn(),
+      },
     }
 
     render(
