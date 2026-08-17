@@ -1,11 +1,10 @@
 import { resolve } from 'node:path'
 import {
   computePackContentHash,
-  createMethodologyRegistry,
   loadMethodologyRegistry,
+  MethodologyRegistry,
   type MethodologyPack,
   type MethodologyPackStatus,
-  type MethodologyRegistry,
 } from '@school-workbench/methodology'
 
 const methodologyRoot = resolve('knowledge/methodology')
@@ -46,7 +45,7 @@ export function registryForProfile(profile: string): MethodologyRegistry {
   }
 
   if (profile === 'retired') {
-    return createMethodologyRegistry(
+    return new MethodologyRegistry(
       repositoryPacks().map((pack) =>
         withStatus(pack, pack.key === 'schooling-by-design' ? 'retired' : 'active'),
       ),
@@ -57,11 +56,11 @@ export function registryForProfile(profile: string): MethodologyRegistry {
     const packs = activePacks()
     const sbd = packs.find((pack) => pack.key === 'schooling-by-design')
     if (!sbd) throw new Error('Schooling by Design fixture is missing')
-    return createMethodologyRegistry([...packs, secondActiveSbdVersion(sbd)])
+    return new MethodologyRegistry([...packs, secondActiveSbdVersion(sbd)])
   }
 
   if (profile === 'active') {
-    return createMethodologyRegistry(activePacks())
+    return new MethodologyRegistry(activePacks())
   }
 
   throw new Error(`Unknown assessment test registry profile: ${profile}`)
