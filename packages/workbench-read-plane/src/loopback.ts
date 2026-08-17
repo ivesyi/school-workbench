@@ -114,7 +114,10 @@ export class WorkbenchLoopbackReadPlane {
           agentRunId,
         })
         if (hasQueryParameters(request.query)) {
-          throw new ReadPlaneError('INPUT_INVALID', 'Query parameters are not accepted by the read plane')
+          throw new ReadPlaneError(
+            'INPUT_INVALID',
+            'Query parameters are not accepted by the read plane',
+          )
         }
         const data = await dispatch(this.service, typedCapability, schoolId, request.body ?? {})
         return reply.code(200).send({ ok: true, data })

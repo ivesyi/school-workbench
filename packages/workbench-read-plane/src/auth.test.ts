@@ -247,6 +247,18 @@ describe('Workbench loopback capability auth', () => {
     expect(bodyScope.status).toBe(400)
     await expect(bodyScope.json()).resolves.toMatchObject({ error: { code: 'INPUT_INVALID' } })
 
+    const queryScope = await fetch(`${endpoint}/school_context?schoolId=school-b`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${valid.token}`,
+        'content-type': 'application/json',
+        'x-swb-school-id': 'school-a',
+        'x-swb-agent-run-id': 'run-a',
+      },
+      body: '{}',
+    })
+    expect(queryScope.status).toBe(400)
+    await expect(queryScope.json()).resolves.toMatchObject({ error: { code: 'INPUT_INVALID' } })
     const serializedLogs = JSON.stringify(logs)
     for (const token of [
       valid.token,
