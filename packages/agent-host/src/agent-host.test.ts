@@ -5,7 +5,7 @@ import {
   type AnyMessage,
   type Stream,
 } from '@agentclientprotocol/sdk'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -114,6 +114,17 @@ function scriptedAgent(options: ScriptedAgentOptions = {}): {
     })
 
   return { app, newSessionRequests, promptRequests, initializeRequests }
+}
+
+/** The shape codex-acp uses to report an MCP server that failed or was cancelled. */
+function mcpStartupFailure(serverName: string): Record<string, unknown> {
+  return {
+    sessionUpdate: 'tool_call',
+    toolCallId: `mcp_startup.${encodeURIComponent(serverName)}`,
+    kind: 'other',
+    title: `mcp__${serverName}__startup`,
+    status: 'failed',
+  }
 }
 
 const scratchDirectories: string[] = []
@@ -383,11 +394,77 @@ describe('agent host lifecycle', () => {
   it('fails the run when the runtime reports the workbench MCP server failed to start', async () => {
     const scripted = scriptedAgent({
       onPrompt: async ({ notify }) => {
+        await notify(mcpStartupFailure(workbenchMcpServerName))
+        return 'end_turn'
+      },
+    })
+    const host = new AgentHost(new InProcessRuntimeLauncher(scripted.app), {
+      verifyTools: async () => ({ visibleTools: [], missingTools: [], forbiddenTools: [] }),
+    })
+
+    const outcome = await host.run(hostRequest(scratchRoot(), scratchRoot()))
+
+    expect(outcome.status).toBe('failed')
+    expect(outcome.failure?.code).toBe('WORKBENCH_MCP_STARTUP_FAILED')
+    expect(outcome.mcpStartupReportedFailure).toBe(true)
+    // The synthetic startup report is not a tool call the agent made, so it
+    // must never be mistaken for evidence that the server was used.
+    expect(outcome.usedWorkbenchTools).toBe(false)
+    expect(outcome.toolCallTitles).toEqual([])
+  })
+
+  it('does not fail a run whose own tool calls contradict the startup report', async () => {
+    // Observed on a real cold start: Codex reported the MCP server as
+    // "cancelled" while the server was in fact serving. The run must not be
+    // recorded as failed when it demonstrably read through that same server.
+    const scripted = scriptedAgent({
+      onPrompt: async ({ notify }) => {
+        await notify(mcpStartupFailure(workbenchMcpServerName))
         await notify({
           sessionUpdate: 'tool_call',
-          toolCallId: `mcp_startup.${encodeURIComponent(workbenchMcpServerName)}`,
-          title: `mcp__${workbenchMcpServerName}__startup`,
-          status: 'failed',
+          toolCallId: 'c1',
+          title: `mcp.${workbenchMcpServerName}.state_current`,
+          status: 'completed',
+        })
+        await notify({
+          sessionUpdate: 'agent_message_chunk',
+          content: { type: 'text', text: '这所学校目前尚无正式状态快照。' },
+        })
+        return 'end_turn'
+      },
+    })
+    const host = new AgentHost(new InProcessRuntimeLauncher(scripted.app), {
+      verifyTools: async () => ({ visibleTools: [], missingTools: [], forbiddenTools: [] }),
+    })
+
+    const outcome = await host.run(hostRequest(scratchRoot(), scratchRoot()))
+
+    expect(outcome.status).toBe('completed')
+    expect(outcome.failure).toBeNull()
+    expect(outcome.usedWorkbenchTools).toBe(true)
+    // The misreport is recorded rather than erased.
+    expect(outcome.mcpStartupReportedFailure).toBe(true)
+    expect(outcome.text).toBe('这所学校目前尚无正式状态快照。')
+  })
+
+  it('still fails when only a different MCP server was used', async () => {
+    // Guards against "any tool call excuses a startup failure". Only a call
+    // routed through the workbench server can contradict a report about the
+    // workbench server.
+    const scripted = scriptedAgent({
+      onPrompt: async ({ notify }) => {
+        await notify(mcpStartupFailure(workbenchMcpServerName))
+        await notify({
+          sessionUpdate: 'tool_call',
+          toolCallId: 'c1',
+          title: 'mcp.some-other-server.read_file',
+          status: 'completed',
+        })
+        await notify({
+          sessionUpdate: 'tool_call',
+          toolCallId: 'c2',
+          title: 'shell',
+          status: 'completed',
         })
         return 'end_turn'
       },
@@ -400,5 +477,64 @@ describe('agent host lifecycle', () => {
 
     expect(outcome.status).toBe('failed')
     expect(outcome.failure?.code).toBe('WORKBENCH_MCP_STARTUP_FAILED')
+    expect(outcome.usedWorkbenchTools).toBe(false)
+  })
+
+  it('ignores a startup failure reported for somebody else’s MCP server', async () => {
+    const scripted = scriptedAgent({
+      onPrompt: async ({ notify }) => {
+        await notify(mcpStartupFailure('a-consultant-owned-server'))
+        return 'end_turn'
+      },
+    })
+    const host = new AgentHost(new InProcessRuntimeLauncher(scripted.app), {
+      verifyTools: async () => ({ visibleTools: [], missingTools: [], forbiddenTools: [] }),
+    })
+
+    const outcome = await host.run(hostRequest(scratchRoot(), scratchRoot()))
+
+    expect(outcome.status).toBe('completed')
+    expect(outcome.mcpStartupReportedFailure).toBe(false)
+  })
+
+  it('runs when the workbench data directory sits under the workspace root', async () => {
+    // The end-to-end shape: `SWB_E2E_USER_DATA_DIR` is a temp directory, and
+    // the workspace root is the temp directory that contains it.
+    const root = scratchRoot()
+    const userData = join(root, 'user-data')
+    mkdirSync(userData, { recursive: true })
+
+    const scripted = scriptedAgent()
+    const host = new AgentHost(new InProcessRuntimeLauncher(scripted.app), {
+      verifyTools: async () => ({ visibleTools: [], missingTools: [], forbiddenTools: [] }),
+    })
+
+    const outcome = await host.run({
+      ...hostRequest(root, userData),
+      forbiddenWorkspaceRoots: [userData],
+    })
+
+    expect(outcome.failure).toBeNull()
+    expect(outcome.status).toBe('completed')
+    const sessionRequest = scripted.newSessionRequests[0] as { cwd: string }
+    expect(sessionRequest.cwd.startsWith(root)).toBe(true)
+    expect(sessionRequest.cwd.startsWith(userData)).toBe(false)
+  })
+
+  it('still refuses to run inside the workbench data directory', async () => {
+    const userData = scratchRoot()
+    const scripted = scriptedAgent()
+    const host = new AgentHost(new InProcessRuntimeLauncher(scripted.app), {
+      verifyTools: async () => ({ visibleTools: [], missingTools: [], forbiddenTools: [] }),
+    })
+
+    const outcome = await host.run({
+      ...hostRequest(userData, userData),
+      forbiddenWorkspaceRoots: [userData],
+    })
+
+    expect(outcome.status).toBe('failed')
+    expect(outcome.failure?.code).toBe('SESSION_WORKSPACE_INVALID')
+    expect(scripted.initializeRequests).toHaveLength(0)
   })
 })

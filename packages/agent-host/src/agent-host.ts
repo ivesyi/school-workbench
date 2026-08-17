@@ -13,10 +13,14 @@ import { agentBootstrapText } from './bootstrap'
 import { AgentHostError, type AgentRunStatus } from './contracts'
 import { buildWorkbenchMcpDescriptor, type WorkbenchMcpDescriptorInput } from './mcp-descriptor'
 import { verifyWorkbenchMcpTools } from './mcp-visibility'
-import { decidePermission, type PermissionOptionLike } from './permission-policy'
+import {
+  decidePermission,
+  isWorkbenchToolCall,
+  type PermissionOptionLike,
+} from './permission-policy'
 import { AgentRunLifecycle } from './run-status'
 import { readSessionNotification, SessionUpdateObserver } from './session-updates'
-import { createSessionWorkspace } from './session-workspace'
+import { createSessionWorkspace, type SessionWorkspace } from './session-workspace'
 import {
   assessRuntimeCompatibility,
   type ContractTestOutcome,
@@ -59,8 +63,16 @@ export type AgentRunOutcome = Readonly<{
   text: string
   /** `session/update` kinds this build did not understand. Ignored, not fatal. */
   unrecognisedUpdateTags: readonly string[]
-  /** Titles of tool calls the agent reported, used to prove the workbench was reached. */
+  /** Titles of tool calls the agent reported. Never includes MCP startup diagnostics. */
   toolCallTitles: readonly string[]
+  /** True when the agent demonstrably called a workbench MCP tool during this run. */
+  usedWorkbenchTools: boolean
+  /**
+   * True when the runtime reported that the workbench MCP server failed to
+   * start. Recorded even when direct evidence contradicted it, so a
+   * misreported startup stays visible instead of disappearing.
+   */
+  mcpStartupReportedFailure: boolean
   workspaceCwd: string | null
   failure: AgentRunFailure | null
 }>
@@ -137,16 +149,23 @@ export class AgentHost {
     let acpSessionId: string | null = null
     let stopReason: string | null = null
     let failure: AgentRunFailure | null = null
+    let mcpStartupReportedFailure = false
 
-    // D3: one throwaway empty directory per Agent Run, never the workbench user
-    // data directory, removed again during teardown.
-    const workspace = await createSessionWorkspace({
-      ...(request.workspaceRoot === undefined ? {} : { root: request.workspaceRoot }),
-      forbiddenRoots: request.forbiddenWorkspaceRoots,
-    })
-    const workspaceCwd = workspace.cwd
+    let workspace: SessionWorkspace | null = null
+    let workspaceCwd: string | null = null
 
     try {
+      // D3: one throwaway empty directory per Agent Run, never the workbench
+      // user data directory, removed again during teardown. Created inside the
+      // try so a rejected workspace is reported as a failed run like any other
+      // problem, instead of escaping this method.
+      const created = await createSessionWorkspace({
+        ...(request.workspaceRoot === undefined ? {} : { root: request.workspaceRoot }),
+        forbiddenRoots: request.forbiddenWorkspaceRoots,
+      })
+      workspace = created
+      workspaceCwd = created.cwd
+
       const descriptor = buildWorkbenchMcpDescriptor({
         ...request.mcp,
         schoolId: request.schoolId,
@@ -224,7 +243,7 @@ export class AgentHost {
 
           // Session.
           const sessionRequest: NewSessionRequest = {
-            cwd: workspace.cwd,
+            cwd: created.cwd,
             mcpServers: [{ ...descriptor, args: [...descriptor.args], env: [...descriptor.env] }],
           }
           const session = await context.buildSession(sessionRequest).start()
@@ -252,13 +271,31 @@ export class AgentHost {
               request.signal?.removeEventListener('abort', onAbort)
             }
 
-            // The one protocol-visible signal about MCP wiring: codex-acp
-            // reports a server that failed or was cancelled at startup as a
-            // synthetic failed tool call. Never continue quietly past it.
+            // codex-acp reports a server that failed or was cancelled at
+            // startup as a synthetic failed tool call. That report is a claim
+            // about one fact: whether the server became ready.
+            //
+            // A tool call routed through that same server is a direct
+            // observation of the very same fact, and it is stronger evidence
+            // than the report: the report can time out while the server is
+            // still coming up (observed on a cold start), but a tool result
+            // cannot arrive from a server that never started.
+            //
+            // So the report fails the run unless the run itself contradicts
+            // it. This cannot swallow a genuine startup failure: a server that
+            // truly did not start serves no tools, so there is nothing to
+            // contradict it with, and the run still fails hard. The
+            // contradiction is recorded either way.
             if (updates.failedMcpStartups.includes(descriptor.name)) {
-              throw new AgentHostError(
-                'WORKBENCH_MCP_STARTUP_FAILED',
-                `The agent runtime reported that MCP server ${descriptor.name} failed to start`,
+              mcpStartupReportedFailure = true
+              if (!updates.toolCallTitles.some(isWorkbenchToolCall)) {
+                throw new AgentHostError(
+                  'WORKBENCH_MCP_STARTUP_FAILED',
+                  `The agent runtime reported that MCP server ${descriptor.name} failed to start`,
+                )
+              }
+              this.options.onDiagnostic?.(
+                `agent runtime misreported MCP startup for ${descriptor.name}: the server served tool calls in this run`,
               )
             }
 
@@ -286,7 +323,7 @@ export class AgentHost {
       lifecycle.settle('failed')
       this.options.onDiagnostic?.(`agent run failed: ${code}`)
     } finally {
-      await workspace.dispose()
+      await workspace?.dispose()
     }
 
     return Object.freeze({
@@ -298,6 +335,8 @@ export class AgentHost {
       text: updates.text,
       unrecognisedUpdateTags: updates.unrecognisedTags,
       toolCallTitles: updates.toolCallTitles,
+      usedWorkbenchTools: updates.toolCallTitles.some(isWorkbenchToolCall),
+      mcpStartupReportedFailure,
       workspaceCwd,
       failure,
     })

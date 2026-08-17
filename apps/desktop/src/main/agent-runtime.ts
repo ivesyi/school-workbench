@@ -1,10 +1,10 @@
 import {
   AgentHost,
+  AgentHostError,
   CodexAcpRuntimeLauncher,
   resolveCodexAcpEntry,
   resolveSystemCodexPath,
   resolveWorkbenchMcpEntry,
-  workbenchMcpServerName,
   type AgentRunOutcome,
 } from '@school-workbench/agent-host'
 import type { SqliteAgentRuntimeRepository } from '@school-workbench/db'
@@ -45,10 +45,6 @@ export type AgentRuntimeDependencies = Readonly<{
   environment?: NodeJS.ProcessEnv
   onDiagnostic?: (message: string) => void
 }>
-
-function usedWorkbenchTools(outcome: AgentRunOutcome): boolean {
-  return outcome.toolCallTitles.some((title) => title.includes(workbenchMcpServerName))
-}
 
 /**
  * Composition root for one Agent Run.
@@ -116,6 +112,11 @@ export async function runAgentOnce(
     dependencies.readPlane.revokeToken(grant.token)
     await dependencies.repository.setRunStatus(run.id, 'failed')
     const message = error instanceof Error ? error.message : String(error)
+    // Keep the host's own error code. Collapsing every pre-flight failure into
+    // one opaque code made unrelated causes — a missing runtime, a missing MCP
+    // bundle, a rejected session workspace — indistinguishable to the caller
+    // and to tests.
+    const failureCode = error instanceof AgentHostError ? error.code : 'AGENT_RUNTIME_UNAVAILABLE'
     return Object.freeze({
       runId: run.id,
       status: 'failed' as const,
@@ -123,7 +124,7 @@ export async function runAgentOnce(
       usedWorkbenchTools: false,
       unrecognisedUpdateKinds: [],
       runtimeCompatibility: 'unsupported' as const,
-      failureCode: 'AGENT_RUNTIME_UNAVAILABLE',
+      failureCode,
       failureMessage: message,
     })
   }
@@ -149,7 +150,7 @@ export async function runAgentOnce(
     runId: run.id,
     status: outcome.status,
     message: outcome.text,
-    usedWorkbenchTools: usedWorkbenchTools(outcome),
+    usedWorkbenchTools: outcome.usedWorkbenchTools,
     unrecognisedUpdateKinds: [...outcome.unrecognisedUpdateTags],
     runtimeCompatibility: outcome.compatibility.compatibility,
     failureCode: outcome.failure?.code ?? null,

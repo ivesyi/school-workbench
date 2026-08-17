@@ -144,14 +144,19 @@ export class SessionUpdateObserver {
       case 'tool_call':
       case 'tool_call_update': {
         const { toolCall } = observed
-        if (toolCall.title) this.#toolCallTitles.push(toolCall.title)
-        if (
-          toolCall.mcpStartupServerName &&
-          toolCall.status === 'failed' &&
-          !this.#failedMcpStartups.includes(toolCall.mcpStartupServerName)
-        ) {
-          this.#failedMcpStartups.push(toolCall.mcpStartupServerName)
+        if (toolCall.mcpStartupServerName) {
+          // codex-acp synthesises this "tool call" to report MCP startup; the
+          // agent never made it. Counting it as a tool call would make a
+          // *startup failure* look like proof that the server was used.
+          if (
+            toolCall.status === 'failed' &&
+            !this.#failedMcpStartups.includes(toolCall.mcpStartupServerName)
+          ) {
+            this.#failedMcpStartups.push(toolCall.mcpStartupServerName)
+          }
+          break
         }
+        if (toolCall.title) this.#toolCallTitles.push(toolCall.title)
         break
       }
       case 'unrecognised':

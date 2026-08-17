@@ -111,8 +111,10 @@ codex-acp 1.4.0 的 `shouldDeduplicateMcpConflicts()` 默认开启：它先读 C
 **ACP v1 没有给 client 任何列举 agent 侧 tool 的方法**（`ClientRequestMethod` 里没有这种东西）。所以做了三层，全是真的：
 
 1. **注入前的 contract test**：用**完全相同的 command / args / env** 起一次真实 workbench MCP server，走真实 MCP `initialize` + `tools/list`，断言 7 个只读 tool 齐全、SPEC 25 的 4 个禁止 tool 一个都没有。失败即整个 run 失败，不进 `session/new`。这同时是 SPEC 62 三态判定里 "Contract test" 那一条腿
-2. **协议层信号**：codex-acp 把「MCP server 启动失败或被取消」编码成一条合成的 `tool_call`，`toolCallId = mcp_startup.<urlencode(名字)>`、`status = failed`。Agent Host 解码它，一旦看到自己的 server 名就抛 `WORKBENCH_MCP_STARTUP_FAILED`，**不静默继续**
+2. **协议层信号**：codex-acp 把「MCP server 启动失败或被取消」编码成一条合成的 `tool_call`，`toolCallId = mcp_startup.<urlencode(名字)>`、`status = failed`。Agent Host 解码它，看到自己的 server 名即失败，**不静默继续**
 3. **运行后的实际使用信号**：`toolCallTitles` 里是否出现 `mcp.<我们的 server 名>.*`，作为 `usedWorkbenchTools` 返回
+
+三层之间的**优先级**（验收后修订，见第 10 节 B3）：层②是一份「server 有没有就绪」的**报告**，层③是同一件事的**直接观测**。报告可能超时误报，但工具结果不可能来自一个从未启动的 server，所以层③在场时压过层②。
 
 ### 3.5 D2：`fs/*` 与 `terminal/*` 不广播
 
@@ -254,7 +256,7 @@ docs/development/AI_RUNTIME_LOOP_LEDGER.md
 
 ### 7.2 Codex 首次冷启动可能把 MCP 启动报成 "cancelled"
 
-4.2-C 实测到一次。之后 3 次连续干净。Agent Host 对此**硬失败**（正确：不能静默继续），所以顾问会看到一次失败的 run，重试即可。没有为此加超时配置项（超范围）。**这条尚未定量**：不知道触发概率、也不知道是否只在 codex app-server 冷启动时发生。
+4.2-C 实测到一次，之后 3 次连续干净。**验收时主会话用真 Codex 定性了这件事：它不是抖动，是误报**——MCP 起来了、tool 被调用了、数据读到了，run 却被记成 failed。已按第 10 节 B3 修复。仍然**未定量**：不知道触发概率，也不确定是否只在 codex app-server 冷启动时发生。没有为此加超时配置项（超范围）。
 
 ### 7.3 UI 与 renderer
 
@@ -334,3 +336,73 @@ sqlite3 "$HOME/Library/Application Support/school-workbench/school-workbench.sql
 ## 9. 本单发现的、与既有文档不符的前提
 
 见答卷；主要三条：`DATABASE_SCHEMA.md` §11 并没有给这三张表的字段（只给了 `agent_runs.status` 的 enum 和一句「保持原设计」）；SPEC 26 的正文在 `SPEC.md:784-802` 而非简报所写的 `762-800`；ACP SDK 1.3.0 会把 `ClientCapabilities` 归一化，`fs` / `terminal` 键在线上 payload 里必然存在（值为 `false`），「不广播 = 键不存在」这个说法不成立。
+
+---
+
+## 10. 验收后修复（2026-08-18）
+
+主会话独立复跑并用**真 Codex 跑通了链路**（`usedWorkbenchTools: true`、`runtimeCompatibility: verified`、Codex 真读到 SQLite 返回 `no_snapshot`、落库与预测逐项一致），同时抓到三个第一版没报的缺陷。以下是修复。
+
+### B1（根因）session workspace 的 root 预校验过严
+
+`createSessionWorkspace` 对**临时根目录**也做了双向重叠校验：
+
+```ts
+const root = resolve(input.root ?? tmpdir())
+assertIsolated(root, input.forbiddenRoots) // ← contains(tmpdir, userDataDir) 为真
+```
+
+于是只要工作台数据目录落在 `os.tmpdir()` 之下，所有 agent run 一律被拒。而**本仓库全部 e2e 的 `SWB_E2E_USER_DATA_DIR` 都是 `mkdtemp(resolve(tmpdir(), ...))`**——agent run 路径在整个 e2e 体系里不可达。生产路径（`~/Library/Application Support/…`）不在 tmpdir 下，所以真机上撞不到。
+
+**修法**：把两种校验分开，因为它们要的东西根本不同。
+
+| 校验对象                   | 规则                             | 理由                                             |
+| -------------------------- | -------------------------------- | ------------------------------------------------ |
+| workspace 根目录（创建前） | 只拒**根目录位于**受保护目录之内 | 这种根目录不可能产出合格的 workspace，早拒早报错 |
+| 实际创建出的 cwd           | **双向**都拒（在其内 / 含有它）  | 这才是 L4 真正要守的不变式，原本就正确，一字未改 |
+
+反向那条**必须**允许：一个根目录经常包含受保护目录，而其下的 workspace 与之毫无重叠——tmpdir 包含数据目录正是这种情况。
+
+**L4 不变式未放松**：`workspaceOverlaps()` 被导出，双向都有直接测试；顺手把 `contains()` 里 `!relation.startsWith('..')` 这个会把 `..foo` 这类兄弟目录误判为「不包含」的写法，换成标准的 `relative` + `isAbsolute` 判据（原写法在这个方向上是**放松**而非收紧）。
+
+**顺带修掉的**：`createSessionWorkspace` 原先在 `try` 之外调用，workspace 被拒时异常会**穿透 `AgentHost.run`**（该方法本应永不抛，只返回 outcome）。现已移入 `try`，工作区被拒和其它问题一样记成 failed run。
+
+### B2 那条 e2e 为错误的原因通过
+
+`agent-runtime.ts` 把所有 pre-flight 异常压成同一个 `AGENT_RUNTIME_UNAVAILABLE`，而 B1 的守卫**先行**产出同一个码——于是「no runtime installed」这条 e2e 即使 runtime 发现完全正常也会绿。
+
+**修法**：保留 `AgentHostError` 自己的码。现在缺 runtime → `RUNTIME_NOT_FOUND`，缺 MCP bundle → `WORKBENCH_MCP_NOT_FOUND`，工作区被拒 → `SESSION_WORKSPACE_INVALID`，彼此可区分。
+
+e2e 相应改成断言 `failureCode === 'RUNTIME_NOT_FOUND'` 且 `failureMessage` 含 `SWB_CODEX_ACP_ENTRY`，并显式断言 `!== 'SESSION_WORKSPACE_INVALID'`。
+
+但这条用例走的是 runtime 发现，**在**工作区守卫之前，所以它本身不能证明 B1 已修。为此**新增**一条 e2e：把 `SWB_CODEX_ACP_ENTRY` 指向一个真实存在、但不是 ACP server 的脚本。于是发现成功 → 工作区被创建并通过 → 真实 MCP contract test 对着活的 loopback 跑过 → 最后停在 ACP 握手，`failureCode === 'AGENT_RUN_FAILED'`。**能走到这个码，就等于走过了工作区守卫和 MCP contract test 两关。**
+
+### B3 冷启动误报：一条 run 记录自相矛盾
+
+真 Codex 冷启动那次记录是 `status: failed` / `WORKBENCH_MCP_STARTUP_FAILED`，同时 `usedWorkbenchTools: true`、`message` 里是真读到的数据。
+
+先修掉一个使这件事更糟的 bug：**codex-acp 合成的启动报告本身长得像一次 tool call**（`title = mcp__<名字>__startup`），旧代码把它计入 `toolCallTitles`，而 `usedWorkbenchTools` 用 `title.includes(serverName)` 判断——于是**一次启动失败会把自己算成「用过 workbench tool」的证据**。现在观测器识别出 `mcpStartupServerName` 后只把它记为启动报告，绝不计入 tool call。
+
+再定判据。层②是一份关于「server 是否就绪」的**报告**；层③（经由同一个 server 的 tool call）是同一件事的**直接观测**。两者冲突时以直接观测为准：
+
+```text
+报告了启动失败？
+  ├─ 本轮有经由 workbench server 的 tool call → 报告与事实矛盾：不失败，但记录 mcpStartupReportedFailure
+  └─ 没有                                   → 硬失败 WORKBENCH_MCP_STARTUP_FAILED（不变）
+```
+
+**为什么这不会吞掉真失败**：真的没起来的 server 不提供任何 tool，也就拿不出任何可以反驳报告的东西，那条分支一字未改。反驳只认**经由本 server 名**的调用（`isWorkbenchToolCall` 锚定 server 名，且已排除合成的启动报告），所以别的 MCP server 或 shell 调用都不算数——这一条有专门的回归测试。误报也不会被抹掉：`mcpStartupReportedFailure` 照常返回，并写一行诊断。
+
+### 本次改动文件
+
+| 文件                                                | 改了什么                                                                                                 |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `packages/agent-host/src/session-workspace.ts`      | B1：拆分 root / cwd 两种校验；导出 `workspaceOverlaps`；收紧 `contains`                                  |
+| `packages/agent-host/src/agent-host.ts`             | B1：workspace 创建移入 try；B3：矛盾判据 + `usedWorkbenchTools` / `mcpStartupReportedFailure` 进 outcome |
+| `packages/agent-host/src/session-updates.ts`        | B3：合成启动报告不再计入 tool call                                                                       |
+| `apps/desktop/src/main/agent-runtime.ts`            | B2：保留 `AgentHostError` 原码；改用 `outcome.usedWorkbenchTools`                                        |
+| `packages/agent-host/src/session-workspace.test.ts` | B1 回归（含 e2e 形状与真实默认 root）                                                                    |
+| `packages/agent-host/src/agent-host.test.ts`        | B1 + B3 回归                                                                                             |
+| `tests/e2e/agent-read-plane-startup.spec.ts`        | B2：断言真实 runtime 发现路径；新增走过守卫的用例                                                        |
+
+验收数字：`pnpm test` **59 files / 268 tests**（+7），`pnpm test:e2e` **11 passed**（+1），typecheck / lint 绿。

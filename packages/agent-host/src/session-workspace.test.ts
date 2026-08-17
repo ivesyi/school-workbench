@@ -1,8 +1,8 @@
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, relative } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createSessionWorkspace } from './session-workspace'
+import { createSessionWorkspace, workspaceOverlaps } from './session-workspace'
 
 const created: string[] = []
 
@@ -55,10 +55,54 @@ describe('agent session workspace', () => {
     ).rejects.toThrowError(/may not overlap/u)
   })
 
-  it('refuses a workspace root that would contain the data directory', async () => {
+  it('rejects overlap in both directions and allows siblings', () => {
+    // Both halves of the invariant, checked directly. `createSessionWorkspace`
+    // can only ever produce the first half because it uses `mkdtemp`.
+    const userData = '/data/school-workbench'
+
+    expect(workspaceOverlaps('/data/school-workbench/run-1', [userData])).toBe(true)
+    expect(workspaceOverlaps(userData, [userData])).toBe(true)
+    expect(workspaceOverlaps('/data', [userData])).toBe(true)
+    expect(workspaceOverlaps('/', [userData])).toBe(true)
+
+    expect(workspaceOverlaps('/tmp/run-1', [userData])).toBe(false)
+    expect(workspaceOverlaps('/data/school-workbench-other/run-1', [userData])).toBe(false)
+    expect(workspaceOverlaps('/data/run-1', [userData])).toBe(false)
+    expect(workspaceOverlaps('/tmp/run-1', [])).toBe(false)
+    expect(workspaceOverlaps('/tmp/run-1', [''])).toBe(false)
+  })
+
+  it('works when the workbench data directory lives under the workspace root', async () => {
+    // This is the shape every end-to-end run has: `SWB_E2E_USER_DATA_DIR` is a
+    // `mkdtemp` directory under the OS temp directory, which is also the
+    // default workspace root. A root that merely contains the data directory
+    // must not block agent runs — only an actually overlapping workspace does.
     const root = scratchRoot()
-    await expect(
-      createSessionWorkspace({ root, forbiddenRoots: [resolve(root, 'inner')] }),
-    ).rejects.toThrowError(/may not overlap/u)
+    const userData = join(root, 'user-data')
+    mkdirSync(userData, { recursive: true })
+
+    const workspace = await createSessionWorkspace({ root, forbiddenRoots: [userData] })
+    try {
+      expect(existsSync(workspace.cwd)).toBe(true)
+      expect(workspace.cwd.startsWith(root)).toBe(true)
+      expect(relative(userData, workspace.cwd).startsWith('..')).toBe(true)
+      expect(relative(workspace.cwd, userData).startsWith('..')).toBe(true)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('works with the real default root even when the data directory is a temp directory', async () => {
+    // The exact production-shaped call the end-to-end suite makes: no explicit
+    // root, so `os.tmpdir()` is used, while the data directory is a temp
+    // directory too.
+    const userData = scratchRoot()
+    const workspace = await createSessionWorkspace({ forbiddenRoots: [userData] })
+    try {
+      expect(existsSync(workspace.cwd)).toBe(true)
+      expect(relative(userData, workspace.cwd).startsWith('..')).toBe(true)
+    } finally {
+      await workspace.dispose()
+    }
   })
 })
