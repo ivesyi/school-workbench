@@ -94,12 +94,18 @@
     {
       "id": "DW.C1.LEARNING_PROBLEM_QUALITY",
       "constructId": "DW.LEARNING_PROBLEM",
-      "dimensionKey": null,
+      "dimensionKey": "key_tasks",
       "practiceType": "adult_practice",
       "title": "学习问题质量",
       "description": "学习问题质量",
       "applicability": {
-        "appliesTo": ["团队探究", "实践证据", "问题陈述", "行动计划", "影响评估"],
+        "appliesTo": [
+          "团队探究",
+          "实践证据",
+          "问题陈述",
+          "行动计划",
+          "影响评估"
+        ],
         "doesNotApplyTo": [
           "单凭一次听课给教师定级",
           "把学生结果直接归因于单一教师",
@@ -115,12 +121,18 @@
     {
       "id": "DW.C2.PRACTICE_VISIBILITY",
       "constructId": "DW.PRACTICE_EVIDENCE",
-      "dimensionKey": null,
+      "dimensionKey": "structure",
       "practiceType": "adult_practice",
       "title": "实践可见性",
       "description": "实践可见性",
       "applicability": {
-        "appliesTo": ["团队探究", "实践证据", "问题陈述", "行动计划", "影响评估"],
+        "appliesTo": [
+          "团队探究",
+          "实践证据",
+          "问题陈述",
+          "行动计划",
+          "影响评估"
+        ],
         "doesNotApplyTo": [
           "单凭一次听课给教师定级",
           "把学生结果直接归因于单一教师",
@@ -136,12 +148,18 @@
     {
       "id": "DW.C3.PROBLEM_OF_PRACTICE_QUALITY",
       "constructId": "DW.PROBLEM_OF_PRACTICE",
-      "dimensionKey": null,
+      "dimensionKey": "culture",
       "practiceType": "adult_practice",
       "title": "实践问题质量",
       "description": "实践问题质量",
       "applicability": {
-        "appliesTo": ["团队探究", "实践证据", "问题陈述", "行动计划", "影响评估"],
+        "appliesTo": [
+          "团队探究",
+          "实践证据",
+          "问题陈述",
+          "行动计划",
+          "影响评估"
+        ],
         "doesNotApplyTo": [
           "单凭一次听课给教师定级",
           "把学生结果直接归因于单一教师",
@@ -157,12 +175,18 @@
     {
       "id": "DW.C4.INFERENCE_DISCIPLINE",
       "constructId": "DW.LADDER_DISCIPLINE",
-      "dimensionKey": null,
+      "dimensionKey": "capability",
       "practiceType": "adult_practice",
       "title": "推论纪律",
       "description": "推论纪律",
       "applicability": {
-        "appliesTo": ["团队探究", "实践证据", "问题陈述", "行动计划", "影响评估"],
+        "appliesTo": [
+          "团队探究",
+          "实践证据",
+          "问题陈述",
+          "行动计划",
+          "影响评估"
+        ],
         "doesNotApplyTo": [
           "单凭一次听课给教师定级",
           "把学生结果直接归因于单一教师",
@@ -178,12 +202,18 @@
     {
       "id": "DW.C5.ACTION_IMPACT_COHERENCE",
       "constructId": "DW.ACTION_IMPACT",
-      "dimensionKey": null,
+      "dimensionKey": "leadership",
       "practiceType": "adult_practice",
       "title": "行动—影响连贯性",
       "description": "行动—影响连贯性",
       "applicability": {
-        "appliesTo": ["团队探究", "实践证据", "问题陈述", "行动计划", "影响评估"],
+        "appliesTo": [
+          "团队探究",
+          "实践证据",
+          "问题陈述",
+          "行动计划",
+          "影响评估"
+        ],
         "doesNotApplyTo": [
           "单凭一次听课给教师定级",
           "把学生结果直接归因于单一教师",
@@ -204,8 +234,12 @@
       "supportingIndicators": [
         "连接优先问题；使用多类证据；同时识别学习者资产与重要差距；在学校可影响范围内；具体、可行动。"
       ],
-      "counterIndicators": ["问题描述成人不满意、课程覆盖或学生标签，却没有可观察的学习表现。"],
-      "insufficientEvidence": ["只有汇总成绩，无法区分任务、群体、体验或具体表现。"],
+      "counterIndicators": [
+        "问题描述成人不满意、课程覆盖或学生标签，却没有可观察的学习表现。"
+      ],
+      "insufficientEvidence": [
+        "只有汇总成绩，无法区分任务、群体、体验或具体表现。"
+      ],
       "counterexampleChecks": [],
       "collectionPrinciples": [],
       "adjustmentConditions": []
@@ -220,7 +254,9 @@
       ],
       "insufficientEvidence": [],
       "counterexampleChecks": [],
-      "collectionPrinciples": ["观察用于学习，不用于绩效评价；记录先保持客观、具体，再解释。"],
+      "collectionPrinciples": [
+        "观察用于学习，不用于绩效评价；记录先保持客观、具体，再解释。"
+      ],
       "adjustmentConditions": []
     },
     {
@@ -228,9 +264,13 @@
       "supportingIndicators": [
         "与学习问题相关；基于成人实践证据；承认教育者已有优势和下一步工作；在控制范围内；具体、可行动。"
       ],
-      "counterIndicators": ["归咎学生、家庭或不可控环境；直接跳到解决方案；用人格标签解释实践。"],
+      "counterIndicators": [
+        "归咎学生、家庭或不可控环境；直接跳到解决方案；用人格标签解释实践。"
+      ],
       "insufficientEvidence": [],
-      "counterexampleChecks": ["同一实践是否在某些学习者、课程或条件下产生不同结果？"],
+      "counterexampleChecks": [
+        "同一实践是否在某些学习者、课程或条件下产生不同结果？"
+      ],
       "collectionPrinciples": [],
       "adjustmentConditions": []
     },
@@ -239,7 +279,9 @@
       "supportingIndicators": [
         "事实、解释、结论分开记录；团队能回到低推论、具体的描述，并主动寻找矛盾证据。"
       ],
-      "counterIndicators": ["从单个片段跳到能力、动机或因果判断；只进行避免分歧的“正向闲谈”。"],
+      "counterIndicators": [
+        "从单个片段跳到能力、动机或因果判断；只进行避免分歧的“正向闲谈”。"
+      ],
       "insufficientEvidence": [],
       "counterexampleChecks": [],
       "collectionPrinciples": [],
@@ -250,11 +292,15 @@
       "supportingIndicators": [
         "行动计划明确谁、做什么、何时做；策略具有杠杆作用；影响计划同时观察学习者体验和表现，并有可测目标。"
       ],
-      "counterIndicators": ["只记录培训完成率、教师满意度或交付物；没有学习者层面的影响证据。"],
+      "counterIndicators": [
+        "只记录培训完成率、教师满意度或交付物；没有学习者层面的影响证据。"
+      ],
       "insufficientEvidence": [],
       "counterexampleChecks": [],
       "collectionPrinciples": [],
-      "adjustmentConditions": ["预先说明什么证据会支持继续、修改或停止当前行动。"]
+      "adjustmentConditions": [
+        "预先说明什么证据会支持继续、修改或停止当前行动。"
+      ]
     }
   ],
   "inferenceGuardrails": [
@@ -294,6 +340,6 @@
   ],
   "canonicalContentHash": {
     "algorithm": "sha256",
-    "value": "390a504d2149cf6192cca6a3b09536ac724917bbaab0dd576e351c4964417750"
+    "value": "f3fd2277bde7f4208c61239cfe5d89ebfbc6b4b2d63662bb07700ee7a5fbb34c"
   }
 }
