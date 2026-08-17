@@ -70,7 +70,26 @@ Data Wise 不等于“教师状态模型”，也不只适用于学生学习。W
 - 个别课堂片段被推广为全校结论：触发 Data Wise inference discipline 与 SBD gap-grounding。
 - 制度目标与教师实际条件冲突：用全等模型定位 mismatch，用 SBD 解释系统错位，用 Data Wise 描述实践层后果。
 
-## 7. Conflict and precedence
+## 7. Criterion 五维主归属
+
+`dimensionKey` 表示 Criterion 在当前 Workbench 中用于查询、路由和组织诊断联查时的**主归属**，不表示该 Criterion 只能解释该维度，也不把方法论 Criterion 变成五维成熟度锚点。
+
+| Criterion | 主归属 |
+| --- | --- |
+| `SBD.C1.RESULT_CLARITY` | `leadership` |
+| `SBD.C2.EVIDENCE_BEFORE_ACTION` | `key_tasks` |
+| `SBD.C3.GAP_GROUNDED` | `capability` |
+| `SBD.C4.SYSTEM_ALIGNMENT` | `structure` |
+| `SBD.C5.FEEDBACK_ADJUSTMENT` | `culture` |
+| `DW.C1.LEARNING_PROBLEM_QUALITY` | `key_tasks` |
+| `DW.C2.PRACTICE_VISIBILITY` | `structure` |
+| `DW.C3.PROBLEM_OF_PRACTICE_QUALITY` | `culture` |
+| `DW.C4.INFERENCE_DISCIPLINE` | `capability` |
+| `DW.C5.ACTION_IMPACT_COHERENCE` | `leadership` |
+
+两个当前 Pack 的 `behaviorAnchors` 继续为空；在可靠角色专业标准源完成结构化和人审前，不为补齐表结构而编造锚点。
+
+## 8. Conflict and precedence
 
 1. 可定位的 ObservationFact 优先于方法论标签；
 2. 当前顾问确认的 StageTarget 是阶段达成判断的直接参照；
