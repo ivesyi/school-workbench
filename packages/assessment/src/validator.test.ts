@@ -1,10 +1,10 @@
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loadGoldenCaseFixtureFile } from './golden'
+import { syntheticGoldenSuite } from '../golden/v1/cases'
+import { loadGoldenCaseFixtures } from './golden'
 import { registryForProfile } from './test-support'
 import { validateAssessmentCandidate } from './validator'
 
-const goldenCases = loadGoldenCaseFixtureFile(resolve('packages/assessment/golden/v1/cases.json'))
+const goldenCases = loadGoldenCaseFixtures(syntheticGoldenSuite)
 
 function caseById(id: string) {
   const goldenCase = goldenCases.find((item) => item.id === id)
