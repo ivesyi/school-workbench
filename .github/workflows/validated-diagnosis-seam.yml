@@ -29,8 +29,40 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Generate Drizzle migration
         run: pnpm db:generate
+      - name: Normalize test query
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('packages/db/src/sqlite-grounded-diagnosis-repository.test.ts')
+          text = path.read_text()
+          text = text.replace("import { methodologyCriteria, methodologyPacks } from './methodology-schema'\n", '')
+          old = """    const persistedCriterion = database.db
+              .select({ id: methodologyCriteria.id })
+              .from(methodologyCriteria)
+              .where((fields, operators) => operators.eq(fields.stableKey, SBD.criterionId))
+              .get()
+            if (!persistedCriterion) throw new Error('criterion fixture missing')
+          """
+          new = """    const persistedCriterion = database.client
+              .prepare('SELECT id FROM methodology_criteria WHERE stable_key = ?')
+              .get(SBD.criterionId) as { id: string } | undefined
+            if (!persistedCriterion) throw new Error('criterion fixture missing')
+          """
+          if old not in text:
+              raise SystemExit('expected criterion query block not found')
+          path.write_text(text.replace(old, new))
+          PY
       - name: Format generated and changed files
         run: pnpm format:write
+      - name: Commit generated artifacts and normalization
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(db): generate grounded diagnosis migration [generated]"
+            git push origin HEAD:validated-diagnosis-seam-20260817
+          fi
       - name: Lint
         run: pnpm lint
       - name: Typecheck
@@ -41,12 +73,3 @@ jobs:
         run: pnpm build
       - name: E2E
         run: pnpm test:e2e
-      - name: Commit generated artifacts
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(db): generate grounded diagnosis migration [generated]"
-            git push origin HEAD:validated-diagnosis-seam-20260817
-          fi
