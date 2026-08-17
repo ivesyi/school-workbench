@@ -45,7 +45,11 @@ function addDuplicateErrors(
   for (const entry of entries) {
     if (seen.has(entry.key)) {
       errors.push(
-        protocolError(code, entry.path, `${entry.label} must be unique within AssessmentCandidate.`),
+        protocolError(
+          code,
+          entry.path,
+          `${entry.label} must be unique within AssessmentCandidate.`,
+        ),
       )
       continue
     }
@@ -313,7 +317,10 @@ export function validateAssessmentCandidate(
     }
   }
 
-  for (const [index, evidenceRef] of candidate.counterEvidenceSearch.searchedEvidenceRefs.entries()) {
+  for (const [
+    index,
+    evidenceRef,
+  ] of candidate.counterEvidenceSearch.searchedEvidenceRefs.entries()) {
     if (!evidenceIds.has(evidenceRef)) {
       errors.push(
         protocolError(

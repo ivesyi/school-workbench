@@ -10,7 +10,10 @@ const counterCase = goldenCases.find((item) => item.id === 'counter-fact-omitted
 
 if (!validCase || !counterCase) throw new Error('Missing assessment golden case')
 
-function expectOnlyCode(result: ReturnType<typeof validateAssessmentCandidate>, code: string): void {
+function expectOnlyCode(
+  result: ReturnType<typeof validateAssessmentCandidate>,
+  code: string,
+): void {
   expect(result.ok).toBe(false)
   if (!result.ok) expect(result.errors.map((error) => error.code)).toEqual([code])
 }
@@ -50,7 +53,12 @@ describe('assessment protocol contracts', () => {
 
   it('rejects duplicate input ids and ClaimFact tuples before Map or Set can hide them', () => {
     const input = validCase.input as Record<string, unknown>
-    for (const field of ['confirmedStageTargets', 'evidence', 'observationFacts', 'claims'] as const) {
+    for (const field of [
+      'confirmedStageTargets',
+      'evidence',
+      'observationFacts',
+      'claims',
+    ] as const) {
       const values = input[field] as readonly unknown[]
       const first = values[0]
       if (!first) throw new Error(`Fixture is missing ${field}`)
@@ -124,9 +132,7 @@ describe('assessment protocol contracts', () => {
         validCase.input,
         {
           ...candidate,
-          interpretations: [
-            { ...firstInterpretation, factRefs: [...factRefs, firstFactRef] },
-          ],
+          interpretations: [{ ...firstInterpretation, factRefs: [...factRefs, firstFactRef] }],
         },
         registryForProfile('active'),
       ),

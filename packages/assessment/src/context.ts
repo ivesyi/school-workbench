@@ -57,7 +57,9 @@ function addDuplicateErrors(
   const seen = new Set<string>()
   for (const entry of entries) {
     if (seen.has(entry.key)) {
-      errors.push(protocolError(code, entry.path, `${entry.label} must be unique within AssessmentInput.`))
+      errors.push(
+        protocolError(code, entry.path, `${entry.label} must be unique within AssessmentInput.`),
+      )
       continue
     }
     seen.add(entry.key)
