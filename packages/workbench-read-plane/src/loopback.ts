@@ -47,6 +47,10 @@ function errorEnvelope(code: ReadPlaneApiErrorCode, message: string): ReadPlaneA
   return Object.freeze({ ok: false, error: Object.freeze({ code, message }) })
 }
 
+function hasQueryParameters(query: unknown): boolean {
+  return query !== null && typeof query === 'object' && Object.keys(query).length > 0
+}
+
 async function dispatch(
   service: WorkbenchReadCapabilityService,
   capability: ReadCapabilityName,
@@ -109,6 +113,9 @@ export class WorkbenchLoopbackReadPlane {
           schoolId,
           agentRunId,
         })
+        if (hasQueryParameters(request.query)) {
+          throw new ReadPlaneError('INPUT_INVALID', 'Query parameters are not accepted by the read plane')
+        }
         const data = await dispatch(this.service, typedCapability, schoolId, request.body ?? {})
         return reply.code(200).send({ ok: true, data })
       } catch (error) {
