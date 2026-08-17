@@ -87,7 +87,6 @@ export class WorkbenchLoopbackReadPlane {
     this.#server = Fastify({
       logger: false,
       bodyLimit: 32 * 1024,
-      disableRequestLogging: true,
     })
 
     this.#server.post('/internal/v1/:capability', async (request, reply) => {

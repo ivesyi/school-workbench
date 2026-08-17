@@ -212,12 +212,14 @@ function fixture() {
     `INSERT INTO diagnosis_stage_targets (proposal_id, stage_target_id) VALUES (?, ?)`,
   ).run('proposal-a-1', 'target-leadership')
 
-  for (const [index, input] of [
-    ['evidence-a-3', 'school-a', '2026-08-17T01:03:00.000Z', 'A3'],
-    ['evidence-a-2', 'school-a', '2026-08-17T01:02:00.000Z', 'A2'],
-    ['evidence-a-1', 'school-a', '2026-08-17T01:01:00.000Z', 'A1'],
-    ['evidence-b-1', 'school-b', '2026-08-17T01:04:00.000Z', 'B1'],
-  ] as const) {
+  for (const [index, input] of (
+    [
+      ['evidence-a-3', 'school-a', '2026-08-17T01:03:00.000Z', 'A3'],
+      ['evidence-a-2', 'school-a', '2026-08-17T01:02:00.000Z', 'A2'],
+      ['evidence-a-1', 'school-a', '2026-08-17T01:01:00.000Z', 'A1'],
+      ['evidence-b-1', 'school-b', '2026-08-17T01:04:00.000Z', 'B1'],
+    ] as const
+  ).entries()) {
     db.prepare(
       `INSERT INTO evidence
        (id, school_id, source_type, uri, inline_text, title, locator_json, content_hash,
