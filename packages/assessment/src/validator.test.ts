@@ -52,6 +52,31 @@ describe('assessment validator', () => {
     )
   })
 
+  it('requires a completed counter search declaration to carry auditable refs', () => {
+    const goldenCase = caseById('sbd-system-alignment-proposed')
+    const candidate = {
+      ...(goldenCase.candidate as Record<string, unknown>),
+      counterEvidenceSearch: {
+        completed: true,
+        summary: '合成测试：声明完成，但没有任何可审核引用。',
+        searchedEvidenceRefs: [],
+        searchedFactRefs: [],
+      },
+    }
+
+    const result = validateAssessmentCandidate(
+      goldenCase.input,
+      candidate,
+      registryForProfile('active'),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.errors.map((error) => error.code)).toContain(
+      'ASSESSMENT_COUNTER_SEARCH_AUDIT_REFS_REQUIRED',
+    )
+  })
+
   it('requires abstention when there is no active Criterion mapping context or supporting ClaimFact', () => {
     const goldenCase = caseById('single-vague-input-abstains')
     const insufficientCandidate = goldenCase.candidate as Record<string, unknown>
@@ -71,6 +96,7 @@ describe('assessment validator', () => {
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.errors.map((error) => error.code)).toContain('ASSESSMENT_ABSTENTION_REQUIRED')
+    expect(result.errors.map((error) => error.code)).toContain('ASSESSMENT_PROPOSED_CLAIM_REQUIRED')
     expect(result.errors.map((error) => error.code)).toContain(
       'ASSESSMENT_PROPOSED_CRITERION_REQUIRED',
     )
@@ -141,6 +167,52 @@ describe('assessment validator', () => {
         'ASSESSMENT_FACT_REF_DANGLING',
       ])
     }
+  })
+
+  it('requires candidate Claim refs to exist and supporting facts to belong to selected Claims', () => {
+    const goldenCase = caseById('sbd-system-alignment-proposed')
+    const danglingCandidate = {
+      ...(goldenCase.candidate as Record<string, unknown>),
+      claimRefs: ['missing-claim'],
+    }
+
+    const danglingResult = validateAssessmentCandidate(
+      goldenCase.input,
+      danglingCandidate,
+      registryForProfile('active'),
+    )
+
+    expect(danglingResult.ok).toBe(false)
+    if (!danglingResult.ok) {
+      expect(danglingResult.errors.map((error) => error.code)).toContain(
+        'ASSESSMENT_CLAIM_REF_DANGLING',
+      )
+      expect(danglingResult.errors.map((error) => error.code)).toContain(
+        'ASSESSMENT_FACT_STANCE_MISMATCH',
+      )
+    }
+  })
+
+  it('scopes counter facts to selected Claims only', () => {
+    const unrelatedCase = caseById('unselected-claim-counter-does-not-pollute')
+    const unrelatedResult = validateAssessmentCandidate(
+      unrelatedCase.input,
+      unrelatedCase.candidate,
+      registryForProfile('active'),
+    )
+    expect(unrelatedResult.ok).toBe(true)
+
+    const selectedCase = caseById('selected-claim-counter-still-required')
+    const selectedResult = validateAssessmentCandidate(
+      selectedCase.input,
+      selectedCase.candidate,
+      registryForProfile('active'),
+    )
+    expect(selectedResult.ok).toBe(false)
+    if (selectedResult.ok) return
+    expect(selectedResult.errors.map((error) => error.code)).toEqual([
+      'ASSESSMENT_COUNTER_FACT_OMITTED',
+    ])
   })
 
   it('requires a proposed candidate to cite a current StageTarget', () => {
