@@ -43,14 +43,6 @@ type BootstrapConfig = Readonly<{
   agentRunId: string
 }>
 
-type ApiErrorEnvelope = Readonly<{
-  ok: false
-  error: Readonly<{
-    code: string
-    message: string
-  }>
-}>
-
 class McpBootstrapError extends Error {
   readonly code = 'ENV_INVALID' as const
 }
