@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { CapabilityTokenStore } from './auth'
+import { ReadPlaneError } from './contracts'
 import { createWorkbenchReadPlaneBootstrap, type SafeReadPlaneLogEvent } from './loopback'
 import type { WorkbenchReadCapabilityService } from './service'
 
@@ -14,12 +15,7 @@ function fakeService(): WorkbenchReadCapabilityService {
     schoolContext: async (schoolId: string, input: unknown) => {
       const body = input as { schoolId?: string }
       if (body.schoolId && body.schoolId !== schoolId) {
-        const error = new Error('Input schoolId does not match the scoped school') as Error & {
-          code: string
-        }
-        error.name = 'ReadPlaneError'
-        error.code = 'INPUT_INVALID'
-        throw error
+        throw new ReadPlaneError('INPUT_INVALID', 'Input schoolId does not match the scoped school')
       }
       return {
         school: {
@@ -203,7 +199,8 @@ describe('Workbench loopback capability auth', () => {
       schoolId: 'school-a',
       agentRunId: 'run-a',
     })
-    expect(bodyScope.status).toBe(500)
+    expect(bodyScope.status).toBe(400)
+    await expect(bodyScope.json()).resolves.toMatchObject({ error: { code: 'INPUT_INVALID' } })
 
     const serializedLogs = JSON.stringify(logs)
     for (const token of [valid.token, unknownToken, expiring.token, revoked.token, wrongScope.token]) {
