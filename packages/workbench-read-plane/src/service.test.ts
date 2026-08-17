@@ -105,7 +105,7 @@ describe('WorkbenchReadCapabilityService', () => {
     })
   })
 
-  it('returns an explicit no-active result for the real review pack', async () => {
+  it('returns an explicit no-active result for a shipped pack that is not in the local database', async () => {
     const registry = loadReviewRegistry()
     const service = createService(registry, [])
 
@@ -119,7 +119,7 @@ describe('WorkbenchReadCapabilityService', () => {
       status: 'no_active_pack',
       packKey: 'schooling-by-design',
       version: '1',
-      reason: 'file_not_active',
+      reason: 'persisted_not_active',
     })
   })
 

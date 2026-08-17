@@ -17,8 +17,7 @@
     "format:write": "prettier --write .",
     "test": "vitest run",
     "test:e2e": "pnpm build && playwright test",
-    "db:generate": "pnpm --filter @school-workbench/db db:generate",
-    "methodology:activate": "pnpm --filter @school-workbench/db build:methodology-cli && node packages/db/dist/activate-methodology-pack.mjs"
+    "db:generate": "pnpm --filter @school-workbench/db db:generate"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

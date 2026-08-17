@@ -9,6 +9,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { openWorkbenchDatabase, type WorkbenchDatabase } from './database'
 import { SqliteMethodologyRepository } from './sqlite-methodology-repository'
+import { SqliteMethodologyReviewRepository } from './sqlite-methodology-review-repository'
 import { SqliteReadPlaneRepository } from './sqlite-read-plane-repository'
 
 const migrationsFolder = resolve('packages/db/drizzle')
@@ -71,5 +72,49 @@ describe('standards_get persisted SQLite boundary', () => {
     expect(result.criteria[0]?.evidenceGuidance).toBeDefined()
     expect(result.criteria[0]?.counterIndicators.length).toBeGreaterThan(0)
     expect(JSON.stringify(result)).not.toContain('SBD.C2.EVIDENCE_BEFORE_ACTION')
+  })
+
+  it('fails closed downstream as soon as the consultant withdraws the pack, and stays closed after a restart', async () => {
+    const registry = loadMethodologyRegistry(methodologyRoot, sourceManifestPath)
+    const pack = registry.getPack('schooling-by-design', '1')
+    if (!pack) throw new Error('Schooling by Design fixture is missing')
+    const now = (): Date => new Date('2026-08-17T00:00:00.000Z')
+    const methodologyRepository = new SqliteMethodologyRepository(database.db, now)
+    const reviewRepository = new SqliteMethodologyReviewRepository(database.db, now)
+    await methodologyRepository.syncRegistry(registry)
+
+    const service = new WorkbenchReadCapabilityService(
+      new SqliteReadPlaneRepository(database),
+      registry,
+      methodologyRepository,
+    )
+    const request = {
+      packKey: pack.key,
+      version: pack.version,
+      criterionRefs: ['SBD.C1.RESULT_CLARITY'],
+    }
+    expect((await service.standardsGet('school-a', request)).status).toBe('ok')
+
+    await reviewRepository.recordSignOff({
+      id: 'sign-off-1',
+      packKey: pack.key,
+      packVersion: pack.version,
+      contentHash: pack.canonicalContentHash.value,
+      decision: 'changes_requested',
+      note: null,
+      signedAt: '2026-08-17T09:00:00.000Z',
+      verdicts: pack.criteria.map((criterion, index) => ({
+        criterionStableKey: criterion.id,
+        verdict: index === 0 ? ('needs_revision' as const) : ('usable' as const),
+        note: null,
+      })),
+    })
+    await methodologyRepository.setPackStatus(pack.key, pack.version, 'review')
+
+    expect((await service.standardsGet('school-a', request)).status).toBe('no_active_pack')
+
+    // A restart re-reads the same shipped file registry; the refusal must survive it.
+    await methodologyRepository.syncRegistry(registry)
+    expect((await service.standardsGet('school-a', request)).status).toBe('no_active_pack')
   })
 })

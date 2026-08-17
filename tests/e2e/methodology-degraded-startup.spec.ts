@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
-test('methodology content is loaded at startup and stays awaiting review', async () => {
+test('methodology content is loaded at startup and is already in use', async () => {
   const userDataDirectory = await mkdtemp(resolve(tmpdir(), 'school-workbench-e2e-'))
   const appDirectory = resolve('apps/desktop')
 
@@ -24,10 +24,11 @@ test('methodology content is loaded at startup and stays awaiting review', async
     await expect(
       window.getByRole('heading', { name: 'Data Wise Third Edition Methodology Pack' }),
     ).toBeVisible()
-    await expect(window.getByText('待审核').first()).toBeVisible()
-    await expect(
-      window.getByText('还没有人审核过这份内容，它不会用于正式判断。').first(),
-    ).toBeVisible()
+    // Zero consultant action: both packs are in use and every criterion is
+    // already presented as usable.
+    await expect(window.getByText('正在使用').first()).toBeVisible()
+    await expect(window.getByText('正在用于正式判断。').first()).toBeVisible()
+    await expect(window.getByRole('radio', { name: '可以用于判断' }).first()).toBeChecked()
 
     await app.close()
   } finally {

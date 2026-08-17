@@ -11,6 +11,8 @@ import {
   packReviewApproves,
   packReviewIsOutdated,
   packReviewSignOffSchema,
+  packReviewWithholdsUse,
+  resolvePackRuntimeStatus,
   type PackReviewCriterionVerdict,
   type PackReviewSignOff,
 } from './review'
@@ -128,5 +130,51 @@ describe('methodology pack review sign-off', () => {
     expect(signOff.decision).toBe('changes_requested')
     expect(packReviewApproves(pack, signOff)).toBe(false)
     expect(packReviewApproves(pack, null)).toBe(false)
+  })
+})
+
+describe('methodology pack runtime status resolution', () => {
+  it('keeps shipped content in use with no consultant action at all', () => {
+    const pack = sbdPack()
+
+    expect(packReviewWithholdsUse(null)).toBe(false)
+    expect(resolvePackRuntimeStatus('active', null)).toBe('active')
+    expect(resolvePackRuntimeStatus('active', signOffFor(pack))).toBe('active')
+  })
+
+  it('withholds the pack as soon as one criterion needs revision', () => {
+    const pack = sbdPack()
+    const vetoed = signOffFor(pack, { verdicts: verdictsFor(pack, 'needs_revision') })
+    const partial = signOffFor(pack, {
+      verdicts: [
+        { criterionStableKey: 'SBD.C1.RESULT_CLARITY', verdict: 'needs_revision', note: null },
+        ...verdictsFor(pack).slice(1),
+      ],
+    })
+
+    expect(packReviewWithholdsUse(vetoed)).toBe(true)
+    expect(partial.decision).toBe('changes_requested')
+    expect(resolvePackRuntimeStatus('active', vetoed)).toBe('review')
+    expect(resolvePackRuntimeStatus('active', partial)).toBe('review')
+  })
+
+  it('carries a veto across content drift but never a stale approval back into use', () => {
+    const reviewed = sbdPack()
+    const drifted = retitledPack('Schooling by Design Methodology Pack v1 (retranslated)')
+    const vetoed = signOffFor(reviewed, { verdicts: verdictsFor(reviewed, 'needs_revision') })
+    const approved = signOffFor(reviewed)
+
+    expect(packReviewIsOutdated(drifted, vetoed)).toBe(true)
+    // D5: a refusal survives the edit; an approval simply stops being an approval.
+    expect(resolvePackRuntimeStatus(drifted.status, vetoed)).toBe('review')
+    expect(resolvePackRuntimeStatus(drifted.status, approved)).toBe('active')
+  })
+
+  it('never lifts a draft or retired pack into use', () => {
+    const pack = sbdPack()
+
+    expect(resolvePackRuntimeStatus('draft', signOffFor(pack))).toBe('draft')
+    expect(resolvePackRuntimeStatus('retired', signOffFor(pack))).toBe('retired')
+    expect(resolvePackRuntimeStatus('review', signOffFor(pack))).toBe('review')
   })
 })

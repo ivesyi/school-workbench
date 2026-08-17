@@ -6,6 +6,8 @@ import {
   projectMethodologyPack,
   type MethodologyPack,
   type MethodologyPackProjection,
+  type MethodologyPackStatus,
+  type MethodologyPackStatusWriter,
   type MethodologyRepository,
   type MethodologyReviewRepository,
   type PackReviewSignOff,
@@ -52,21 +54,40 @@ function retranslatedPack(): MethodologyPack {
   return methodologyPackSchema.parse(raw) as MethodologyPack
 }
 
-function stubMethodologyRepository(
-  packs: readonly MethodologyPack[],
-  status?: string,
-): MethodologyRepository {
-  const projections = new Map<string, MethodologyPackProjection>(
-    packs.map((pack) => {
-      const projection = projectMethodologyPack(status ? packWithStatus(pack, status) : pack)
-      return [`${pack.key}@${pack.version}`, projection]
-    }),
-  )
-  return {
-    listPacks: async () => [...projections.values()],
-    getPack: async (key, version) => projections.get(`${key}@${version}`) ?? null,
-    getCriterion: async () => null,
-    findCriteria: async () => [],
+class InMemoryMethodologyRepository implements MethodologyRepository, MethodologyPackStatusWriter {
+  readonly statusWrites: string[] = []
+  private readonly projections: Map<string, MethodologyPackProjection>
+
+  constructor(packs: readonly MethodologyPack[], status?: string) {
+    this.projections = new Map(
+      packs.map((pack) => {
+        const projection = projectMethodologyPack(status ? packWithStatus(pack, status) : pack)
+        return [`${pack.key}@${pack.version}`, projection]
+      }),
+    )
+  }
+
+  async listPacks(): Promise<readonly MethodologyPackProjection[]> {
+    return [...this.projections.values()]
+  }
+
+  async getPack(key: string, version: string): Promise<MethodologyPackProjection | null> {
+    return this.projections.get(`${key}@${version}`) ?? null
+  }
+
+  async getCriterion(): Promise<null> {
+    return null
+  }
+
+  async findCriteria(): Promise<readonly MethodologyPackProjection['criteria'][number][]> {
+    return []
+  }
+
+  async setPackStatus(key: string, version: string, status: MethodologyPackStatus): Promise<void> {
+    const current = this.projections.get(`${key}@${version}`)
+    if (!current) throw new Error(`missing projection ${key}@${version}`)
+    this.projections.set(`${key}@${version}`, { ...current, status })
+    this.statusWrites.push(status)
   }
 }
 
@@ -89,13 +110,33 @@ function serviceFor(
   packs: readonly MethodologyPack[],
   reviewRepository: MethodologyReviewRepository,
   persistedStatus?: string,
+  methodologyRepository = new InMemoryMethodologyRepository(packs, persistedStatus),
 ): MethodologyReviewService {
-  return new MethodologyReviewService(
-    registryFor(packs),
-    stubMethodologyRepository(packs, persistedStatus),
-    reviewRepository,
-    { createId: () => 'sign-off-1', now: () => new Date('2026-08-17T09:00:00Z') },
-  )
+  let sequence = 0
+  return new MethodologyReviewService(registryFor(packs), methodologyRepository, reviewRepository, {
+    createId: () => {
+      sequence += 1
+      return `sign-off-${sequence}`
+    },
+    now: () => new Date('2026-08-17T09:00:00Z'),
+  })
+}
+
+async function signOffEveryCriterion(
+  pack: MethodologyPack,
+  reviewRepository: MethodologyReviewRepository,
+  verdict: 'usable' | 'needs_revision',
+): Promise<void> {
+  await serviceFor([pack], reviewRepository).signOff({
+    packKey: pack.key,
+    packVersion: pack.version,
+    note: null,
+    verdicts: pack.criteria.map((criterion) => ({
+      criterionStableKey: criterion.id,
+      verdict,
+      note: null,
+    })),
+  })
 }
 
 describe('MethodologyReviewService', () => {
@@ -106,10 +147,13 @@ describe('MethodologyReviewService', () => {
 
     expect(view.packs).toHaveLength(2)
     const sbd = view.packs.find((pack) => pack.key === 'schooling-by-design')
-    expect(sbd?.status).toBe('review')
-    expect(sbd?.statusLabel).toBe('待审核')
-    expect(sbd?.inUse).toBe(false)
+    // Nothing was signed off: the content is in use by default.
+    expect(sbd?.status).toBe('active')
+    expect(sbd?.statusLabel).toBe('正在使用')
+    expect(sbd?.statusDetail).toBe('正在用于正式判断。')
+    expect(sbd?.inUse).toBe(true)
     expect(sbd?.review).toBeNull()
+    expect(sbd?.criteria.every((criterion) => criterion.lastVerdict === null)).toBe(true)
     expect(sbd?.criteria).toHaveLength(5)
     expect(sbd?.constructs).toHaveLength(7)
     expect(sbd?.criteria[0]?.gaps).toContain('还没有真正的描述：描述与名称完全相同。')
@@ -152,7 +196,9 @@ describe('MethodologyReviewService', () => {
       needsRevisionCount: 1,
       outdated: false,
     })
-    expect(view?.statusDetail).toContain('还需要修订')
+    expect(view?.statusDetail).toContain('你把其中 1 条标为需要修订')
+    expect(view?.inUse).toBe(false)
+    expect(view?.status).toBe('review')
     expect(view?.criteria[0]?.lastVerdict).toEqual({
       verdict: 'needs_revision',
       note: '描述与名称完全相同。',
@@ -183,24 +229,70 @@ describe('MethodologyReviewService', () => {
   it('marks an earlier sign-off as outdated once the content changes', async () => {
     const reviewRepository = new InMemoryReviewRepository()
     const reviewed = sbdPack()
-    await serviceFor([reviewed], reviewRepository).signOff({
-      packKey: 'schooling-by-design',
-      packVersion: '1',
-      note: null,
-      verdicts: reviewed.criteria.map((criterion) => ({
-        criterionStableKey: criterion.id,
-        verdict: 'usable' as const,
-        note: null,
-      })),
-    })
+    await signOffEveryCriterion(reviewed, reviewRepository, 'usable')
 
     const driftedView = await serviceFor([retranslatedPack()], reviewRepository).getWorkbench()
     if (driftedView.state !== 'ready') throw new Error('expected a ready workbench')
     const pack = driftedView.packs[0]
 
     expect(pack?.review?.outdated).toBe(true)
-    expect(pack?.statusDetail).toContain('之前的结论已经失效')
     expect(pack?.criteria.every((criterion) => criterion.lastVerdict === null)).toBe(true)
+    // D5: the previous conclusion was an approval, so drift leaves the content in use.
+    expect(pack?.inUse).toBe(true)
+    expect(pack?.statusDetail).toBe('正在用于正式判断。')
+  })
+
+  it('withdraws the pack from use on one needs_revision and restores it when the consultant changes his mind', async () => {
+    const reviewRepository = new InMemoryReviewRepository()
+    const pack = sbdPack()
+    const methodologyRepository = new InMemoryMethodologyRepository([pack])
+    const service = serviceFor([pack], reviewRepository, undefined, methodologyRepository)
+
+    const withdrawn = await service.signOff({
+      packKey: 'schooling-by-design',
+      packVersion: '1',
+      note: null,
+      verdicts: pack.criteria.map((criterion, index) => ({
+        criterionStableKey: criterion.id,
+        verdict: index === 2 ? ('needs_revision' as const) : ('usable' as const),
+        note: null,
+      })),
+    })
+    if (withdrawn.state !== 'ready') throw new Error('expected a ready workbench')
+    expect(methodologyRepository.statusWrites).toEqual(['review'])
+    expect(withdrawn.packs[0]?.inUse).toBe(false)
+
+    const restored = await service.signOff({
+      packKey: 'schooling-by-design',
+      packVersion: '1',
+      note: null,
+      verdicts: pack.criteria.map((criterion) => ({
+        criterionStableKey: criterion.id,
+        verdict: 'usable' as const,
+        note: null,
+      })),
+    })
+    if (restored.state !== 'ready') throw new Error('expected a ready workbench')
+    expect(methodologyRepository.statusWrites).toEqual(['review', 'active'])
+    expect(restored.packs[0]?.inUse).toBe(true)
+    expect(restored.packs[0]?.review?.decisionLabel).toBe('全部可以用于判断')
+  })
+
+  it('keeps a vetoed pack out of use after the content drifts instead of silently reviving it', async () => {
+    const reviewRepository = new InMemoryReviewRepository()
+    const reviewed = sbdPack()
+    await signOffEveryCriterion(reviewed, reviewRepository, 'needs_revision')
+
+    // The drifted content is persisted as withdrawn, exactly as the sign-off left it.
+    const drifted = retranslatedPack()
+    const view = await serviceFor([drifted], reviewRepository, 'review').getWorkbench()
+    if (view.state !== 'ready') throw new Error('expected a ready workbench')
+
+    expect(view.packs[0]?.review?.outdated).toBe(true)
+    expect(view.packs[0]?.inUse).toBe(false)
+    expect(view.packs[0]?.statusDetail).toBe(
+      '你上次要求修订之后，这份内容又有改动。在你重新看过之前，它不会用于正式判断。',
+    )
   })
 
   it('reports a pack as in use only when the file and the local database agree', async () => {

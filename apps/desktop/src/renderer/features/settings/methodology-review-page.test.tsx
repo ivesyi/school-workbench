@@ -40,17 +40,17 @@ function criterion(stableKey: string, title: string, gaps: string[]) {
   }
 }
 
-const pending: PackReviewWorkbenchView = {
+const inUse: PackReviewWorkbenchView = {
   state: 'ready',
   packs: [
     {
       key: 'schooling-by-design',
       version: '1',
       title: 'Schooling by Design Methodology Pack v1',
-      status: 'review',
-      statusLabel: '待审核',
-      statusDetail: '还没有人审核过这份内容，它不会用于正式判断。',
-      inUse: false,
+      status: 'active',
+      statusLabel: '正在使用',
+      statusDetail: '正在用于正式判断。',
+      inUse: true,
       sourceLabel: '书籍',
       constructs: [
         {
@@ -82,20 +82,24 @@ const pending: PackReviewWorkbenchView = {
         sourceRef: 'references/books/schooling-by-design-2007.pdf',
         sourceFingerprint: 'b'.repeat(64),
         contentHash: 'c'.repeat(64),
-        fileStatus: 'review',
-        storedStatus: 'review',
+        fileStatus: 'active',
+        storedStatus: 'active',
         reviewedContentHash: null,
       },
     },
   ],
 }
 
-const reviewed: PackReviewWorkbenchView = {
+const withdrawn: PackReviewWorkbenchView = {
   state: 'ready',
   packs: [
     {
-      ...pending.packs[0]!,
-      statusDetail: '上次审核认为这份内容还需要修订，因此没有启用。',
+      ...inUse.packs[0]!,
+      status: 'review',
+      statusLabel: '按你的要求暂停使用',
+      statusDetail:
+        '你把其中 1 条标为需要修订，所以这份内容暂时不用于正式判断；改回「可以用于判断」并保存后立刻恢复。',
+      inUse: false,
       review: {
         decision: 'changes_requested',
         decisionLabel: '需要修订',
@@ -105,7 +109,11 @@ const reviewed: PackReviewWorkbenchView = {
         needsRevisionCount: 1,
         outdated: false,
       },
-      technical: { ...pending.packs[0]!.technical, reviewedContentHash: 'c'.repeat(64) },
+      technical: {
+        ...inUse.packs[0]!.technical,
+        storedStatus: 'review',
+        reviewedContentHash: 'c'.repeat(64),
+      },
     },
   ],
 }
@@ -138,7 +146,7 @@ afterEach(() => cleanup())
 describe('MethodologyReviewPage', () => {
   it('reaches the review workbench only through advanced settings, never the main navigation', async () => {
     renderPage(
-      apiWith({ getReviewWorkbench: vi.fn().mockResolvedValue(pending), signOff: vi.fn() }),
+      apiWith({ getReviewWorkbench: vi.fn().mockResolvedValue(inUse), signOff: vi.fn() }),
       '/settings',
     )
 
@@ -149,43 +157,71 @@ describe('MethodologyReviewPage', () => {
   })
 
   it('shows the reviewable content, its current status and the gaps in this translation', async () => {
-    renderPage(
-      apiWith({ getReviewWorkbench: vi.fn().mockResolvedValue(pending), signOff: vi.fn() }),
-    )
+    renderPage(apiWith({ getReviewWorkbench: vi.fn().mockResolvedValue(inUse), signOff: vi.fn() }))
 
     expect(await screen.findByText('Schooling by Design Methodology Pack v1')).toBeInTheDocument()
-    expect(screen.getByText('待审核')).toBeInTheDocument()
-    expect(screen.getByText('还没有人审核过这份内容，它不会用于正式判断。')).toBeInTheDocument()
+    expect(screen.getByText('正在使用')).toBeInTheDocument()
+    expect(screen.getByText('正在用于正式判断。')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '结果清晰度' })).toBeInTheDocument()
     // The translated description is still identical to the title.
     expect(screen.getAllByText('结果清晰度')).toHaveLength(2)
     expect(screen.getAllByText('· 还没有真正的描述：描述与名称完全相同。')).toHaveLength(2)
     expect(screen.getByText('· 还没有对应到五个维度中的任何一个。')).toBeInTheDocument()
-    expect(screen.getByText('还有 2 条没有给出结论。')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '提交审核结论' })).toBeDisabled()
 
-    // Technical vocabulary stays inside the advanced disclosure.
+    // Technical vocabulary and internal state names never reach the page.
     expect(screen.queryByText(/canonicalContentHash/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/syncRegistry/)).not.toBeInTheDocument()
+    expect(screen.queryAllByText(/\b(active|review|retired|sync|hash)\b/i)).toHaveLength(0)
+  })
+
+  it('presents every criterion as usable by default and needs no consultant action at all', async () => {
+    const signOff = vi.fn().mockResolvedValue(inUse)
+    renderPage(apiWith({ getReviewWorkbench: vi.fn().mockResolvedValue(inUse), signOff }))
+
+    const first = await screen.findByRole('group', { name: '结果清晰度：这条可以用来判断吗？' })
+    const second = screen.getByRole('group', { name: '证据先于行动：这条可以用来判断吗？' })
+    expect(within(first).getByRole('radio', { name: '可以用于判断' })).toBeChecked()
+    expect(within(first).getByRole('radio', { name: '需要修订' })).not.toBeChecked()
+    expect(within(second).getByRole('radio', { name: '可以用于判断' })).toBeChecked()
+    expect(
+      screen.getByText('不改动就什么都不用做：这些标准默认都可以用于判断。'),
+    ).toBeInTheDocument()
+
+    // Saving without touching anything records the default, it does not refuse.
+    const save = screen.getByRole('button', { name: '保存我的调整' })
+    expect(save).toBeEnabled()
+    await userEvent.click(save)
+
+    await waitFor(() =>
+      expect(signOff).toHaveBeenCalledWith({
+        packKey: 'schooling-by-design',
+        packVersion: '1',
+        note: null,
+        verdicts: [
+          { criterionStableKey: 'SBD.C1.RESULT_CLARITY', verdict: 'usable', note: null },
+          { criterionStableKey: 'SBD.C2.EVIDENCE_BEFORE_ACTION', verdict: 'usable', note: null },
+        ],
+      }),
+    )
   })
 
   it('submits one conclusion per criterion and shows the recorded outcome', async () => {
-    const signOff = vi.fn().mockResolvedValue(reviewed)
-    renderPage(apiWith({ getReviewWorkbench: vi.fn().mockResolvedValue(pending), signOff }))
+    const signOff = vi.fn().mockResolvedValue(withdrawn)
+    renderPage(apiWith({ getReviewWorkbench: vi.fn().mockResolvedValue(inUse), signOff }))
 
     const first = await screen.findByRole('group', { name: '结果清晰度：这条可以用来判断吗？' })
     await userEvent.click(within(first).getByRole('radio', { name: '需要修订' }))
     await userEvent.type(screen.getByLabelText('结果清晰度的未决意见'), '描述与名称完全相同。')
 
-    expect(screen.getByRole('button', { name: '提交审核结论' })).toBeDisabled()
+    expect(
+      screen.getByText('保存后，这份内容会暂停用于正式判断，直到这 1 条被改回「可以用于判断」。'),
+    ).toBeInTheDocument()
 
-    const second = screen.getByRole('group', { name: '证据先于行动：这条可以用来判断吗？' })
-    await userEvent.click(within(second).getByRole('radio', { name: '可以用于判断' }))
+    // The second criterion is deliberately left untouched: it stays usable.
     await userEvent.type(
       screen.getByLabelText('Schooling by Design Methodology Pack v1的未决意见'),
       '需要补翻译后再看。',
     )
-    await userEvent.click(screen.getByRole('button', { name: '提交审核结论' }))
+    await userEvent.click(screen.getByRole('button', { name: '保存我的调整' }))
 
     await waitFor(() =>
       expect(signOff).toHaveBeenCalledWith({
@@ -208,7 +244,12 @@ describe('MethodologyReviewPage', () => {
     )
     expect(await screen.findByText(/上次结论：需要修订/)).toBeInTheDocument()
     expect(screen.getByText('可以用于判断 1 条 · 需要修订 1 条')).toBeInTheDocument()
-    expect(screen.getByText('上次审核认为这份内容还需要修订，因此没有启用。')).toBeInTheDocument()
+    expect(screen.getByText('按你的要求暂停使用')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        '你把其中 1 条标为需要修订，所以这份内容暂时不用于正式判断；改回「可以用于判断」并保存后立刻恢复。',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('stays usable and quiet when methodology content cannot be read', async () => {
@@ -225,7 +266,7 @@ describe('MethodologyReviewPage', () => {
 
     expect(await screen.findByText('暂时看不到方法论内容')).toBeInTheDocument()
     expect(screen.getByText('方法论内容暂时读不到，工作台其他部分不受影响。')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '提交审核结论' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '保存我的调整' })).not.toBeInTheDocument()
     expect(screen.queryByText(/No methodology pack.json files found/)).not.toBeInTheDocument()
   })
 })

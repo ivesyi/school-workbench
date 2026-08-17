@@ -5,9 +5,11 @@ import {
   inferenceGuardrailSchema,
   persistenceEvidenceGuidanceSchema,
   projectMethodologyPack,
+  resolvePackRuntimeStatus,
   sourceLocatorSchema,
   type CanonicalDimensionKey,
   type MethodologyPackProjection,
+  type MethodologyPackStatusWriter,
   type MethodologyRepository,
   type MethodologyRegistry,
   type MethodologyPackStatus,
@@ -15,6 +17,7 @@ import {
 import { and, eq } from 'drizzle-orm'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { behaviorAnchors, methodologyCriteria, methodologyPacks } from './methodology-schema'
+import { SqliteMethodologyReviewRepository } from './sqlite-methodology-review-repository'
 
 const statuses: MethodologyPackStatus[] = ['draft', 'review', 'active', 'retired']
 const sourceTypes: MethodologyPackProjection['sourceType'][] = ['book', 'framework', 'standard']
@@ -25,11 +28,20 @@ const dimensionKeys: CanonicalDimensionKey[] = [
   'culture',
   'capability',
 ]
-const nextStatus: Readonly<Record<MethodologyPackStatus, MethodologyPackStatus | null>> = {
-  draft: 'review',
-  review: 'active',
-  active: 'retired',
-  retired: null,
+/**
+ * Lifecycle transitions the persisted projection accepts.
+ *
+ * `active -> review` exists so a consultant can withdraw a pack from use at any
+ * time; that refusal must be expressible, otherwise the only way to stop using a
+ * pack would be to retire it permanently. `retired` stays terminal.
+ */
+const allowedTransitions: Readonly<
+  Record<MethodologyPackStatus, readonly MethodologyPackStatus[]>
+> = {
+  draft: ['review'],
+  review: ['active'],
+  active: ['review', 'retired'],
+  retired: [],
 }
 
 function parseJson(value: string): unknown {
@@ -82,19 +94,58 @@ function sameProjectionContent(
 
 function assertStatusTransition(from: MethodologyPackStatus, to: MethodologyPackStatus): void {
   if (from === to) return
-  if (nextStatus[from] !== to) {
+  if (!allowedTransitions[from].includes(to)) {
     throw new Error(`Invalid methodology status transition: ${from} -> ${to}`)
   }
 }
 
-export class SqliteMethodologyRepository implements MethodologyRepository {
+export class SqliteMethodologyRepository
+  implements MethodologyRepository, MethodologyPackStatusWriter
+{
+  private readonly reviewRepository: SqliteMethodologyReviewRepository
+
   constructor(
     private readonly database: BetterSQLite3Database,
     private readonly now: () => Date = () => new Date(),
-  ) {}
+  ) {
+    this.reviewRepository = new SqliteMethodologyReviewRepository(database, now)
+  }
 
+  /**
+   * Projects the file registry into SQLite. The persisted status is never copied
+   * blindly from the file: a pack the consultant asked to revise stays out of use
+   * across restarts, so no automatic process can silently overturn that refusal.
+   */
   async syncRegistry(registry: MethodologyRegistry): Promise<void> {
-    for (const pack of registry.listPacks()) this.syncPack(projectMethodologyPack(pack))
+    for (const pack of registry.listPacks()) {
+      const projection = projectMethodologyPack(pack)
+      const signOff = await this.reviewRepository.getLatestSignOff(
+        projection.key,
+        projection.version,
+      )
+      this.syncPack(projection, resolvePackRuntimeStatus(projection.status, signOff))
+    }
+  }
+
+  async setPackStatus(key: string, version: string, status: MethodologyPackStatus): Promise<void> {
+    const existing = this.database
+      .select({ id: methodologyPacks.id, status: methodologyPacks.status })
+      .from(methodologyPacks)
+      .where(and(eq(methodologyPacks.key, key), eq(methodologyPacks.version, version)))
+      .get()
+    if (!existing) throw new Error(`Methodology ${key}@${version} is not in the local database`)
+
+    const current = assertStatus(existing.status)
+    if (current === status) return
+    assertStatusTransition(current, status)
+    const result = this.database
+      .update(methodologyPacks)
+      .set({ status })
+      .where(and(eq(methodologyPacks.id, existing.id), eq(methodologyPacks.status, current)))
+      .run()
+    if (result.changes !== 1) {
+      throw new Error(`Methodology ${key}@${version} status changed during transition`)
+    }
   }
 
   async listPacks(): Promise<readonly MethodologyPackProjection[]> {
@@ -150,7 +201,10 @@ export class SqliteMethodologyRepository implements MethodologyRepository {
     return deepFreeze(matches)
   }
 
-  private syncPack(projection: MethodologyPackProjection): void {
+  private syncPack(
+    projection: MethodologyPackProjection,
+    targetStatus: MethodologyPackStatus,
+  ): void {
     const existing = this.database
       .select()
       .from(methodologyPacks)
@@ -173,12 +227,12 @@ export class SqliteMethodologyRepository implements MethodologyRepository {
           `Methodology ${projection.key}@${projection.version} persisted content does not match registry`,
         )
       }
-      if (persisted.status === projection.status) return
+      if (persisted.status === targetStatus) return
 
-      assertStatusTransition(persisted.status, projection.status)
+      assertStatusTransition(persisted.status, targetStatus)
       const result = this.database
         .update(methodologyPacks)
-        .set({ status: projection.status })
+        .set({ status: targetStatus })
         .where(
           and(eq(methodologyPacks.id, existing.id), eq(methodologyPacks.status, persisted.status)),
         )
@@ -202,7 +256,7 @@ export class SqliteMethodologyRepository implements MethodologyRepository {
           sourceRef: projection.sourceRef,
           sourceFingerprint: projection.sourceFingerprint,
           contentHash: projection.contentHash,
-          status: projection.status,
+          status: targetStatus,
           createdAt: this.now().toISOString(),
         })
         .run()

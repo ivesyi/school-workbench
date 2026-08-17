@@ -40,7 +40,7 @@ function sourceManifestFor(pack: Record<string, unknown>): ReadonlyMap<string, s
 }
 
 describe('methodology pack loader and registry', () => {
-  it('loads the two reviewed baselines with complete traceability', () => {
+  it('loads the two shipped baselines, ready for use, with complete traceability', () => {
     const registry = loadMethodologyRegistry(methodologyRoot, sourceManifestPath)
     const packs = registry.listPacks()
 
@@ -65,7 +65,7 @@ describe('methodology pack loader and registry', () => {
       'DW.C4.INFERENCE_DISCIPLINE': 'capability',
       'DW.C5.ACTION_IMPACT_COHERENCE': 'leadership',
     })
-    expect(packs.every((pack) => pack.status === 'review')).toBe(true)
+    expect(packs.every((pack) => pack.status === 'active')).toBe(true)
     expect(
       packs.every(
         (pack) =>
@@ -82,14 +82,14 @@ describe('methodology pack loader and registry', () => {
   })
 
   it('keeps canonical content hash stable when only lifecycle status changes', () => {
-    const review = cloneSbd()
-    const contentHash = computeCanonicalContentHash(review)
-    const active: Record<string, unknown> = { ...review, status: 'active' }
+    const shipped = cloneSbd()
+    const contentHash = computeCanonicalContentHash(shipped)
+    const withdrawn: Record<string, unknown> = { ...shipped, status: 'review' }
 
-    expect(computeCanonicalContentHash(active)).toBe(contentHash)
-    active.canonicalContentHash = { algorithm: 'sha256', value: contentHash }
-    expect(parseMethodologyPack(JSON.stringify(active), sourceManifestFor(review)).status).toBe(
-      'active',
+    expect(computeCanonicalContentHash(withdrawn)).toBe(contentHash)
+    withdrawn.canonicalContentHash = { algorithm: 'sha256', value: contentHash }
+    expect(parseMethodologyPack(JSON.stringify(withdrawn), sourceManifestFor(shipped)).status).toBe(
+      'review',
     )
   })
 
