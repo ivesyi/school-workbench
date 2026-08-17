@@ -1,0 +1,23 @@
+{
+  "name": "@school-workbench/workbench-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "school-workbench-mcp": "./dist/stdio.js"
+  },
+  "scripts": {
+    "build": "esbuild src/stdio.ts --bundle --platform=node --format=esm --outfile=dist/stdio.js --banner:js='#!/usr/bin/env node'",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.0.0",
+    "@school-workbench/workbench-read-plane": "workspace:*",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
+    "esbuild": "0.25.12",
+    "typescript": "5.9.3"
+  }
+}

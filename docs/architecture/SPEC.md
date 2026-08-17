@@ -700,94 +700,62 @@ Agent 必须结构化提交。
 
 ---
 
-# 24. Diagnosis 最小 Schema
+# 24. Diagnosis strict Assessment Contract
 
-```ts
-type DiagnosisProposalInput = {
-  type: 'state' | 'characteristic' | 'mismatch' | 'practice'
+Diagnosis 的 canonical 输入边界不再维护第二套 `DiagnosisProposalInput`。
 
-  title: string
+正式 contract 以 `packages/assessment` 的 strict schema 为准：
 
-  observedFacts: string
-
-  judgment: string
-
-  mechanism?: string
-
-  dimensionKeys?: string[]
-
-  stageTargetIds?: string[]
-
-  frameworkVersionIds: string[]
-
-  criterionRefs: string[]
-
-  supportingEvidenceIds: string[]
-
-  counterEvidenceIds?: string[]
-
-  unresolvedQuestions?: string[]
-
-  alternativeHypotheses?: string[]
-
-  proposedActions?: string[]
-
-  recommendedObservations?: string[]
-
-  impactMeasures?: string[]
-
-  evidenceQuality: {
-    directness: 'low' | 'medium' | 'high'
-
-    triangulated: boolean
-
-    notes?: string
-  }
-
-  confidence: 'low' | 'medium' | 'high'
-}
+```text
+AssessmentInput
+AssessmentCandidate
 ```
+
+Agent / future MCP write plane 形成候选后，Workbench 必须执行：
+
+```text
+validateAssessmentCandidate(input, candidate)
+```
+
+只有通过 strict schema、引用完整性、school/stage/methodology/provenance 与 assessment protocol 校验的 candidate，才允许映射为 immutable `DiagnosisProposal` 并进入 HumanReview。调用方不能用额外布尔位或另一套宽松 DTO 绕过 validation gate。
 
 ## 24.1 Assessment Provenance
 
-`observedFacts` 只能包含可定位的观察陈述。
+`AssessmentInput` 负责提供可验证的 School、StageTarget、Evidence、ObservationFact、Claim 与 Methodology 上下文；`AssessmentCandidate` 只引用这些输入中的稳定 ID，并保持 Interpretation、Provisional Judgment、Alternative Hypothesis、Counter-evidence search、Unresolved Question 与 Action / Observation / Impact plan 分离。
 
-以下内容必须分开保存：
-
-```text
-Observation Fact
-Interpretation
-Judgment
-Alternative Hypothesis
-```
-
-Workbench 保存可审核的解释，不保存或展示模型隐藏思维过程。
+Workbench 保存可审核的解释与 provenance，不保存或展示模型隐藏思维过程。
 
 ## 24.2 standards_get
 
-输入允许：
+当前 read plane 的输入允许：
 
 ```text
-schoolId
-stageId
-dimensionKeys
-practiceType
-criterionRefs
+packKey          required
+version          required
+schoolId         optional scope assertion only
+dimensionKeys    bounded canonical filter
+practiceType     bounded filter
+criterionRefs    bounded stable-id filter
 ```
 
-返回经过筛选的：
+至少提供 `dimensionKeys / practiceType / criterionRefs` 之一；未知值、重复值、越界 limit/filter 必须 fail closed。`schoolId` 如出现必须与 capability token / run scope 精确一致。
+
+只有 file Registry 与 persisted SQLite 中同一个 Pack 都为 `active`，并且 key/version/content hash/source fingerprint/criterion projection 精确一致时才返回内容。
+
+返回最小相关投影：
 
 ```text
-Framework Version
-Constructs
-Criteria
-Behavior Anchors
+Pack / Version / Hash Provenance
+Required Constructs
+Selected Criteria
+Selected Behavior Anchors
 Evidence Guidance
+Counter Indicators
 Inference Guardrails
 Source Locators
 ```
 
-默认不返回整本书或整个 Methodology Pack。
+默认不返回整本书、PDF 或整个 Methodology Pack。
 
 ---
 

@@ -15,6 +15,7 @@
     "@school-workbench/assessment": "workspace:*",
     "@school-workbench/domain": "workspace:*",
     "@school-workbench/methodology": "workspace:*",
+    "@school-workbench/workbench-read-plane": "workspace:*",
     "better-sqlite3": "13.0.3",
     "drizzle-orm": "0.45.2"
   },
