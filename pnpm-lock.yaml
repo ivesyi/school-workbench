@@ -111,9 +111,15 @@ importers:
 
   packages/application:
     dependencies:
+      '@school-workbench/assessment':
+        specifier: workspace:*
+        version: link:../assessment
       '@school-workbench/domain':
         specifier: workspace:*
         version: link:../domain
+      '@school-workbench/methodology':
+        specifier: workspace:*
+        version: link:../methodology
       '@school-workbench/shared':
         specifier: workspace:*
         version: link:../shared
@@ -140,6 +146,9 @@ importers:
       '@school-workbench/application':
         specifier: workspace:*
         version: link:../application
+      '@school-workbench/assessment':
+        specifier: workspace:*
+        version: link:../assessment
       '@school-workbench/domain':
         specifier: workspace:*
         version: link:../domain

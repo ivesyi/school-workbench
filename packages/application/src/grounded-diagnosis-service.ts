@@ -35,7 +35,9 @@ export type GroundedDiagnosisPersistenceRequest = Readonly<{
 }>
 
 export interface GroundedDiagnosisRepository {
-  saveGroundedProposal(request: GroundedDiagnosisPersistenceRequest): Promise<GroundedDiagnosisRecord>
+  saveGroundedProposal(
+    request: GroundedDiagnosisPersistenceRequest,
+  ): Promise<GroundedDiagnosisRecord>
   findGroundedProposal(id: string): Promise<GroundedDiagnosisRecord | null>
 }
 

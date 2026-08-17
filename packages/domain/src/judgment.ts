@@ -256,9 +256,7 @@ export function assertReviewDecisionAllowed(
     proposal.status === 'insufficient_evidence' &&
     (decision === 'accepted' || decision === 'modified')
   ) {
-    throw new DiagnosisReviewInvariantError(
-      '证据不足的判断只能被拒绝或标记为需要补充更多依据',
-    )
+    throw new DiagnosisReviewInvariantError('证据不足的判断只能被拒绝或标记为需要补充更多依据')
   }
   if (
     proposal.status === 'proposed' &&
@@ -303,9 +301,7 @@ export function createReviewOutcome(
   }
 
   const statement =
-    input.decision === 'modified'
-      ? input.finalText!.trim()
-      : proposal.provisionalJudgment!.trim()
+    input.decision === 'modified' ? input.finalText!.trim() : proposal.provisionalJudgment!.trim()
 
   return {
     review,

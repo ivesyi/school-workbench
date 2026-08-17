@@ -19,7 +19,6 @@ import {
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { openWorkbenchDatabase, type WorkbenchDatabase } from './database'
-import { methodologyCriteria, methodologyPacks } from './methodology-schema'
 import { SqliteGroundedDiagnosisRepository } from './sqlite-grounded-diagnosis-repository'
 import { SqliteJudgmentRepository } from './sqlite-judgment-repository'
 import { SqliteMethodologyRepository } from './sqlite-methodology-repository'
@@ -112,9 +111,7 @@ function proposedFixture(
         scope: { kind: 'school', schoolId },
       },
     ],
-    claimFacts: [
-      { claimId: `${schoolId}-c1`, factId: `${schoolId}-f1`, stance: 'supporting' },
-    ],
+    claimFacts: [{ claimId: `${schoolId}-c1`, factId: `${schoolId}-f1`, stance: 'supporting' }],
     methodologyContext: [criterion],
   })
 
@@ -287,7 +284,10 @@ function persistInput(database: WorkbenchDatabase, input: AssessmentInput): void
       .run()
   }
   input.claimFacts.forEach((link, index) => {
-    database.db.insert(claimFacts).values({ ...link, sequence: index + 1 }).run()
+    database.db
+      .insert(claimFacts)
+      .values({ ...link, sequence: index + 1 })
+      .run()
   })
 }
 
@@ -324,16 +324,15 @@ function relationCounts(database: WorkbenchDatabase): Record<string, number> {
   )
 }
 
-async function expectProtocolFailure(
-  action: () => Promise<unknown>,
-  code: string,
-): Promise<void> {
+async function expectProtocolFailure(action: () => Promise<unknown>, code: string): Promise<void> {
   try {
     await action()
     throw new Error('expected protocol failure')
   } catch (error) {
     expect(error).toBeInstanceOf(GroundedDiagnosisProtocolError)
-    expect((error as GroundedDiagnosisProtocolError).errors.map((item) => item.code)).toContain(code)
+    expect((error as GroundedDiagnosisProtocolError).errors.map((item) => item.code)).toContain(
+      code,
+    )
   }
 }
 
@@ -352,33 +351,38 @@ describe('validated diagnosis persistence seam', () => {
   it.each([
     ['SBD', SBD],
     ['Data Wise', DATA_WISE],
-  ] as const)('round-trips a validated %s proposed diagnosis without copying source records', async (_, criterion) => {
-    const fixture = proposedFixture(`school-${criterion.packKey}`, criterion)
-    persistInput(database, fixture.input)
-    const service = fixedService(database, activeRegistry)
+  ] as const)(
+    'round-trips a validated %s proposed diagnosis without copying source records',
+    async (_, criterion) => {
+      const fixture = proposedFixture(`school-${criterion.packKey}`, criterion)
+      persistInput(database, fixture.input)
+      const service = fixedService(database, activeRegistry)
 
-    const saved = await service.create({
-      schoolId: fixture.input.school.schoolId,
-      type: 'state',
-      title: '合成 grounded proposal',
-      rawAssessmentInput: fixture.input,
-      rawAssessmentCandidate: fixture.candidate,
-    })
+      const saved = await service.create({
+        schoolId: fixture.input.school.schoolId,
+        type: 'state',
+        title: '合成 grounded proposal',
+        rawAssessmentInput: fixture.input,
+        rawAssessmentCandidate: fixture.candidate,
+      })
 
-    expect(saved.proposal.provisionalJudgment).toBe(fixture.candidate.provisionalJudgment)
-    expect(saved.proposal.interpretations).toEqual(['该事实支持一个可审核的暂定解释。'])
-    expect(saved.claimIds).toEqual([`${fixture.input.school.schoolId}-c1`])
-    expect(saved.criteria).toHaveLength(1)
-    expect(saved.criteria[0]?.stableKey).toBe(criterion.criterionId)
-    expect(saved.stageTargetIds).toEqual([`${fixture.input.school.schoolId}-target`])
-    expect(await service.find(saved.proposal.id)).toEqual(saved)
-    expect(database.client.prepare('SELECT count(*) AS count FROM evidence').get()).toEqual({ count: 1 })
-    expect(relationCounts(database)).toEqual({
-      diagnosis_claims: 1,
-      diagnosis_criteria: 1,
-      diagnosis_stage_targets: 1,
-    })
-  })
+      expect(saved.proposal.provisionalJudgment).toBe(fixture.candidate.provisionalJudgment)
+      expect(saved.proposal.interpretations).toEqual(['该事实支持一个可审核的暂定解释。'])
+      expect(saved.claimIds).toEqual([`${fixture.input.school.schoolId}-c1`])
+      expect(saved.criteria).toHaveLength(1)
+      expect(saved.criteria[0]?.stableKey).toBe(criterion.criterionId)
+      expect(saved.stageTargetIds).toEqual([`${fixture.input.school.schoolId}-target`])
+      expect(await service.find(saved.proposal.id)).toEqual(saved)
+      expect(database.client.prepare('SELECT count(*) AS count FROM evidence').get()).toEqual({
+        count: 1,
+      })
+      expect(relationCounts(database)).toEqual({
+        diagnosis_claims: 1,
+        diagnosis_criteria: 1,
+        diagnosis_stage_targets: 1,
+      })
+    },
+  )
 
   it.each(['review', 'retired'] as const)(
     'rejects a %s file-registry pack before persistence',
@@ -436,9 +440,7 @@ describe('validated diagnosis persistence seam', () => {
     persistInput(database, fixture.input)
     const wrongVersion = {
       ...fixture.candidate,
-      criterionMappings: [
-        { ...fixture.candidate.criterionMappings[0]!, version: '99' },
-      ],
+      criterionMappings: [{ ...fixture.candidate.criterionMappings[0]!, version: '99' }],
     }
     await expectProtocolFailure(
       () =>
@@ -475,11 +477,9 @@ describe('validated diagnosis persistence seam', () => {
   it('rejects persisted criterion drift even when the pack hash row was not changed', async () => {
     const fixture = proposedFixture('school-criterion-drift', SBD)
     persistInput(database, fixture.input)
-    const persistedCriterion = database.db
-      .select({ id: methodologyCriteria.id })
-      .from(methodologyCriteria)
-      .where((fields, operators) => operators.eq(fields.stableKey, SBD.criterionId))
-      .get()
+    const persistedCriterion = database.client
+      .prepare('SELECT id FROM methodology_criteria WHERE stable_key = ?')
+      .get(SBD.criterionId) as { id: string } | undefined
     if (!persistedCriterion) throw new Error('criterion fixture missing')
     database.client
       .prepare('UPDATE methodology_criteria SET description = ? WHERE id = ?')

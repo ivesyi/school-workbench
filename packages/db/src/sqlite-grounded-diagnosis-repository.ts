@@ -241,10 +241,7 @@ function assertPersistedInput(tx: Transaction, request: GroundedDiagnosisPersist
   }
 }
 
-function resolveCriterion(
-  tx: Transaction,
-  expectation: GroundedMethodologyExpectation,
-): string {
+function resolveCriterion(tx: Transaction, expectation: GroundedMethodologyExpectation): string {
   const pack = tx
     .select()
     .from(methodologyPacks)
@@ -378,9 +375,7 @@ export class SqliteGroundedDiagnosisRepository implements GroundedDiagnosisRepos
         tx.insert(diagnosisClaims).values({ proposalId: request.proposal.id, claimId }).run()
       }
       for (const criterionId of criterionIds) {
-        tx.insert(diagnosisCriteria)
-          .values({ proposalId: request.proposal.id, criterionId })
-          .run()
+        tx.insert(diagnosisCriteria).values({ proposalId: request.proposal.id, criterionId }).run()
       }
       for (const stageTargetId of request.candidate.stageTargetRefs) {
         tx.insert(diagnosisStageTargets)
