@@ -10,7 +10,9 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@school-workbench/assessment": "workspace:*",
     "@school-workbench/domain": "workspace:*",
+    "@school-workbench/methodology": "workspace:*",
     "@school-workbench/shared": "workspace:*"
   },
   "devDependencies": {

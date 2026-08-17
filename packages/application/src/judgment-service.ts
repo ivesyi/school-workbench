@@ -47,6 +47,10 @@ export class BaselineAssessmentEngine implements AssessmentEngine {
 }
 
 function toReviewView(chain: ProposalChain): JudgmentReviewView {
+  if (chain.proposal.status !== 'proposed' || !chain.proposal.provisionalJudgment) {
+    throw new Error('工作台待确认判断必须包含暂定判断文本')
+  }
+
   return {
     evidence: chain.evidence.map((item) => ({
       id: item.id,

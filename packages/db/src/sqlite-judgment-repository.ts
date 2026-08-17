@@ -1,9 +1,10 @@
-import type {
-  AcceptedJudgment,
-  DiagnosisProposal,
-  JudgmentRepository,
-  ProposalChain,
-  ReviewOutcome,
+import {
+  assertReviewDecisionAllowed,
+  type AcceptedJudgment,
+  type DiagnosisProposal,
+  type JudgmentRepository,
+  type ProposalChain,
+  type ReviewOutcome,
 } from '@school-workbench/domain'
 import { desc, eq } from 'drizzle-orm'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
@@ -37,7 +38,12 @@ function toProposal(row: typeof diagnosisProposals.$inferSelect): DiagnosisPropo
   if (!['state', 'characteristic', 'mismatch', 'practice'].includes(row.type)) {
     throw new Error(`Unsupported diagnosis type: ${row.type}`)
   }
-  if (!row.provisionalJudgment) throw new Error('Persisted proposal is missing a judgment')
+  if (row.status === 'proposed' && !row.provisionalJudgment) {
+    throw new Error('Persisted proposed diagnosis is missing a judgment')
+  }
+  if (row.status === 'insufficient_evidence' && row.provisionalJudgment !== null) {
+    throw new Error('Persisted insufficient-evidence diagnosis carries a judgment')
+  }
 
   return {
     id: row.id,
@@ -87,6 +93,9 @@ function assertProposalChain(chain: ProposalChain): void {
   ].find((value) => value !== schoolId)
   if (wrongSchool) throw new Error('不能跨学校保存判断链')
 
+  if (chain.proposal.status !== 'proposed' || !chain.proposal.provisionalJudgment?.trim()) {
+    throw new Error('既有工作台判断链只能保存带暂定判断的 proposed Proposal')
+  }
   if (chain.evidence.some((item) => !item.uri && !item.inlineText)) {
     throw new Error('依据必须包含可定位来源或原始内容')
   }
@@ -152,6 +161,29 @@ export class SqliteJudgmentRepository implements JudgmentRepository {
         .where(eq(humanReviews.proposalId, outcome.review.proposalId))
         .get()
       if (existing) throw new Error('这个判断已经确认过了')
+
+      const proposalRow = tx
+        .select()
+        .from(diagnosisProposals)
+        .where(eq(diagnosisProposals.id, outcome.review.proposalId))
+        .get()
+      if (!proposalRow) throw new Error('没有找到这个待确认判断')
+      const proposal = toProposal(proposalRow)
+      assertReviewDecisionAllowed(proposal, outcome.review.decision)
+
+      const shouldCreateAcceptedJudgment =
+        outcome.review.decision === 'accepted' || outcome.review.decision === 'modified'
+      if (shouldCreateAcceptedJudgment !== Boolean(outcome.acceptedJudgment)) {
+        throw new Error('审核结果与 AcceptedJudgment 不一致')
+      }
+      if (
+        outcome.acceptedJudgment &&
+        (outcome.acceptedJudgment.schoolId !== proposal.schoolId ||
+          outcome.acceptedJudgment.proposalId !== proposal.id ||
+          outcome.acceptedJudgment.reviewId !== outcome.review.id)
+      ) {
+        throw new Error('AcceptedJudgment 与审核作用域不一致')
+      }
 
       tx.insert(humanReviews).values(outcome.review).run()
       if (!outcome.acceptedJudgment) return

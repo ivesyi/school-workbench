@@ -190,7 +190,7 @@ status(proposed|insufficient_evidence),
 created_at
 ```
 
-Proposal 创建后不可原地修改。
+Proposal 创建后不可原地修改。`proposed` 必须有非空 `provisional_judgment`；`insufficient_evidence` 必须保持 `provisional_judgment = NULL`，它记录“当前不足以形成判断”的正式 abstention，不等同于 AcceptedJudgment。
 
 ```text
 diagnosis_claims(proposal_id, claim_id)
@@ -198,7 +198,7 @@ diagnosis_criteria(proposal_id, criterion_id)
 diagnosis_stage_targets(proposal_id, stage_target_id)
 ```
 
-`methodology_criteria.pack_id` 已固定 Pack/version 来源，不再重复保存 frameworkVersionIds。
+`methodology_criteria.pack_id` 已固定 Pack/version 来源，不再重复保存 frameworkVersionIds。Validated Diagnosis Persistence Seam 通过新的 forward migration 实现 `diagnosis_criteria` 与 `diagnosis_stage_targets`；`diagnosis_claims` 继续复用既有关系表。Grounded save 必须在同一事务内重新读取 Evidence / Fact / Claim / ClaimFact、active Stage / confirmed Targets 以及 persisted Methodology，并校验 file Registry 与数据库的 active pack/version/content/source fingerprint/criterion projection 一致；任一 stale、跨校或 provenance 不一致均整体回滚。
 
 ## 7. HumanReview and AcceptedJudgment
 
@@ -212,7 +212,7 @@ reason NULL,
 reviewed_at
 ```
 
-HumanReview 是审核记录，不修改原 Proposal。
+HumanReview 是审核记录，不修改原 Proposal。`status = proposed` 保持四种既有 decision；`status = insufficient_evidence` 只允许 `rejected` 或 `needs_more_evidence`，不得通过 `accepted` / `modified` 绕过证据门槛。
 
 ```text
 accepted_judgments
@@ -224,7 +224,7 @@ valid_to NULL,
 created_at
 ```
 
-只有 `accepted` / `modified` Review 可以产生 AcceptedJudgment。
+只有对 `proposed` Proposal 的 `accepted` / `modified` Review 可以产生 AcceptedJudgment；`insufficient_evidence` 永远不能产生 AcceptedJudgment。
 
 ```text
 judgment_claims(judgment_id, claim_id)
@@ -311,9 +311,10 @@ agent_runs.status = queued|running|needs_input|completed|failed|cancelled
 - 每校最多一个 active Stage；planned/active 阻止新的 planned，但 completed/cancelled 历史不阻止；
 - ObservationFact 有 Evidence + locator，且不包含评价/因果推断；
 - Claim 至少有 supporting Fact；counter search 必须显式完成；
-- Proposal 至少有一个 Claim 和一个 Criterion；
-- Proposal immutable；
-- 只有 HumanReview 可产生 AcceptedJudgment；
+- `proposed` Proposal 至少有一个 Claim、一个 Criterion、一个当前 confirmed StageTarget 与 supporting Fact；`insufficient_evidence` 可以没有这些关系，但必须保持判断为空并给出 unresolved question / next observation；
+- Proposal immutable；重复 Proposal id 必须拒绝，不能更新历史；
+- 只有 HumanReview 可产生 AcceptedJudgment；`insufficient_evidence` 只允许 rejected / needs_more_evidence，绝不能产生 AcceptedJudgment；
+- Grounded Proposal 保存前必须重新验证持久化 Evidence→Fact、Fact→Claim stance、school scope、active Stage / confirmed Target，以及 file Registry 与 SQLite Methodology 的 active status、精确版本与 Criterion 内容一致；
 - Snapshot 只能记录 AcceptedJudgment / Assessment；新确认状态必须来自该校 active Stage 的 confirmed Targets；
 - 每个正式 Snapshot 恰好五个 canonical DimensionAssessment；非 `unverified` Assessment 至少一条同校 AcceptedJudgment；
 - 后续 Snapshot 必须链接同校当前 latest，`sequence = previous.sequence + 1`，且 `is_baseline = 0`；
@@ -334,6 +335,10 @@ Baseline State 纵切使用 forward migration 新增 `state_snapshots`、`dimens
 
 有新的 AcceptedJudgment 时，StateAssessmentEngine 使用 active Stage 的 confirmed Targets 与当前全部 AcceptedJudgment 形成更新草稿；确认时在一个事务内验证 expected previous 仍为 latest，并原子写入下一份 immutable Snapshot、五维 Assessment 与完整 FK provenance。重启后“和上一次相比”由 latest 与其 `previous_snapshot_id` 指向的上一份正式状态重新计算，不修改历史状态。
 
-Methodology Registry Foundation 已用新的 forward migration 实现 `methodology_packs`、`methodology_criteria`、`behavior_anchors`，并增加文件 Registry 与 SQLite Repository seam。当前仅加载 Schooling by Design v1 与 Data Wise v3 的人审文本工程转译；两者均为 `review`，不参与 AssessmentEngine、Diagnosis 或任何自动评分。相同 `key + version + hash` 重复 sync 无副作用；相同版本内容变化拒绝覆盖；新版本可并存。原始 PDF 只通过 `references/SOURCE_MANIFEST.md` 的 SHA-256 追溯，不进入 runtime pack、测试夹具或安装产物。
+Methodology Registry Foundation 已用新的 forward migration 实现 `methodology_packs`、`methodology_criteria`、`behavior_anchors`，并增加文件 Registry 与 SQLite Repository seam。当前仅加载 Schooling by Design v1 与 Data Wise v3 的人审文本工程转译；两者均为 `review`。相同 `key + version + hash` 重复 sync 无副作用；相同版本内容变化拒绝覆盖；新版本可并存。原始 PDF 只通过 `references/SOURCE_MANIFEST.md` 的 SHA-256 追溯，不进入 runtime pack、测试夹具或安装产物。
 
-尚未实现阶段迁移、任意历史版本浏览/比较、教师实践或真实 Agent Runtime、MCP、飞书、RAG；Methodology 尚未接入 AssessmentEngine / Diagnosis criterion mapping / `standards_get`，Congruence 与 Role Standards Pack 也仍等待各自充分的人审结构化基线。这些能力继续按真实纵切增加，不为未实现能力制造额外基础设施。
+Assessment Contract + Quality Harness Foundation 已建立运行时无关的 strict protocol、active-only Methodology context builder、candidate validator 与 synthetic Golden Harness。它只证明 protocol correctness 与引用完整性，不代表顾问认可，也没有接现有产品 live flow。
+
+Validated Diagnosis Persistence Seam 已用 forward migration 新增 `diagnosis_criteria` 与 `diagnosis_stage_targets`，并复用既有 `diagnosis_claims`。`GroundedDiagnosisService` 自行执行 Assessment validation，再由 SQLite Repository 在单事务内重新读取并核对学校、active Stage / confirmed Targets、Evidence / Fact / Claim / ClaimFact provenance 与 persisted active Methodology；成功后才写入 immutable Proposal 及 canonical FK relations。`insufficient_evidence` 可被持久记录，但不能被 accepted / modified，也不会形成 AcceptedJudgment。仓库中的 Schooling by Design / Data Wise Pack 文件仍保持 `review`；本轮测试只使用内存 active 副本与隔离 SQLite active fixture，不擅自激活产品 Pack。
+
+尚未实现阶段迁移、任意历史版本浏览/比较、教师实践或真实 Agent Runtime、MCP、飞书、RAG；Validated Diagnosis seam 尚未接 IPC/UI、现有 BaselineAssessmentEngine 或产品 live flow，Methodology 也尚未提供 `standards_get`。Congruence 与 Role Standards Pack 仍等待各自充分的人审结构化基线。这些能力继续按真实纵切增加，不为未实现能力制造额外基础设施。

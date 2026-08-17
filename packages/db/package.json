@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@school-workbench/application": "workspace:*",
+    "@school-workbench/assessment": "workspace:*",
     "@school-workbench/domain": "workspace:*",
     "@school-workbench/methodology": "workspace:*",
     "better-sqlite3": "13.0.3",
