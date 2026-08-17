@@ -19,7 +19,7 @@ import { useWorkbenchApi } from '../../lib/workbench-api'
 
 type VerdictDraft = Readonly<{
   verdict?: PackReviewVerdictValue
-  note: string
+  note?: string
 }>
 
 type PackDraft = Readonly<{
@@ -28,6 +28,19 @@ type PackDraft = Readonly<{
 }>
 
 const emptyDraft: PackDraft = { note: '', verdicts: {} }
+
+/**
+ * Everything is already accepted for use unless the consultant says otherwise.
+ * An untouched criterion therefore reads as usable, and the last recorded
+ * conclusion — when there is one — is what he sees on the way back in.
+ */
+function verdictFor(criterion: PackCriterionReviewView, draft: PackDraft): PackReviewVerdictValue {
+  return draft.verdicts[criterion.stableKey]?.verdict ?? criterion.lastVerdict?.verdict ?? 'usable'
+}
+
+function noteFor(criterion: PackCriterionReviewView, draft: PackDraft): string {
+  return draft.verdicts[criterion.stableKey]?.note ?? criterion.lastVerdict?.note ?? ''
+}
 
 function List({ title, items }: { title: string; items: readonly string[] }) {
   if (items.length === 0) return null
@@ -51,13 +64,15 @@ function LocatorText({ locator }: { locator: PackCriterionReviewView['sourceLoca
 function CriterionCard({
   packKey,
   criterion,
-  draft,
+  verdict,
+  note,
   onVerdict,
   onNote,
 }: {
   packKey: string
   criterion: PackCriterionReviewView
-  draft: VerdictDraft
+  verdict: PackReviewVerdictValue
+  note: string
   onVerdict: (verdict: PackReviewVerdictValue) => void
   onNote: (note: string) => void
 }) {
@@ -114,7 +129,7 @@ function CriterionCard({
               type="radio"
               name={groupName}
               value="usable"
-              checked={draft.verdict === 'usable'}
+              checked={verdict === 'usable'}
               onChange={() => onVerdict('usable')}
             />
             可以用于判断
@@ -124,7 +139,7 @@ function CriterionCard({
               type="radio"
               name={groupName}
               value="needs_revision"
-              checked={draft.verdict === 'needs_revision'}
+              checked={verdict === 'needs_revision'}
               onChange={() => onVerdict('needs_revision')}
             />
             需要修订
@@ -135,7 +150,7 @@ function CriterionCard({
           <Textarea
             className="mt-1"
             rows={2}
-            value={draft.note}
+            value={note}
             aria-label={`${criterion.title}的未决意见`}
             onChange={(event) => onNote(event.target.value)}
           />
@@ -158,10 +173,9 @@ function PackSection({
   onChange: (next: PackDraft) => void
   onSubmit: () => void
 }) {
-  const decided = pack.criteria.filter(
-    (criterion) => draft.verdicts[criterion.stableKey]?.verdict,
+  const needsRevision = pack.criteria.filter(
+    (criterion) => verdictFor(criterion, draft) === 'needs_revision',
   ).length
-  const complete = decided === pack.criteria.length
 
   return (
     <section className="mt-8 rounded-xl border border-border bg-surface">
@@ -232,7 +246,8 @@ function PackSection({
               key={criterion.stableKey}
               packKey={pack.key}
               criterion={criterion}
-              draft={draft.verdicts[criterion.stableKey] ?? { note: '' }}
+              verdict={verdictFor(criterion, draft)}
+              note={noteFor(criterion, draft)}
               onVerdict={(verdict) =>
                 onChange({
                   ...draft,
@@ -240,7 +255,7 @@ function PackSection({
                     ...draft.verdicts,
                     [criterion.stableKey]: {
                       verdict,
-                      note: draft.verdicts[criterion.stableKey]?.note ?? '',
+                      note: noteFor(criterion, draft),
                     },
                   },
                 })
@@ -251,7 +266,7 @@ function PackSection({
                   verdicts: {
                     ...draft.verdicts,
                     [criterion.stableKey]: {
-                      ...(draft.verdicts[criterion.stableKey] ?? {}),
+                      verdict: verdictFor(criterion, draft),
                       note,
                     },
                   },
@@ -273,13 +288,13 @@ function PackSection({
         </label>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <Button type="button" disabled={!complete || submitting} onClick={onSubmit}>
-            提交审核结论
+          <Button type="button" disabled={submitting} onClick={onSubmit}>
+            保存我的调整
           </Button>
           <span className="text-sm text-muted-foreground">
-            {complete
-              ? '提交后会记录你对每一条的结论。'
-              : `还有 ${pack.criteria.length - decided} 条没有给出结论。`}
+            {needsRevision === 0
+              ? '不改动就什么都不用做：这些标准默认都可以用于判断。'
+              : `保存后，这份内容会暂停用于正式判断，直到这 ${needsRevision} 条被改回「可以用于判断」。`}
           </span>
         </div>
 
@@ -291,16 +306,11 @@ function PackSection({
             <p>标识：{pack.technical.packId}</p>
             <p>原始来源：{pack.technical.sourceRef}</p>
             <p>来源指纹：{pack.technical.sourceFingerprint}</p>
-            <p>内容哈希：{pack.technical.contentHash}</p>
-            <p>已审核内容哈希：{pack.technical.reviewedContentHash ?? '（还没有审核记录）'}</p>
+            <p>内容指纹：{pack.technical.contentHash}</p>
             <p>
-              文件状态：{pack.technical.fileStatus} · 本地库状态：
-              {pack.technical.storedStatus ?? '（尚未写入）'}
+              你上次看过的内容指纹：{pack.technical.reviewedContentHash ?? '（还没有调整记录）'}
             </p>
-            <p>
-              审核通过后，在仓库里执行 pnpm methodology:activate --pack {pack.key} --version{' '}
-              {pack.version} --apply 才会真正启用。
-            </p>
+            <p>当前情况：{pack.statusLabel}</p>
           </div>
         </details>
       </div>
@@ -339,19 +349,18 @@ export function MethodologyReviewPage(): React.JSX.Element {
         packVersion: pack.version,
         note: draft.note.trim() ? draft.note.trim() : null,
         verdicts: pack.criteria.map((criterion) => {
-          const entry = draft.verdicts[criterion.stableKey]
-          if (!entry?.verdict) throw new Error('missing verdict')
+          const note = noteFor(criterion, draft).trim()
           return {
             criterionStableKey: criterion.stableKey,
-            verdict: entry.verdict,
-            note: entry.note.trim() ? entry.note.trim() : null,
+            verdict: verdictFor(criterion, draft),
+            note: note ? note : null,
           }
         }),
       })
       setWorkbench(result)
       setDrafts((current) => ({ ...current, [pack.key]: emptyDraft }))
     } catch {
-      setError('这次审核结论没有保存成功。请检查每条结论后再试一次。')
+      setError('这次调整没有保存成功。请再试一次。')
     } finally {
       setSubmitting(null)
     }
@@ -368,7 +377,8 @@ export function MethodologyReviewPage(): React.JSX.Element {
       </Link>
       <h1 className="mt-4 text-3xl font-semibold tracking-tight">方法论内容审核</h1>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
-        这些判断标准是从已出版的方法论整理出来的。只有你逐条确认过，它们才会用来约束正式判断。
+        这些判断标准是从已出版的方法论整理出来的，默认全部可以用来约束正式判断，你不需要做任何操作。
+        只有当你认为某一条还需要修订时，才在这里改掉它并保存——那份内容会立刻停止用于正式判断，直到你改回来。
       </p>
 
       {error ? (

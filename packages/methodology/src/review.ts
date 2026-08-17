@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { DeepReadonly, MethodologyPack } from './contracts'
+import type { DeepReadonly, MethodologyPack, MethodologyPackStatus } from './contracts'
 import { computePackContentHash } from './hash'
 
 export const packReviewVerdictValues = ['usable', 'needs_revision'] as const
@@ -111,6 +111,33 @@ export function packReviewIsOutdated(
 ): boolean {
   if (!signOff) return false
   return signOff.contentHash !== pack.canonicalContentHash.value
+}
+
+/**
+ * True when the consultant's most recent act on this pack version withheld it
+ * from use. The veto is deliberately *not* scoped to the reviewed content hash:
+ * a later edit of the pack must not silently overturn a human refusal. Content
+ * drift makes the earlier verdicts stop counting as an approval (see
+ * `packReviewIsOutdated`), but it never restores the pack to use on its own.
+ */
+export function packReviewWithholdsUse(signOff: PackReviewSignOff | null): boolean {
+  return signOff?.decision === 'changes_requested'
+}
+
+/**
+ * The single rule that decides the persisted lifecycle status of a pack.
+ *
+ * Methodology content ships ready for use, so the file status is the ceiling and
+ * a pack is in use by default with no consultant action at all. The only thing
+ * that lowers it is the consultant's own refusal, and only the consultant can
+ * lift that refusal again by re-reviewing the pack.
+ */
+export function resolvePackRuntimeStatus(
+  fileStatus: MethodologyPackStatus,
+  signOff: PackReviewSignOff | null,
+): MethodologyPackStatus {
+  if (fileStatus !== 'active') return fileStatus
+  return packReviewWithholdsUse(signOff) ? 'review' : 'active'
 }
 
 export interface MethodologyReviewRepository {

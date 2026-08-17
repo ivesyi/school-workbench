@@ -2,9 +2,11 @@ import {
   assertPackReviewCoverage,
   derivePackReviewDecision,
   packReviewIsOutdated,
+  resolvePackRuntimeStatus,
   type Criterion,
   type EvidenceGuidance,
   type MethodologyPack,
+  type MethodologyPackStatusWriter,
   type MethodologyRegistry,
   type MethodologyRepository,
   type MethodologyReviewRepository,
@@ -25,8 +27,8 @@ import { ulid } from 'ulid'
 
 const statusLabels: Readonly<Record<PackLifecycleStatus, string>> = {
   draft: '还在整理',
-  review: '待审核',
-  active: '已启用',
+  review: '按你的要求暂停使用',
+  active: '正在使用',
   retired: '已停用',
 }
 
@@ -90,20 +92,28 @@ function criterionGaps(
   return gaps
 }
 
+/**
+ * Says, in the consultant's own terms, whether this content is currently
+ * constraining real judgment — and if not, that it was his own call.
+ */
 function statusDetail(
   pack: MethodologyPack,
   storedStatus: PackLifecycleStatus | null,
   signOff: PackReviewSignOff | null,
   outdated: boolean,
 ): string {
-  if (pack.status === 'active' && storedStatus === 'active') return '正在用于正式判断。'
-  if (pack.status === 'active') return '这份内容已标记启用，但本机还没有完成一次加载。'
-  if (pack.status !== 'review') return '这份内容目前不参与正式判断。'
-  if (!signOff) return '还没有人审核过这份内容，它不会用于正式判断。'
-  if (outdated) return '上次审核之后内容发生了变化，之前的结论已经失效，需要重新审核。'
-  if (signOff.decision === 'approved')
-    return '审核已通过，启用还需要再确认一次（见「更技术的信息」）。'
-  return '上次审核认为这份内容还需要修订，因此没有启用。'
+  if (pack.status !== 'active' || storedStatus === 'retired') {
+    return '这份内容目前不参与正式判断。'
+  }
+  if (storedStatus === 'active') return '正在用于正式判断。'
+  if (storedStatus === null) return '这份内容默认可以用于判断，本机还没有完成一次加载。'
+  if (outdated) {
+    return '你上次要求修订之后，这份内容又有改动。在你重新看过之前，它不会用于正式判断。'
+  }
+  const needsRevision =
+    signOff?.verdicts.filter((item) => item.verdict === 'needs_revision').length ?? 0
+  if (needsRevision === 0) return '按你的要求，这份内容暂时不用于正式判断。'
+  return `你把其中 ${needsRevision} 条标为需要修订，所以这份内容暂时不用于正式判断；改回「可以用于判断」并保存后立刻恢复。`
 }
 
 export class MethodologyReviewService {
@@ -112,7 +122,7 @@ export class MethodologyReviewService {
 
   constructor(
     private readonly registry: MethodologyRegistry,
-    private readonly methodologyRepository: MethodologyRepository,
+    private readonly methodologyRepository: MethodologyRepository & MethodologyPackStatusWriter,
     private readonly reviewRepository: MethodologyReviewRepository,
     dependencies: MethodologyReviewServiceDependencies = {},
   ) {
@@ -143,7 +153,7 @@ export class MethodologyReviewService {
       verdicts,
     })
 
-    await this.reviewRepository.recordSignOff({
+    const record: PackReviewSignOff = {
       id: this.createId(),
       packKey: pack.key,
       packVersion: pack.version,
@@ -152,9 +162,29 @@ export class MethodologyReviewService {
       note: parsed.note && parsed.note.trim() ? parsed.note.trim() : null,
       signedAt: this.now().toISOString(),
       verdicts,
-    })
+    }
+    await this.reviewRepository.recordSignOff(record)
+    await this.applyReviewOutcome(pack, record)
 
     return this.getWorkbench()
+  }
+
+  /**
+   * A conclusion takes effect immediately. One `needs_revision` withdraws the
+   * pack from use and every downstream judgment fails closed from that moment;
+   * marking everything usable again puts it straight back.
+   */
+  private async applyReviewOutcome(
+    pack: MethodologyPack,
+    signOff: PackReviewSignOff,
+  ): Promise<void> {
+    if (pack.status !== 'active') return
+    const persisted = await this.methodologyRepository.getPack(pack.key, pack.version)
+    if (!persisted) return
+    if (persisted.status !== 'active' && persisted.status !== 'review') return
+    const target = resolvePackRuntimeStatus(pack.status, signOff)
+    if (target === persisted.status) return
+    await this.methodologyRepository.setPackStatus(pack.key, pack.version, target)
   }
 
   private async buildPackView(pack: MethodologyPack): Promise<PackReviewView> {
@@ -212,12 +242,16 @@ export class MethodologyReviewService {
       }
     })
 
+    // What the consultant sees is what actually happens locally, not what the
+    // shipped file declares.
+    const effectiveStatus: PackLifecycleStatus = storedStatus ?? pack.status
+
     return {
       key: pack.key,
       version: pack.version,
       title: pack.title,
-      status: pack.status,
-      statusLabel: statusLabels[pack.status],
+      status: effectiveStatus,
+      statusLabel: statusLabels[effectiveStatus],
       statusDetail: statusDetail(pack, storedStatus, signOff, outdated),
       inUse: pack.status === 'active' && storedStatus === 'active',
       sourceLabel: sourceLabels[pack.sourceType],
@@ -235,7 +269,7 @@ export class MethodologyReviewService {
       review: signOff
         ? {
             decision: signOff.decision,
-            decisionLabel: signOff.decision === 'approved' ? '可以启用' : '需要修订',
+            decisionLabel: signOff.decision === 'approved' ? '全部可以用于判断' : '需要修订',
             decidedAt: signOff.signedAt,
             note: signOff.note,
             usableCount: signOff.verdicts.filter((item) => item.verdict === 'usable').length,

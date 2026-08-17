@@ -41,7 +41,13 @@ function secondActiveSbdVersion(pack: MethodologyPack): MethodologyPack {
 
 export function registryForProfile(profile: string): MethodologyRegistry {
   if (profile === 'review') {
-    return loadMethodologyRegistry(methodologyRoot, sourceManifestPath)
+    // The shipped packs are ready for use, so this profile states the withdrawn
+    // status explicitly instead of inheriting it from the repository fixture.
+    return new MethodologyRegistry(
+      repositoryPacks().map((pack) =>
+        withStatus(pack, pack.key === 'schooling-by-design' ? 'review' : 'active'),
+      ),
+    )
   }
 
   if (profile === 'retired') {

@@ -14,7 +14,7 @@ The Markdown `PACK.md` files remain the human-review baseline. The JSON files ar
 
 ## Review status
 
-Both machine-readable packs use `status = review`, not `active`.
+Both machine-readable packs used `status = review`, not `active`, at the end of this slice. **Superseded on 2026-08-17**: they now ship as `active` and a consultant withdraws them in-app instead. See `METHODOLOGY_PACK_ACTIVATION_STATUS.md`.
 
 The current Markdown proves a human-review baseline but does not prove that this specific machine translation has been explicitly approved as an active runtime standard. Activation requires a consultant review of the translated stable IDs, criterion wording, evidence guidance, boundaries/guardrails, source locators, source fingerprints, and canonical content hashes. This slice does not auto-activate packs.
 

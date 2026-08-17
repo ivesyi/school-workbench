@@ -57,13 +57,52 @@ describe('methodology runtime bootstrap', () => {
     const packs = database.client
       .prepare('SELECT key, status FROM methodology_packs ORDER BY key')
       .all() as Array<{ key: string; status: string }>
+    // Zero-maintenance default: a launch with no consultant action puts both
+    // packs straight into use.
     expect(packs).toEqual([
-      { key: 'data-wise', status: 'review' },
-      { key: 'schooling-by-design', status: 'review' },
+      { key: 'data-wise', status: 'active' },
+      { key: 'schooling-by-design', status: 'active' },
     ])
 
     const view = await runtime.service.getWorkbench()
     expect(view.state).toBe('ready')
+  })
+
+  it('keeps a withdrawn pack out of use across relaunches', async () => {
+    const paths = { methodologyRoot, sourceManifestPath, origin: 'repository' as const }
+    const first = await createMethodologyRuntime({ database, paths })
+    if (first.state !== 'ready') throw new Error('expected a ready methodology runtime')
+
+    const view = await first.service.getWorkbench()
+    if (view.state !== 'ready') throw new Error('expected a ready workbench')
+    const pack = view.packs.find((item) => item.key === 'schooling-by-design')
+    if (!pack) throw new Error('missing SBD pack')
+    await first.service.signOff({
+      packKey: pack.key,
+      packVersion: pack.version,
+      note: null,
+      verdicts: pack.criteria.map((criterion, index) => ({
+        criterionStableKey: criterion.stableKey,
+        verdict: index === 0 ? ('needs_revision' as const) : ('usable' as const),
+        note: null,
+      })),
+    })
+
+    // Relaunch: the shipped file still says the pack is ready for use.
+    const second = await createMethodologyRuntime({ database, paths })
+    if (second.state !== 'ready') throw new Error('expected a ready methodology runtime')
+
+    expect(
+      database.client
+        .prepare('SELECT key, status FROM methodology_packs ORDER BY key')
+        .all() as Array<{ key: string; status: string }>,
+    ).toEqual([
+      { key: 'data-wise', status: 'active' },
+      { key: 'schooling-by-design', status: 'review' },
+    ])
+    const relaunched = await second.service.getWorkbench()
+    if (relaunched.state !== 'ready') throw new Error('expected a ready workbench')
+    expect(relaunched.packs.find((item) => item.key === 'schooling-by-design')?.inUse).toBe(false)
   })
 
   it('degrades quietly when the methodology content cannot be read', async () => {

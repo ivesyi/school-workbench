@@ -6,12 +6,14 @@ import {
   projectMethodologyPack,
   type MethodologyPack,
   type MethodologyPackStatus,
+  type PackReviewCriterionVerdict,
 } from '@school-workbench/methodology'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { openWorkbenchDatabase, type WorkbenchDatabase } from './database'
 import { methodologyPacks } from './methodology-schema'
 import { SqliteMethodologyRepository } from './sqlite-methodology-repository'
+import { SqliteMethodologyReviewRepository } from './sqlite-methodology-review-repository'
 
 const migrationsFolder = resolve('packages/db/drizzle')
 const methodologyRoot = resolve('knowledge/methodology')
@@ -39,6 +41,7 @@ function packWithStatus(pack: MethodologyPack, status: MethodologyPackStatus): M
 describe('SqliteMethodologyRepository', () => {
   let database: WorkbenchDatabase
   let repository: SqliteMethodologyRepository
+  let reviewRepository: SqliteMethodologyReviewRepository
   let registry: MethodologyRegistry
 
   beforeEach(() => {
@@ -47,12 +50,45 @@ describe('SqliteMethodologyRepository', () => {
       database.db,
       () => new Date('2026-08-17T00:00:00Z'),
     )
+    reviewRepository = new SqliteMethodologyReviewRepository(
+      database.db,
+      () => new Date('2026-08-17T00:00:00Z'),
+    )
     registry = loadMethodologyRegistry(methodologyRoot, sourceManifestPath)
   })
 
   afterEach(() => database.close())
 
-  it('syncs both reviewed packs idempotently and round-trips the persisted projection', async () => {
+  async function recordSignOff(
+    id: string,
+    verdict: PackReviewCriterionVerdict['verdict'],
+    options: Readonly<{ contentHash?: string; signedAt?: string }> = {},
+  ): Promise<void> {
+    const pack = registry.getPack('schooling-by-design', '1')
+    if (!pack) throw new Error('missing SBD pack')
+    await reviewRepository.recordSignOff({
+      id,
+      packKey: pack.key,
+      packVersion: pack.version,
+      contentHash: options.contentHash ?? pack.canonicalContentHash.value,
+      decision: verdict === 'usable' ? 'approved' : 'changes_requested',
+      note: null,
+      signedAt: options.signedAt ?? '2026-08-17T09:00:00.000Z',
+      verdicts: pack.criteria.map((criterion) => ({
+        criterionStableKey: criterion.id,
+        verdict,
+        note: null,
+      })),
+    })
+  }
+
+  function sbdStatus(): Promise<string | undefined> {
+    return repository
+      .getPack('schooling-by-design', '1')
+      .then((persisted) => persisted?.status ?? undefined)
+  }
+
+  it('syncs both shipped packs idempotently and round-trips the persisted projection', async () => {
     await repository.syncRegistry(registry)
     await repository.syncRegistry(registry)
 
@@ -74,7 +110,7 @@ describe('SqliteMethodologyRepository', () => {
     expect(await repository.findCriteria({ practiceType: 'school_design' })).toHaveLength(5)
   })
 
-  it('allows review to active without changing immutable methodology content', async () => {
+  it('moves a pack out of use and back without changing immutable methodology content', async () => {
     await repository.syncRegistry(registry)
     const original = registry.getPack('schooling-by-design', '1')
     if (!original) throw new Error('missing SBD pack')
@@ -100,9 +136,12 @@ describe('SqliteMethodologyRepository', () => {
       )
       .get(beforePack.id) as { count: number }
 
-    const active = packWithStatus(original, 'active')
-    expect(active.canonicalContentHash.value).toBe(original.canonicalContentHash.value)
-    await repository.syncRegistry(new MethodologyRegistry([active]))
+    expect(beforePack.status).toBe('active')
+    const withdrawn = packWithStatus(original, 'review')
+    expect(withdrawn.canonicalContentHash.value).toBe(original.canonicalContentHash.value)
+    await repository.setPackStatus(original.key, original.version, 'review')
+    expect(await sbdStatus()).toBe('review')
+    await repository.setPackStatus(original.key, original.version, 'active')
 
     const afterPack = database.client
       .prepare(
@@ -120,10 +159,10 @@ describe('SqliteMethodologyRepository', () => {
       )
       .get(beforePack.id) as { count: number }
 
-    expect(afterPack).toEqual({ ...beforePack, status: 'active' })
+    expect(afterPack).toEqual(beforePack)
     expect(afterCriteria).toEqual(beforeCriteria)
     expect(afterAnchorCount).toEqual(beforeAnchorCount)
-    expect((await repository.getPack(original.key, original.version))?.status).toBe('active')
+    expect(await sbdStatus()).toBe('active')
   })
 
   it('rejects lifecycle rollback and skipped lifecycle states', async () => {
@@ -132,14 +171,82 @@ describe('SqliteMethodologyRepository', () => {
     if (!original) throw new Error('missing SBD pack')
 
     await expect(
-      repository.syncRegistry(new MethodologyRegistry([packWithStatus(original, 'retired')])),
-    ).rejects.toThrow(/review -> retired/)
+      repository.syncRegistry(new MethodologyRegistry([packWithStatus(original, 'draft')])),
+    ).rejects.toThrow(/active -> draft/)
 
-    const active = packWithStatus(original, 'active')
-    await repository.syncRegistry(new MethodologyRegistry([active]))
+    await repository.setPackStatus(original.key, original.version, 'review')
+    await expect(repository.setPackStatus(original.key, original.version, 'draft')).rejects.toThrow(
+      /review -> draft/,
+    )
     await expect(
-      repository.syncRegistry(new MethodologyRegistry([packWithStatus(original, 'review')])),
-    ).rejects.toThrow(/active -> review/)
+      repository.setPackStatus(original.key, original.version, 'retired'),
+    ).rejects.toThrow(/review -> retired/)
+    await expect(repository.setPackStatus('schooling-by-design', '9', 'review')).rejects.toThrow(
+      /not in the local database/,
+    )
+    expect(await sbdStatus()).toBe('review')
+  })
+
+  it('never restores a pack the consultant withdrew, however often the registry is synced', async () => {
+    await repository.syncRegistry(registry)
+    expect(await sbdStatus()).toBe('active')
+
+    // The consultant marks the content as needing revision; the file still says active.
+    await recordSignOff('sign-off-1', 'needs_revision')
+    await repository.setPackStatus('schooling-by-design', '1', 'review')
+
+    // Every subsequent launch re-reads the same active file registry.
+    await repository.syncRegistry(registry)
+    await repository.syncRegistry(registry)
+
+    expect(await sbdStatus()).toBe('review')
+    expect(
+      database.client
+        .prepare("SELECT status FROM methodology_packs WHERE key = 'schooling-by-design'")
+        .get(),
+    ).toEqual({ status: 'review' })
+  })
+
+  it('honours a veto recorded against content that has since drifted', async () => {
+    await repository.syncRegistry(registry)
+    // A refusal made before the content changed must not be washed out by the edit.
+    await recordSignOff('sign-off-drifted', 'needs_revision', { contentHash: 'a'.repeat(64) })
+    await repository.setPackStatus('schooling-by-design', '1', 'review')
+
+    await repository.syncRegistry(registry)
+
+    expect(await sbdStatus()).toBe('review')
+  })
+
+  it('puts the pack back in use only after the consultant says every criterion is usable', async () => {
+    await repository.syncRegistry(registry)
+    await recordSignOff('sign-off-1', 'needs_revision')
+    await repository.setPackStatus('schooling-by-design', '1', 'review')
+    await repository.syncRegistry(registry)
+    expect(await sbdStatus()).toBe('review')
+
+    await recordSignOff('sign-off-2', 'usable', { signedAt: '2026-08-17T10:00:00.000Z' })
+    await repository.syncRegistry(registry)
+
+    expect(await sbdStatus()).toBe('active')
+  })
+
+  it('withdraws a pack at sync time when a veto was recorded while the app was closed', async () => {
+    await repository.syncRegistry(registry)
+    expect(await sbdStatus()).toBe('active')
+
+    await recordSignOff('sign-off-1', 'needs_revision')
+    await repository.syncRegistry(registry)
+
+    expect(await sbdStatus()).toBe('review')
+  })
+
+  it('projects a vetoed pack straight into review on a database that never saw it', async () => {
+    await recordSignOff('sign-off-1', 'needs_revision')
+    await repository.syncRegistry(registry)
+
+    expect(await sbdStatus()).toBe('review')
+    expect((await repository.getPack('data-wise', '3'))?.status).toBe('active')
   })
 
   it('refuses to revive a retired pack', async () => {
