@@ -1,0 +1,56 @@
+name: Workbench MCP Read Plane Temp Verify
+
+on:
+  push:
+    branches:
+      - feat-workbench-mcp-read-plane-20260817
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: ${{ !contains(github.event.head_commit.message, '[generated]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat-workbench-mcp-read-plane-20260817
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+      - name: Install and refresh lockfile
+        run: pnpm install --no-frozen-lockfile
+      - name: Format generated and changed files
+        run: pnpm format:write
+      - name: Commit generated artifacts
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(mcp): refresh lockfile and formatting [generated]"
+            git push origin HEAD:feat-workbench-mcp-read-plane-20260817
+          fi
+      - name: Drizzle no drift
+        run: |
+          pnpm db:generate
+          git diff --exit-code -- packages/db/drizzle
+      - name: Format
+        run: pnpm format
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Test
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+      - name: E2E
+        run: xvfb-run -a pnpm test:e2e
