@@ -1,5 +1,6 @@
 # Documentation
 
+- `development/PROJECT_HANDOFF.md`：当前项目基线、已验证能力、待修审查项和后续关键路径；新 Agent 从这里接管。
 - `product/`：用户问题、产品边界、体验与业务闭环。
 - `architecture/`：系统架构、协议、技术边界及 Architecture Decision Records。
 - `data/`：Canonical Data Model、约束和迁移原则。
