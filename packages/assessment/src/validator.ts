@@ -80,11 +80,7 @@ function parseCandidate(
   return deepFreeze({ ok: true, candidate: parsed.data as AssessmentCandidate })
 }
 
-function methodologyRefKey(ref: {
-  packKey: string
-  version: string
-  criterionId: string
-}): string {
+function methodologyRefKey(ref: { packKey: string; version: string; criterionId: string }): string {
   return `${ref.packKey}@${ref.version}#${ref.criterionId}`
 }
 
@@ -202,7 +198,10 @@ export function validateAssessmentCandidate(
     }
   }
 
-  for (const [index, evidenceRef] of candidate.counterEvidenceSearch.searchedEvidenceRefs.entries()) {
+  for (const [
+    index,
+    evidenceRef,
+  ] of candidate.counterEvidenceSearch.searchedEvidenceRefs.entries()) {
     if (!evidenceIds.has(evidenceRef)) {
       errors.push(
         protocolError(

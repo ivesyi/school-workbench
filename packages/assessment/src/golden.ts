@@ -61,7 +61,9 @@ function sameCodes(
 ): boolean {
   const actual = sortedCodes(actualCodes)
   const expected = sortedCodes(expectedCodes)
-  return actual.length === expected.length && actual.every((code, index) => code === expected[index])
+  return (
+    actual.length === expected.length && actual.every((code, index) => code === expected[index])
+  )
 }
 
 function summarizeResult(
@@ -98,11 +100,7 @@ export function runGoldenCase(
   goldenCase: GoldenCase,
   registry: MethodologyRegistry,
 ): GoldenCaseResult {
-  const validation = validateAssessmentCandidate(
-    goldenCase.input,
-    goldenCase.candidate,
-    registry,
-  )
+  const validation = validateAssessmentCandidate(goldenCase.input, goldenCase.candidate, registry)
   if (validation.ok) {
     return summarizeResult(goldenCase, 'pass', [], null)
   }
@@ -141,11 +139,6 @@ export async function runGoldenCaseWithAdapter(
       adapter.id,
     )
   } catch {
-    return summarizeResult(
-      goldenCase,
-      'fail',
-      ['ASSESSMENT_RUNTIME_ADAPTER_ERROR'],
-      adapter.id,
-    )
+    return summarizeResult(goldenCase, 'fail', ['ASSESSMENT_RUNTIME_ADAPTER_ERROR'], adapter.id)
   }
 }
