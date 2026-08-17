@@ -54,6 +54,15 @@ Consequences that follow from the above and are not defects of this slice:
 - `GroundedDiagnosisService` still cannot resolve criterion references against a persisted active Pack, so it stays off the live flow.
 - The `dimensionKeys` filter of `standards_get` remains inert for these Packs; only `practiceType` and `criterionRefs` select anything.
 
+### Addendum (2026-08-17, commit `fcd4981`)
+
+The table above records the content as it stood at commit `ab08537`. Two rows have since changed and the "all still true" claim no longer holds for them:
+
+- The consultant assigned every criterion to a congruence dimension, so `dimensionKey` is now populated for 10 / 10 criteria and the `dimensionKeys` filter of `standards_get` is no longer inert. The mapping is the consultant's own professional judgment; it is not derived from `WORKBENCH-METHODOLOGY-CROSSWALK.md`, which deliberately does not map criteria onto the congruence dimensions. **The rationale for each assignment is not yet recorded anywhere and should be.**
+- The Packs kept `version` 1 and 3 while their content changed, so `canonicalContentHash` was recomputed in place. Any SQLite projection persisted from the earlier content will now be rejected by `syncRegistry` with `already exists with different content`; such a database must be discarded or the Packs must be re-versioned before the projection can be refreshed.
+
+Every other row is unchanged, and no Pack has been activated.
+
 Outstanding work list for a later slice ("补翻译"), explicitly **not** done here:
 
 1. Write a real `description` for each of the ten criteria from the printed source, distinct from the title.

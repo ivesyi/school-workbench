@@ -46,15 +46,15 @@ unarchive  fork  cloud  exec-server  features  help
 
 **适配层：`@agentclientprotocol/codex-acp`，就是 SPEC 第 12 章写的 `codex-acp`。** 我独立向 npm registry 核实（未安装）：
 
-| 项 | 值 |
-|---|---|
-| 包名 | `@agentclientprotocol/codex-acp` |
-| 最新版本 | **1.4.0**，发布于 **2026-08-16**（写这份报告的前一天） |
-| bin | `codex-acp` → `dist/index.js` |
-| 仓库 | `github.com/agentclientprotocol/codex-acp` |
-| 依赖 | **`@openai/codex: ^0.147.0`**、`@agentclientprotocol/sdk: ^1.3.0`、`vscode-jsonrpc ^9`、`zod ^4`、`diff ^9`、`open ^11` |
-| 许可 | Apache 2.0 |
-| 维护节奏 | 1.1.10 → 1.4.0 共 8 个版本发布于 2026-08-06 ~ 08-16（10 天） |
+| 项       | 值                                                                                                                      |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 包名     | `@agentclientprotocol/codex-acp`                                                                                        |
+| 最新版本 | **1.4.0**，发布于 **2026-08-16**（写这份报告的前一天）                                                                  |
+| bin      | `codex-acp` → `dist/index.js`                                                                                           |
+| 仓库     | `github.com/agentclientprotocol/codex-acp`                                                                              |
+| 依赖     | **`@openai/codex: ^0.147.0`**、`@agentclientprotocol/sdk: ^1.3.0`、`vscode-jsonrpc ^9`、`zod ^4`、`diff ^9`、`open ^11` |
+| 许可     | Apache 2.0                                                                                                              |
+| 维护节奏 | 1.1.10 → 1.4.0 共 8 个版本发布于 2026-08-06 ~ 08-16（10 天）                                                            |
 
 **关键巧合值得记一笔**：codex-acp 1.4.0 依赖 `@openai/codex@^0.147.0`，与本机已装的 codex 0.147.0 **完全同版本**。
 
@@ -68,7 +68,7 @@ npm install -g @agentclientprotocol/codex-acp && codex-acp --version
 CODEX_PATH=/path/to/codex npx -y @agentclientprotocol/codex-acp
 ```
 
-README 自述：*"`codex-acp` is a stdio ACP agent server. It starts the Codex App Server, translates ACP requests into Codex operations, and maps Codex events back into the client."*
+README 自述：_"`codex-acp` is a stdio ACP agent server. It starts the Codex App Server, translates ACP requests into Codex operations, and maps Codex events back into the client."_
 
 它的运行时环境变量：`CODEX_API_KEY` / `OPENAI_API_KEY` / `CODEX_PATH` / `CODEX_CONFIG`（JSON，merge 进 session config）/ `MODEL_PROVIDER` / `DEFAULT_AUTH_REQUEST` / `INITIAL_AGENT_MODE`（`read-only|agent|agent-full-access`）/ `NO_BROWSER` / `APP_SERVER_LOGS`。
 
@@ -151,19 +151,19 @@ codex mcp add [OPTIONS] <NAME> (--url <URL> | -- <COMMAND>...)
 
 ```ts
 function shouldDeduplicateMcpConflicts(): boolean {
-    const disabledByEnv = process.env["DISABLE_MCP_CONFIG_FILTERING"] === "true";
-    return !disabledByEnv;
+  const disabledByEnv = process.env['DISABLE_MCP_CONFIG_FILTERING'] === 'true'
+  return !disabledByEnv
 }
 ```
 
-即**默认开启**。开启时会先读现有 config 的 server 名（含所有 config layer），**同名的会被过滤掉、不配置**（注释：*"Prevents Codex from deep-merging incompatible field types, such as url and stdio schemas."*）。所以 MCP server 名要选一个不可能与顾问全局 `~/.codex/config.toml` 撞车的。
+即**默认开启**。开启时会先读现有 config 的 server 名（含所有 config layer），**同名的会被过滤掉、不配置**（注释：_"Prevents Codex from deep-merging incompatible field types, such as url and stdio schemas."_）。所以 MCP server 名要选一个不可能与顾问全局 `~/.codex/config.toml` 撞车的。
 
 `sanitizeMcpServerName()` 的实现很温和（`src/McpServerName.ts` 全文）：
 
 ```ts
-const MCP_SERVER_NAME_WHITESPACE = /\p{White_Space}/gu;
+const MCP_SERVER_NAME_WHITESPACE = /\p{White_Space}/gu
 export function sanitizeMcpServerName(name: string): string {
-    return name.replace(MCP_SERVER_NAME_WHITESPACE, "_");
+  return name.replace(MCP_SERVER_NAME_WHITESPACE, '_')
 }
 ```
 
@@ -178,14 +178,14 @@ export function sanitizeMcpServerName(name: string): string {
 
 ## A5. ACP 协议现状（联网查证）
 
-| 项 | 结论 | 来源 |
-|---|---|---|
-| 仓库 | 已从 `zed-industries/agent-client-protocol` 迁到独立组织 **`agentclientprotocol/agent-client-protocol`** | https://github.com/agentclientprotocol/agent-client-protocol |
-| 规范站 | https://agentclientprotocol.com | 同上 |
-| 稳定协议版本 | **v1**（README：*"The current stable ACP protocol version is `1`."*；`schema/v1/meta.json` 里 `"version": 1`） | https://raw.githubusercontent.com/agentclientprotocol/agent-client-protocol/main/schema/v1/meta.json |
-| v2 | **草案**，官方明说 *"ACP v2 is still a draft. Its wire protocol and the TypeScript API may change incompatibly in any SDK release."* | 官方 docs |
-| 活跃度 | `schema/v1/CHANGELOG.md` 更新到 **1.20.0 / 2026-07-21** | 同仓库 |
-| 治理 | **查不到**。没找到 governance 文档，没找到捐给基金会的证据（对比：MCP 已于 2025-12-09 进入 Linux Foundation 的 Agentic AI Foundation）。只能说「还在那个 GitHub 组织下」 | — |
+| 项           | 结论                                                                                                                                                                     | 来源                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| 仓库         | 已从 `zed-industries/agent-client-protocol` 迁到独立组织 **`agentclientprotocol/agent-client-protocol`**                                                                 | https://github.com/agentclientprotocol/agent-client-protocol                                         |
+| 规范站       | https://agentclientprotocol.com                                                                                                                                          | 同上                                                                                                 |
+| 稳定协议版本 | **v1**（README：_"The current stable ACP protocol version is `1`."_；`schema/v1/meta.json` 里 `"version": 1`）                                                           | https://raw.githubusercontent.com/agentclientprotocol/agent-client-protocol/main/schema/v1/meta.json |
+| v2           | **草案**，官方明说 _"ACP v2 is still a draft. Its wire protocol and the TypeScript API may change incompatibly in any SDK release."_                                     | 官方 docs                                                                                            |
+| 活跃度       | `schema/v1/CHANGELOG.md` 更新到 **1.20.0 / 2026-07-21**                                                                                                                  | 同仓库                                                                                               |
+| 治理         | **查不到**。没找到 governance 文档，没找到捐给基金会的证据（对比：MCP 已于 2025-12-09 进入 Linux Foundation 的 Agentic AI Foundation）。只能说「还在那个 GitHub 组织下」 | —                                                                                                    |
 
 **方法面（直接读 `schema/v1/meta.json`，非记忆）**：
 
@@ -195,18 +195,18 @@ export function sanitizeMcpServerName(name: string): string {
 
 **SDK**（向 npm / crates.io registry 实查）：
 
-| 包 | registry | 最新 | 说明 |
-|---|---|---|---|
-| **`@agentclientprotocol/sdk`** | npm | **1.3.0** | 当前正牌 TS SDK；实现 ACP **client**（我们这一侧）用它的 `client()` fluent API。旧的 `AgentSideConnection` / `ClientSideConnection` 类已 deprecated |
-| `@zed-industries/agent-client-protocol` | npm | 0.4.5 | 旧名，npm 页面自己写了已更名，仅向后兼容 |
-| `agent-client-protocol` | crates.io | 2.0.0 | Rust 核心类型 |
-| `agent-client-protocol` | PyPI | 0.12.1 | 社区 Python 实现 |
+| 包                                      | registry  | 最新      | 说明                                                                                                                                                |
+| --------------------------------------- | --------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`@agentclientprotocol/sdk`**          | npm       | **1.3.0** | 当前正牌 TS SDK；实现 ACP **client**（我们这一侧）用它的 `client()` fluent API。旧的 `AgentSideConnection` / `ClientSideConnection` 类已 deprecated |
+| `@zed-industries/agent-client-protocol` | npm       | 0.4.5     | 旧名，npm 页面自己写了已更名，仅向后兼容                                                                                                            |
+| `agent-client-protocol`                 | crates.io | 2.0.0     | Rust 核心类型                                                                                                                                       |
+| `agent-client-protocol`                 | PyPI      | 0.12.1    | 社区 Python 实现                                                                                                                                    |
 
 **ACP × MCP 的关系（直接读 `schema/v1/schema.json`）**：
 
 - `NewSessionRequest` 的 `"required"` 是 `["cwd", "mcpServers"]` —— **`mcpServers` 是必填字段**（空数组也得给）
 - `McpServer` 是按 `"type"` 标签的判别联合：
-  - stdio（默认变体，无需 `type` 标签）→ `McpServerStdio`，字段 `name` / `command`（"Absolute path to the MCP server executable"）/ `args` / `env`（`EnvVariable[]`），required 全部四个。规范原文：***"All Agents MUST support this transport."***
+  - stdio（默认变体，无需 `type` 标签）→ `McpServerStdio`，字段 `name` / `command`（"Absolute path to the MCP server executable"）/ `args` / `env`（`EnvVariable[]`），required 全部四个。规范原文：_**"All Agents MUST support this transport."**_
   - `"type": "http"` → `McpServerHttp`：`name` / `url` / `headers`（`HttpHeader{name,value}[]`）。仅当 agent 广播 `mcp_capabilities.http === true` 时可用
   - `"type": "sse"` → `McpServerSse`：同上，需 `mcp_capabilities.sse`
 - 规范文档锚点：https://agentclientprotocol.com/protocol/session-setup#mcp-servers
@@ -241,15 +241,15 @@ SPEC 第 8 章把「DeepSeek Harness」和「Codex」并列写成 V1 首批 runt
 
 ## B1. 各退路方案（若 Codex 路真的塌了）
 
-| 方案 | 驱动方式 | MCP 支持 | 与 SPEC 偏离度 |
-|---|---|---|---|
-| **Gemini CLI + 原生 ACP** | `gemini --acp`（stdio ACP server） | ACP `session/new` 原生带 `mcpServers` | **零协议偏离**（ACP + MCP 都满足）。偏离点只在 SPEC 第 8 章的「首批 = DSH + Codex」名单，需要改名单。本机未装 |
-| **OpenCode + 原生 ACP** | `opencode acp` | 同上 | 同上，零协议偏离，改名单即可。本机未装 |
-| **Claude Code + `claude-agent-acp` 适配器** | `claude-agent-acp`（0.69.0） | 走 ACP `mcpServers` | 零协议偏离，改名单。本机已装 claude 2.1.233，但适配器未装 |
-| **Claude Code 裸 CLI（不走 ACP）** | `claude -p --input-format stream-json --output-format stream-json --mcp-config <file> --strict-mcp-config`（本机 `claude --help` 实测有这些 flag） | 有，`--mcp-config` + `--strict-mcp-config`（只用指定的，忽略全局） | **严重偏离**：绕开 ACP，Agent Host 变成 Claude 私有 stream-json 协议的宿主，直接违反 SPEC 第 3、7、8 章。而且 SPEC 第 64 章「Workbench 不依赖 Codex 内部私有结构」的同类原则在这里被打破 |
-| **cursor-agent 裸 CLI** | `cursor-agent -p --output-format stream-json`（本机 2026.07.09-a3815c0 实测），`--approve-mcps` | 有 `cursor-agent mcp` | 同上，严重偏离 |
-| **Codex `app-server`（不走 codex-acp）** | `codex app-server --listen stdio://`，用 `codex app-server generate-ts` 生成 TS 绑定 | 走 Codex session config 的 `mcp_servers` | **中度偏离 + 明确违反 SPEC 第 64 章**（"Workbench 不依赖 Codex 内部 Session / DB / **App Server** 私有结构"）。而且 app-server 自带 `[experimental]` 标记 |
-| **Codex `exec` 一次性调用** | `codex exec --json --output-schema ... -c mcp_servers.xxx=...` | 靠 `-c` 覆盖注入 | **严重偏离**：没有 session、没有 permission、没有 cancel，SPEC 第 7 章的 Agent Host 生命周期只剩一半 |
+| 方案                                        | 驱动方式                                                                                                                                           | MCP 支持                                                           | 与 SPEC 偏离度                                                                                                                                                                           |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gemini CLI + 原生 ACP**                   | `gemini --acp`（stdio ACP server）                                                                                                                 | ACP `session/new` 原生带 `mcpServers`                              | **零协议偏离**（ACP + MCP 都满足）。偏离点只在 SPEC 第 8 章的「首批 = DSH + Codex」名单，需要改名单。本机未装                                                                            |
+| **OpenCode + 原生 ACP**                     | `opencode acp`                                                                                                                                     | 同上                                                               | 同上，零协议偏离，改名单即可。本机未装                                                                                                                                                   |
+| **Claude Code + `claude-agent-acp` 适配器** | `claude-agent-acp`（0.69.0）                                                                                                                       | 走 ACP `mcpServers`                                                | 零协议偏离，改名单。本机已装 claude 2.1.233，但适配器未装                                                                                                                                |
+| **Claude Code 裸 CLI（不走 ACP）**          | `claude -p --input-format stream-json --output-format stream-json --mcp-config <file> --strict-mcp-config`（本机 `claude --help` 实测有这些 flag） | 有，`--mcp-config` + `--strict-mcp-config`（只用指定的，忽略全局） | **严重偏离**：绕开 ACP，Agent Host 变成 Claude 私有 stream-json 协议的宿主，直接违反 SPEC 第 3、7、8 章。而且 SPEC 第 64 章「Workbench 不依赖 Codex 内部私有结构」的同类原则在这里被打破 |
+| **cursor-agent 裸 CLI**                     | `cursor-agent -p --output-format stream-json`（本机 2026.07.09-a3815c0 实测），`--approve-mcps`                                                    | 有 `cursor-agent mcp`                                              | 同上，严重偏离                                                                                                                                                                           |
+| **Codex `app-server`（不走 codex-acp）**    | `codex app-server --listen stdio://`，用 `codex app-server generate-ts` 生成 TS 绑定                                                               | 走 Codex session config 的 `mcp_servers`                           | **中度偏离 + 明确违反 SPEC 第 64 章**（"Workbench 不依赖 Codex 内部 Session / DB / **App Server** 私有结构"）。而且 app-server 自带 `[experimental]` 标记                                |
+| **Codex `exec` 一次性调用**                 | `codex exec --json --output-schema ... -c mcp_servers.xxx=...`                                                                                     | 靠 `-c` 覆盖注入                                                   | **严重偏离**：没有 session、没有 permission、没有 cancel，SPEC 第 7 章的 Agent Host 生命周期只剩一半                                                                                     |
 
 **推荐顺位**：Codex + codex-acp（首选，已验证）→ Gemini CLI 或 OpenCode 原生 ACP（若 codex-acp 出事，换 runtime 比换协议便宜得多）→ 其余都要先改 SPEC。
 
@@ -353,7 +353,7 @@ claimFacts            数组（可空），每条 { claimId, factId, stance ∈ 
 methodologyContext    数组（可空），每条 { packKey, version, criterionId }
 ```
 
-长度约束：id ≤200；shortText 1~1000；longText 1~20000（`contracts.ts:4-6`）。
+长度约束：id ≤200；shortText 1~~1000；longText 1~~20000（`contracts.ts:4-6`）。
 
 Input 的交叉校验（`context.ts:152-352`）：所有 id 去重；`activeStage.schoolId` / 每条 target/evidence/fact/claim 的 `schoolId` 及 `claim.scope.schoolId` 必须 === `school.schoolId`；每条 target 的 `stageId` 必须 === `activeStage.id`；每条 fact 的 `evidenceId` 必须在 `evidence` 里；每条 claimFact 的 `claimId`/`factId` 必须都在；`methodologyContext` 每条必须 `registry.getPack()` 找得到 **且 `status === 'active'` 且 criterion 存在**。
 
@@ -418,8 +418,10 @@ export interface AssessmentRuntimeAdapter {
 }
 
 export async function runGoldenCaseWithAdapter(
-  goldenCase, registry, adapter
-): Promise<GoldenCaseResult>   // 失败自动归类为 ASSESSMENT_RUNTIME_ADAPTER_ERROR
+  goldenCase,
+  registry,
+  adapter,
+): Promise<GoldenCaseResult> // 失败自动归类为 ASSESSMENT_RUNTIME_ADAPTER_ERROR
 ```
 
 **意味着「真 AI 能不能产出合格候选」这件事，可以在不启动 Electron、不接 ACP 的情况下先单独验证**（把 codex-acp 包成一个 `AssessmentRuntimeAdapter` 跑 golden 套件）。这应该是本轮的第一个可验证里程碑，而不是最后一个。
@@ -445,6 +447,7 @@ GroundedDiagnosisService.create({ schoolId, type, title,
 **写面 tool 基本上只需要**：新增 `diagnosis.propose` scope → loopback 加一条 POST 路由 → service 方法转调 `GroundedDiagnosisService.create` → MCP 侧注册 tool（inputSchema 用 `assessmentCandidateSchema` 派生）。**没有新 domain 逻辑要写。**
 
 ⚠️ 但有两处必须动的地方：
+
 - `packages/workbench-read-plane/src/auth.ts:49, 101-103` 的 `READ_SCOPE_SET` 只认 6 个 read scope，写 scope 会被 `issue()` 直接 throw
 - `loopback.ts:37` 的 `statusFor()` 与 `ReadPlaneApiErrorCode` 联合类型没有涵盖 assessment 协议错误，需要扩展错误映射（34 个 `ASSESSMENT_*` 码要么透传要么折叠）
 - `GroundedDiagnosisService` **当前完全没有在 Electron main 里被实例化**（`apps/desktop/src/main/index.ts` 只 new 了 School/Judgment/Stage/State 四个 service）
@@ -502,6 +505,7 @@ queued  running  needs_input  completed  failed  cancelled
 **规模**：`diagnosis_propose` 中等偏小（后端全有，主要是接线 + 错误映射）；`evidence_register` 中等（要新写 service + 迁移）。
 
 **最大风险点**：
+
 1. **错误面的爆炸**。`validateAssessmentCandidate` 会吐 34 种 `ASSESSMENT_*` 码，而 loopback 现有的错误信封只有 5 个 `ReadPlaneErrorCode` + 7 个 `CapabilityAuthErrorCode`（`contracts.ts:117-118`、`auth.ts:4-12`）。设计上要决定：**把结构化 errors 数组原样返给 Agent（让它自我纠正）还是折叠成一个码（保护信息面）**。前者对模型迭代友好，后者对 SPEC 第 24 章「不能用额外布尔位或宽松 DTO 绕过 validation gate」的精神更安全。**这是判断题，不是实现题。**
 2. **写 scope 一旦引入，`READ_SCOPE_SET` 的白名单就不再是「只读」的保证。** 当前 `auth.ts:101-103` 这行是最后一道结构性防线（「Only frozen read scopes can be issued in this slice」）。放开它之后，SPEC 第 25 章禁止的 `diagnosis_accept / diagnosis_reject / state_commit / stage_activate` 就只靠「没写这些 tool」在挡，而不是靠类型系统。**建议把禁止清单做成一个显式的 negative 常量 + 测试，而不是靠「没实现」。**
 3. `evidence_register` 的去重语义：contentHash 怎么算（inlineText 的规范化？uri 的规范化？）SPEC 没写，**需要先定契约**。
@@ -513,6 +517,7 @@ queued  running  needs_input  completed  failed  cancelled
 **规模**：**本轮最大的一块。** ACP client 要实现 11 个 client-side 方法（`session/update`、`session/request_permission`、`fs/read_text_file`、`fs/write_text_file`、`terminal/*` 5 个、`elicitation/*` 2 个），加 runtime discovery / spawn / 生命周期 / 六态状态机 / 三张新表 / IPC。
 
 **最大风险点**：
+
 1. **`session/update` 是流式的、事件形状极多。** codex-acp README 列的事件种类：shell command、file change、permission request、MCP tool call、terminal output、reasoning、plan、web search、image generation、image view、token usage、review、subagent。**Agent Host 必须对未知事件类型 fail-open（忽略并继续）而不是 fail-closed**，否则 codex-acp 每次发版都可能打挂 Workbench——这直接关系到 SPEC 第 64 章「Codex 独立升级」能不能成立。
 2. **`fs/*` 与 `terminal/*` 是 client 侧方法，意味着 Agent 可以要求 Workbench 读写文件和开终端。** SPEC 第 7 章说 Agent Host「不放任何学校业务逻辑」，但没说这些能力给不给。**给了就等于 Agent 有了 MCP 之外的第二条访问路径，与 SPEC 第 13 章「Workbench MCP 是 Agent 访问 Workbench Domain 的唯一正式接口」直接张力。** 建议：`fs/*` 严格限制在 run 的 cwd 沙箱内且不含 Workbench 数据目录；`terminal/*` 保留（SPEC 第 27 章要求 Agent 通过 shell 调 `lark-cli`，那正是 terminal 能力）。**这条必须先想清楚再写代码。**
 3. **`session/new` 的 `cwd` 给什么？** ACP 规范里 `cwd` 是必填。Workbench 是 local-first 桌面应用，没有「项目目录」概念。给用户数据目录会让 Agent 能读 SQLite（违反 SPEC 第 5 章「Renderer 不访问 SQLite」的同源精神），给临时目录则 `lark-cli` 的工作区语义要另外安排。**未解决的设计问题。**
@@ -531,19 +536,20 @@ queued  running  needs_input  completed  failed  cancelled
 ```jsonc
 // ACP session/new 的 mcpServers 里放一条：
 {
-  "name": "school_workbench",              // 会过 sanitizeMcpServerName()
-  "command": "<绝对路径>/node",             // 规范要求 absolute path
+  "name": "school_workbench", // 会过 sanitizeMcpServerName()
+  "command": "<绝对路径>/node", // 规范要求 absolute path
   "args": ["<绝对路径>/workbench-mcp/dist/stdio.js"],
   "env": [
-    {"name": "SWB_ENDPOINT",     "value": "http://127.0.0.1:<port>/internal/v1"},
-    {"name": "SWB_TOKEN",        "value": "<32~512 字符 base64url>"},
-    {"name": "SWB_SCHOOL_ID",    "value": "<schoolId>"},
-    {"name": "SWB_AGENT_RUN_ID", "value": "<agentRunId>"}
-  ]
+    { "name": "SWB_ENDPOINT", "value": "http://127.0.0.1:<port>/internal/v1" },
+    { "name": "SWB_TOKEN", "value": "<32~512 字符 base64url>" },
+    { "name": "SWB_SCHOOL_ID", "value": "<schoolId>" },
+    { "name": "SWB_AGENT_RUN_ID", "value": "<agentRunId>" },
+  ],
 }
 ```
 
 **最大风险点**：
+
 1. **依赖链是三层第三方叠加**：`codex-acp@1.4.0` → `@openai/codex@^0.147.0` → OpenAI 后端。codex-acp 10 天发了 8 个版本，**必须 pin 精确版本并做升级契约测试**，否则 SPEC 第 64 章的「独立升级」会变成「随机爆炸」。
 2. **`shouldDeduplicateMcpConflicts()` 的同名跳过逻辑默认开启**（`CodexAcpClient.ts:609-613` + `:1252-1255`，默认 true）：如果顾问的 `~/.codex/config.toml`（或任何 config layer）里恰好有同名 server，我们的注入会被**静默过滤掉**，表现为「Agent 看不到 workbench tool」且没有明显报错。**server 名必须选一个极不可能撞车的**，并且 Agent Host 必须在 `session/new` 之后主动验证 tool 列表（codex-acp 侧有 `awaitMcpServerStartup(serverNames, afterVersion)` 机制可借鉴）。逃生阀是给子进程设 `DISABLE_MCP_CONFIG_FILTERING=true`，但那会让 Codex 去深合并两套不兼容 schema，不推荐。
 3. **认证是用户级的，不是应用级的。** codex-acp 支持 ChatGPT login / `CODEX_API_KEY` / `OPENAI_API_KEY` / 自定义 gateway。顾问的 Codex 已登录（SPEC 第 12 章「优先使用顾问现有 System Codex」），但 `CODEX_PATH` 不设时 codex-acp 用**它自己 bundle 的那份 codex**，凭据是否共享（`CODEX_HOME`）需要实测。**未验证。**
