@@ -130,6 +130,7 @@ function baseApi(stateView: StateWorkspaceView = draft): WorkbenchApi {
       list: vi.fn(),
       create: vi.fn(),
       get: vi.fn().mockResolvedValue(school),
+      archive: vi.fn(),
     },
     judgments: {
       review: vi.fn(),
@@ -152,6 +153,7 @@ function baseApi(stateView: StateWorkspaceView = draft): WorkbenchApi {
     settings: {
       getAssistant: vi.fn().mockResolvedValue({
         selected: 'codex',
+        localTools: [],
         options: [{ key: 'codex', label: 'Codex', availability: 'ready', detail: null }],
       }),
       chooseAssistant: vi.fn(),

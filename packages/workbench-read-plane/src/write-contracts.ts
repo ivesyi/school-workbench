@@ -152,10 +152,70 @@ export const diagnosisProposeInputSchema = z
   })
   .strict()
 
+/**
+ * One five-dimension stage target the Agent proposes (PRD 11).
+ *
+ * The canonical dimension set is fixed by the domain, so the payload has to
+ * name all five explicitly; a proposal that omits one is fail-closed at the
+ * schema rather than half-persisted.
+ */
+export const stageTargetDraftSchema = z
+  .object({
+    title: shortTextSchema,
+    description: longTextSchema,
+  })
+  .strict()
+
+/**
+ * An initial Stage proposal for a school that has no current stage.
+ *
+ * This is the only write tool that may run when the school has no Stage yet;
+ * `diagnosis_propose` still fails closed in that state. The Agent proposes the
+ * wording, the consultant confirms it through the Workbench UI, and only then
+ * does the Stage become `active` with confirmed targets (SPEC 25).
+ */
+export const stageProposeInputSchema = z
+  .object({
+    schoolId: idSchema.optional(),
+    title: shortTextSchema,
+    summary: shortTextSchema,
+    focus: longTextSchema,
+    targets: z
+      .object({
+        leadership: stageTargetDraftSchema,
+        key_tasks: stageTargetDraftSchema,
+        structure: stageTargetDraftSchema,
+        culture: stageTargetDraftSchema,
+        capability: stageTargetDraftSchema,
+      })
+      .strict(),
+  })
+  .strict()
+
 export type EvidenceRegisterInput = z.infer<typeof evidenceRegisterInputSchema>
 export type RegisterObservationFactInput = z.infer<typeof registerObservationFactSchema>
 export type RegisterClaimInput = z.infer<typeof registerClaimSchema>
 export type DiagnosisProposeInput = z.infer<typeof diagnosisProposeInputSchema>
+export type StageProposeInput = z.infer<typeof stageProposeInputSchema>
+
+export type StageProposalDto = Readonly<{
+  stageId: string
+  title: string
+  summary: string
+  focus: string
+  status: 'planned'
+  targets: readonly Readonly<{
+    dimensionKey: string
+    title: string
+    description: string
+  }>[]
+}>
+
+export type StageProposalCommand = Readonly<{
+  schoolId: string
+  agentRunId: string
+  input: StageProposeInput
+}>
 
 export type RegisteredRef = Readonly<{
   /** The local handle the Agent used in this call. */
@@ -201,6 +261,7 @@ export type RegisterEvidenceCommand = Readonly<{
  */
 export interface WritePlaneRepository {
   registerEvidence(command: RegisterEvidenceCommand): Promise<EvidenceRegistrationDto>
+  saveStageProposal(command: StageProposalCommand): Promise<StageProposalDto>
   buildAssessmentInput(schoolId: string): Promise<unknown>
 }
 

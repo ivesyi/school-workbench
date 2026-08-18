@@ -43,4 +43,10 @@ export class SchoolService {
     const school = await this.repository.findById(schoolIdSchema.parse(id))
     return school ? this.toSchoolView(school) : null
   }
+
+  async archive(id: string): Promise<void> {
+    const schoolId = schoolIdSchema.parse(id)
+    const archived = await this.repository.archive(schoolId, new Date().toISOString())
+    if (!archived) throw new Error('这所学校已归档或不存在，暂时无法再次归档。')
+  }
 }

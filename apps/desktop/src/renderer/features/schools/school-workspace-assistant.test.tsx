@@ -103,18 +103,39 @@ function agentRun(overrides: Partial<AgentRunView> = {}): AgentRunView {
   }
 }
 
+const activeStage = {
+  state: 'active' as const,
+  stage: {
+    id: 'stage-1',
+    title: '让改进实践变得可见',
+    summary: '我理解这个学校目前大致处于“让改进实践变得可见”的阶段。',
+    focus: '这个阶段现在最需要看到：教研与课堂实践能够被同伴看见。',
+    targets: [
+      { id: 't1', dimensionKey: 'leadership' as const, label: '领导力', text: '目标 1' },
+      { id: 't2', dimensionKey: 'key_tasks' as const, label: '关键任务', text: '目标 2' },
+      { id: 't3', dimensionKey: 'structure' as const, label: '结构与机制', text: '目标 3' },
+      { id: 't4', dimensionKey: 'culture' as const, label: '文化', text: '目标 4' },
+      { id: 't5', dimensionKey: 'capability' as const, label: '能力', text: '目标 5' },
+    ],
+  },
+}
 function api(
   availability: 'ready' | 'unavailable' = 'ready',
   overrides: Partial<WorkbenchApi['agent']> = {},
 ): WorkbenchApi {
   return {
-    schools: { list: vi.fn(), create: vi.fn(), get: vi.fn().mockResolvedValue(school) },
+    schools: {
+      list: vi.fn(),
+      create: vi.fn(),
+      get: vi.fn().mockResolvedValue(school),
+      archive: vi.fn(),
+    },
     judgments: {
       listAccepted: vi.fn().mockResolvedValue([]),
       review: vi.fn().mockResolvedValue({ decision: 'accepted', acceptedJudgment: null }),
     },
     stages: {
-      getWorkspace: vi.fn().mockResolvedValue({ state: 'none' }),
+      getWorkspace: vi.fn().mockResolvedValue(activeStage),
       adjust: vi.fn(),
       confirm: vi.fn(),
     },
@@ -127,6 +148,7 @@ function api(
     settings: {
       getAssistant: vi.fn().mockResolvedValue({
         selected: 'codex',
+        localTools: [],
         options: [
           {
             key: 'codex',
@@ -172,6 +194,45 @@ async function say(text: string, button = '提交情况'): Promise<void> {
 afterEach(cleanup)
 
 describe('the workbench when the assistant can run', () => {
+  it('lets a school with no stage start: the assistant proposes the first stage', async () => {
+    const workbench = api()
+    vi.mocked(workbench.stages.getWorkspace)
+      .mockResolvedValueOnce({ state: 'none' })
+      .mockResolvedValue({ state: 'suggested', stage: activeStage.stage })
+    vi.mocked(workbench.agent.run).mockResolvedValue(
+      agentRun({ outcome: 'no_new_judgment', proposal: null }),
+    )
+    renderPage(workbench)
+
+    await screen.findByText(/AI 助手会先看一遍/)
+    await say('教研组把三节课的记录贴到了公共墙上。')
+
+    expect(workbench.agent.run).toHaveBeenCalledWith({
+      schoolId: 'school-1',
+      message: '教研组把三节课的记录贴到了公共墙上。',
+    })
+    expect(
+      await screen.findByText('AI 助手根据你说的情况，先提议了一个当前阶段。请确认后再继续。'),
+    ).toBeInTheDocument()
+    expect(await screen.findByText('这样理解基本对吗？')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '提交情况' })).toBeDisabled()
+  })
+
+  it('still blocks a new run while a stage suggestion is waiting for confirmation', async () => {
+    const workbench = api()
+    vi.mocked(workbench.stages.getWorkspace).mockResolvedValue({
+      state: 'suggested',
+      stage: activeStage.stage,
+    })
+    renderPage(workbench)
+    expect(
+      await screen.findByText('请先确认或调整上方的阶段建议，再开始新的分析。'),
+    ).toBeInTheDocument()
+    await type('教研组把三节课的记录贴到了公共墙上。')
+    expect(screen.getByRole('button', { name: '提交情况' })).toBeDisabled()
+    expect(workbench.agent.run).not.toHaveBeenCalled()
+  })
+
   it('sends the sentence to the assistant and shows the judgement it produced', async () => {
     const workbench = api()
     renderPage(workbench)

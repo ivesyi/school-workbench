@@ -117,13 +117,14 @@ function baseApi(): WorkbenchApi {
       list: vi.fn(),
       create: vi.fn(),
       get: vi.fn().mockResolvedValue(school),
+      archive: vi.fn(),
     },
     judgments: {
       listAccepted: vi.fn().mockResolvedValue([]),
       review: vi.fn(),
     },
     stages: {
-      getWorkspace: vi.fn().mockResolvedValue({ state: 'none' }),
+      getWorkspace: vi.fn().mockResolvedValue(activeStage),
       adjust: vi.fn(),
       confirm: vi.fn(),
     },
@@ -139,6 +140,7 @@ function baseApi(): WorkbenchApi {
     settings: {
       getAssistant: vi.fn().mockResolvedValue({
         selected: 'codex',
+        localTools: [],
         options: [{ key: 'codex', label: 'Codex', availability: 'ready', detail: null }],
       }),
       chooseAssistant: vi.fn(),

@@ -92,6 +92,7 @@ function schoolRepository(): SchoolRepository {
     save: vi.fn(),
     findById: vi.fn().mockResolvedValue(school),
     listActive: vi.fn().mockResolvedValue([school]),
+    archive: vi.fn().mockResolvedValue(true),
   }
 }
 

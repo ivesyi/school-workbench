@@ -5,6 +5,7 @@ export type School = {
   id: string
   name: string
   createdAt: string
+  /** Set instead of deleting rows, so all historical work remains intact. */
   archivedAt: string | null
 }
 
@@ -36,4 +37,6 @@ export interface SchoolRepository {
   save(school: School): Promise<void>
   findById(id: string): Promise<School | null>
   listActive(): Promise<School[]>
+  /** Returns false when no active school with this identifier remains. */
+  archive(id: string, archivedAt: string): Promise<boolean>
 }

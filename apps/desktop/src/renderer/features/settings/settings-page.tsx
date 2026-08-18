@@ -1,6 +1,6 @@
 import { Alert, AlertDescription, AlertTitle, Separator } from '@school-workbench/experience'
 import type { AssistantChoice, AssistantSettingsView } from '@school-workbench/shared'
-import { CheckCircle2, ChevronRight } from 'lucide-react'
+import { CheckCircle2, ChevronRight, CircleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useWorkbenchApi } from '../../lib/workbench-api'
@@ -113,6 +113,48 @@ export function SettingsPage(): React.JSX.Element {
               {error}
             </p>
           ) : null}
+        </div>
+      </section>
+
+      <section className="mt-6 overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="px-6 py-5">
+          <h2 className="font-medium">本机工具状态</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            这里只检查工具是否已安装，不会读取你的登录信息或飞书内容。
+          </p>
+          {assistant === null ? (
+            <p className="mt-4 text-sm text-muted-foreground">正在检查…</p>
+          ) : (
+            <div className="mt-4 divide-y divide-border rounded-lg border border-border">
+              {assistant.localTools.map((tool) => {
+                const available = tool.availability === 'available'
+                return (
+                  <div key={tool.key} className="flex items-start justify-between gap-4 px-4 py-3">
+                    <span>
+                      <span className="block text-sm font-medium">{tool.label}</span>
+                      <span className="mt-1 block text-sm text-muted-foreground">
+                        {tool.detail}
+                      </span>
+                    </span>
+                    <span
+                      className={
+                        available
+                          ? 'inline-flex shrink-0 items-center gap-2 text-sm text-primary'
+                          : 'inline-flex shrink-0 items-center gap-2 text-sm text-muted-foreground'
+                      }
+                    >
+                      {available ? (
+                        <CheckCircle2 className="size-4" />
+                      ) : (
+                        <CircleAlert className="size-4" />
+                      )}
+                      {available ? '已检测到' : '未检测到'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </section>
 

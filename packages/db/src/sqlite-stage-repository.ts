@@ -60,10 +60,13 @@ function toTarget(row: typeof stageTargets.$inferSelect): StageTarget {
 function assertScope(recommendation: StageRecommendation): void {
   const { stage, targets, judgmentIds } = recommendation
   if (targets.length !== stageDimensionKeys.length) throw new Error('阶段目标数量不完整')
-  if (judgmentIds.length === 0) throw new Error('阶段建议必须关联至少一条正式判断')
   if (targets.some((target) => target.schoolId !== stage.schoolId || target.stageId !== stage.id)) {
     throw new Error('阶段和目标不能跨学校保存')
   }
+  // An Agent-proposed starting stage legitimately carries no judgment links
+  // (PRD 11); any link that does exist must still belong to this school, which
+  // `assertJudgmentScope` enforces on write.
+  void judgmentIds
 }
 
 export class SqliteStageRepository implements StageRepository {

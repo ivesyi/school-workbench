@@ -207,7 +207,7 @@ pnpm typecheck && pnpm lint && pnpm format && pnpm test && pnpm build && pnpm te
 - 产品里的 AI 不再是「入口」，而是**唯一**的分析通路：工作台打一句话交给 Codex，跑的时候有高层进度，跑完的判断带完整依据与出处进审核卡片，顾问点头才算数
 - `HOW_TO_RUN.md` 已按新事实改写（不再声称「不用 AI 也能完整使用」，不再声称数据绝不离开本机）
 - **10.1 判据 1–6 全部满足**，判据 5 的真 Codex 证据见 §11
-- **但产品仍不能交给顾问自己从零开始用**：新建学校无法自力形成第一个 active Stage（§12），必须先由顾问定夺
+- **从零起步已通**：新建学校可以说一句话 → Agent 用 `stage_propose` 提议首个阶段 → 顾问确认 → 开始真实分析（§12.1）
 
 ---
 
@@ -305,9 +305,18 @@ SCREEN 2026-08-18T06:09:25.742Z  (进度条已消失)
 2. 承认工作台可以在没有判断时给一个「起步阶段」，明确它是脚手架不是专业判断 → 改 PRD 12 的边界；
 3. 接受现状：产品只服务「已经有历史数据」的学校，新建学校必须先由维护者灌入起点 → 需要顾问明确认可。
 
-**在此之前**：`docs/development/HOW_TO_RUN.md` 的「建一所学校 → 说一条情况」这条路径，对**全新**学校是走不通的（写面 `buildAssessmentInput` 在没有 active Stage 时直接 `READ_STALE` fail-closed，Agent 连弃权都提交不了，界面上表现为「这次没有形成需要你确认的新判断」）。真 Codex 验收（§11、§11.1）用的都是灌了历史的学校。
+**之前的状态**：`HOW_TO_RUN.md` 的「建一所学校 → 说一条情况」这条路径，对**全新**学校是走不通的（写面 `buildAssessmentInput` 在没有 active Stage 时直接 `READ_STALE` fail-closed，Agent 连弃权都提交不了，界面上表现为「这次没有形成需要你确认的新判断」）。真 Codex 验收（§11、§11.1）用的都是灌了历史的学校。指南当时同步了「卡的是阶段不是材料」的说明，但缺口本身未修。
 
-**指南已同步（2026-08-18，评审发现后当日修）**：`HOW_TO_RUN.md` 第三节开头补了一段说清「卡的是阶段不是材料」，以及全新学校目前需要维护者先放一次起点数据、再由顾问点「基本对」确认阶段；排障节把原来那条「目前依据不足」拆成两种情况（没有当前阶段 → 去确认阶段；有当前阶段但依据不足 → 补可核实材料）。指南不再许诺产品还做不到的事，但**缺口本身仍未修**，仍等本节的顾问决定。
+### 12.1 已解决：Agent 提议起步阶段（2026-08-18）
+
+顾问拍板：**从零开始测试，数据一律走前端**，不走「维护者灌 SQLite 起点」的路。因此采用上面的路 1 —— 把 PRD 11 落实为真实的写面工具：
+
+- **SPEC 17/18/26 + 23.1**：允许列表加入 `stage.propose`；工具清单加入 `stage_propose`；bootstrap 注入「如果学校还没有当前阶段：使用 stage_propose 提议一个，供顾问确认」；新增 §23.1 定义工具契约（只建立提议、不激活）。
+- **写面**：`stage_propose`（`packages/workbench-read-plane` 的 `stage.propose` scope + `WorkbenchWriteCapabilityService.stagePropose`），仅当学校**没有** `planned`/`active` Stage 时写入 `stages.status = planned` + 五条 `stage_targets.status = draft`，不落 `stage_judgments` 关联；激活仍只在顾问点「基本对」后发生（SPEC 25 不变）。
+- **领域**：`createAgentStageProposal` 允许零判断关联（全新学校没有已确认判断）；`adjustStageRecommendation` 同步允许零判断，让「调整一下」在从零流程可用；`SqliteStageRepository.assertScope` 放开空 `judgmentIds`。
+- **界面**：没有当前阶段的学校**允许**提交一句话（PRD 11/51 的「一句话可以开始分析」）；跑完若 Agent 提议了阶段，工作台刷新出「这样理解基本对吗？」建议卡并提示先确认；有 `planned` 阶段待确认时暂不开始新分析。
+- **验收**：`pnpm typecheck` / `pnpm lint` / `pnpm format` / `pnpm test`（70 files / 385 tests）全绿；新增用例覆盖领域工厂、写面落库（planned + 5 draft targets + 零 judgment 关联、已有阶段时 `READ_STALE` 拒绝）、MCP 工具可见性与路由、渲染层从零流程。
+- **仍留待顾问定**：`BaselineStageRecommendationEngine`（阶段建议）与 `DeterministicStateAssessmentEngine`（状态五维草稿）仍是工作台自己的确定性推理（§13）；PRD 19「系统建议改成……」（AI 按反馈重写判断）仍未实现。
 
 ---
 

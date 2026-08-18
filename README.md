@@ -49,7 +49,7 @@ AGENTS.md      贡献与 Agent 工作规则
 
 尚未开始：DeepSeek Harness、飞书授权与 lark-cli、RAG / FTS / 向量检索、本地文件与音频 Evidence、教师实践纵切、打包签名与自动更新。
 
-悬而未决与下一步：全新学校的起点建立方式待顾问决定（见 `docs/development/AI_RUNTIME_LOOP_LEDGER.md` §12 的三条路）；两份 Pack 的翻译内容待补齐（10 条 criterion 的真实描述、行为锚点边界、证据指引，清单见 `docs/development/METHODOLOGY_PACK_ACTIVATION_STATUS.md`）。历史任务书（前瞻性文档，已执行）：`docs/development/METHODOLOGY_PACK_ACTIVATION_BRIEF.md`。
+悬而未决与下一步：全新学校从零起步已通（说一句话 → Agent 提议首个阶段 → 顾问确认 → 开始真实分析，见 `docs/development/AI_RUNTIME_LOOP_LEDGER.md` §12.1）；两份 Pack 的翻译内容待补齐（10 条 criterion 的真实描述、行为锚点边界、证据指引，清单见 `docs/development/METHODOLOGY_PACK_ACTIVATION_STATUS.md`）。历史任务书（前瞻性文档，已执行）：`docs/development/METHODOLOGY_PACK_ACTIVATION_BRIEF.md`。
 
 已知的关键约束：
 

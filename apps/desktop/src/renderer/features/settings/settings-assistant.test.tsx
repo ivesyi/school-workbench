@@ -13,13 +13,27 @@ function view(
 ): AssistantSettingsView {
   return {
     selected: 'codex',
+    localTools: [
+      {
+        key: 'codex_cli',
+        label: 'Codex 命令行工具',
+        availability: 'available',
+        detail: '已检测到，可用于新的学校分析。',
+      },
+      {
+        key: 'lark_cli',
+        label: '飞书命令行工具',
+        availability: 'unavailable',
+        detail: '未检测到。启用飞书材料接入前需要先安装飞书命令行工具。',
+      },
+    ],
     options: [{ key: 'codex', label: 'Codex', availability, detail }],
   }
 }
 
 function api(settings: Partial<WorkbenchApi['settings']> = {}): WorkbenchApi {
   return {
-    schools: { list: vi.fn(), create: vi.fn(), get: vi.fn() },
+    schools: { list: vi.fn(), create: vi.fn(), get: vi.fn(), archive: vi.fn() },
     judgments: { review: vi.fn(), listAccepted: vi.fn() },
     stages: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
     states: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
@@ -56,6 +70,16 @@ describe('choosing a default AI assistant in settings', () => {
     expect(radios[0]).toBeChecked()
     expect(screen.getByRole('radio', { name: /Codex/ })).toBeInTheDocument()
     expect(screen.queryByText(/暂不使用/)).not.toBeInTheDocument()
+  })
+
+  it('shows the local Codex and Feishu CLI status separately from assistant choice', async () => {
+    renderPage(api())
+    expect(await screen.findByText('本机工具状态')).toBeInTheDocument()
+    expect(screen.getByText('Codex 命令行工具')).toBeInTheDocument()
+    expect(screen.getByText('飞书命令行工具')).toBeInTheDocument()
+    expect(screen.getByText('已检测到')).toBeInTheDocument()
+    expect(screen.getByText('未检测到')).toBeInTheDocument()
+    expect(screen.getByText(/不会读取你的登录信息或飞书内容/)).toBeInTheDocument()
   })
 
   it('says in plain words when the assistant cannot be used here', async () => {

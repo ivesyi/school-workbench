@@ -571,3 +571,66 @@ describe('diagnosis_propose', () => {
     ).rejects.toBeInstanceOf(WritePlaneProtocolError)
   })
 })
+
+describe('stage_propose', () => {
+  const proposalInput = {
+    title: '建立共同推动改进的组织基础',
+    summary: '我理解这个学校目前大致处于“建立共同推动改进的组织基础”的阶段。',
+    focus: '这个阶段现在最需要看到：中层开始独立承担关键任务，学校形成可重复的协作方式。',
+    targets: {
+      leadership: { title: '领导力', description: '领导团队持续追问改进行动是否带来变化。' },
+      key_tasks: { title: '关键任务', description: '关键改进任务由中层独立拆解和推进。' },
+      structure: { title: '结构与机制', description: '形成稳定的任务分工、推进节奏和复盘机制。' },
+      culture: { title: '文化', description: '中层能够公开讨论问题并对结果负责。' },
+      capability: { title: '能力', description: '中层能够独立分析问题、制定行动并完成复盘。' },
+    },
+  }
+
+  it('writes the first planned stage with five draft targets and no judgment links', async () => {
+    database.client
+      .prepare('INSERT INTO schools (id, name, created_at, archived_at) VALUES (?, ?, ?, NULL)')
+      .run('school-stage-1', '从零开始的学校', NOW)
+    const service = writeService(activeRegistry())
+
+    const result = await service.stagePropose(
+      { schoolId: 'school-stage-1', agentRunId: RUN },
+      proposalInput,
+    )
+
+    expect(result.status).toBe('planned')
+    expect(result.stageId).toMatch(/^[A-Z0-9]+$/u)
+    expect(result.targets).toHaveLength(5)
+
+    const stageRow = database.client
+      .prepare('SELECT status, sequence FROM stages WHERE id = ?')
+      .get(result.stageId) as { status: string; sequence: number }
+    expect(stageRow.status).toBe('planned')
+    expect(stageRow.sequence).toBe(1)
+
+    const targetRows = database.client
+      .prepare('SELECT status, dimension_key FROM stage_targets WHERE stage_id = ?')
+      .all(result.stageId) as Array<{ status: string; dimension_key: string }>
+    expect(targetRows).toHaveLength(5)
+    expect(targetRows.every((target) => target.status === 'draft')).toBe(true)
+
+    const links = database.client
+      .prepare('SELECT judgment_id FROM stage_judgments WHERE stage_id = ?')
+      .all(result.stageId)
+    expect(links).toHaveLength(0)
+  })
+
+  it('refuses when the school already has a planned or active stage', async () => {
+    seedSchool('school-1')
+    const service = writeService(activeRegistry())
+    await expect(
+      service.stagePropose({ schoolId: 'school-1', agentRunId: RUN }, proposalInput),
+    ).rejects.toThrowError(/already has a pending or current Stage/u)
+  })
+
+  it('refuses for a school that does not exist', async () => {
+    const service = writeService(activeRegistry())
+    await expect(
+      service.stagePropose({ schoolId: 'missing-school', agentRunId: RUN }, proposalInput),
+    ).rejects.toThrowError(/Scoped school was not found/u)
+  })
+})

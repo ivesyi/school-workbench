@@ -1,5 +1,5 @@
 import type { School, SchoolRepository } from '@school-workbench/domain'
-import { asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { schools, type SchoolRow } from './schema'
 
@@ -32,5 +32,14 @@ export class SqliteSchoolRepository implements SchoolRepository {
       .orderBy(asc(schools.createdAt))
       .all()
     return rows.map(toDomain)
+  }
+
+  async archive(id: string, archivedAt: string): Promise<boolean> {
+    const outcome = this.database
+      .update(schools)
+      .set({ archivedAt })
+      .where(and(eq(schools.id, id), isNull(schools.archivedAt)))
+      .run()
+    return outcome.changes === 1
   }
 }

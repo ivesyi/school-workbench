@@ -92,6 +92,8 @@ async function dispatchWrite(
       return service.evidenceRegister(context, input)
     case 'diagnosis_propose':
       return service.diagnosisPropose(context, input)
+    case 'stage_propose':
+      return service.stagePropose(context, input)
   }
 }
 

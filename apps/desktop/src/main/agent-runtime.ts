@@ -68,6 +68,7 @@ const PROGRESS_PHASE_BY_TOOL: Readonly<Record<string, AgentProgressPhase>> = Obj
   state_history: 'comparing',
   evidence_register: 'drafting',
   diagnosis_propose: 'drafting',
+  stage_propose: 'drafting',
 })
 
 const PHASE_ORDER: readonly AgentProgressPhase[] = Object.freeze([

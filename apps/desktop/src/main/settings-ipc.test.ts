@@ -1,3 +1,4 @@
+import type { AssistantSettingsView } from '@school-workbench/shared'
 import { describe, expect, it } from 'vitest'
 import {
   ASSISTANT_PREFERENCE_KEY,
@@ -14,9 +15,24 @@ function store(initial: Record<string, string> = {}) {
     write: async (key: string, value: string) => {
       values.set(key, value)
     },
+    localToolStatuses: () => localTools,
   }
 }
 
+const localTools: AssistantSettingsView['localTools'] = [
+  {
+    key: 'codex_cli',
+    label: 'Codex 命令行工具',
+    availability: 'available',
+    detail: '已检测到，可用于新的学校分析。',
+  },
+  {
+    key: 'lark_cli',
+    label: '飞书命令行工具',
+    availability: 'unavailable',
+    detail: '未检测到。启用飞书材料接入前需要先安装飞书命令行工具。',
+  },
+]
 const ready: AssistantReadiness = { ready: true, detail: null }
 const notReady: AssistantReadiness = {
   ready: false,
@@ -36,6 +52,7 @@ describe('choosing a default assistant', () => {
     // DeepSeek Harness is a later slice; nothing offers what does not exist.
     expect(view.options.map((option) => option.key)).toEqual(['codex'])
     expect(view.options.map((option) => option.label)).toEqual(['Codex'])
+    expect(view.localTools).toEqual(localTools)
   })
 
   it('remembers the choice', async () => {

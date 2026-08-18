@@ -49,8 +49,10 @@ export class BaselineStageRecommendationEngine implements StageRecommendationEng
     judgments: AcceptedJudgment[],
     feedback?: string,
   ): Promise<StageRecommendationDraft> {
-    if (judgments.length === 0) throw new Error('没有正式判断时不能形成阶段建议')
-
+    // Empty judgments reach here only when a consultant adjusts an
+    // Agent-proposed starting stage (PRD 11): there are no confirmed judgments
+    // on a brand-new school, so the wording is driven by the explicit feedback
+    // (or the organisation default) rather than by judgment text.
     const trimmedFeedback = feedback?.trim() ?? ''
     const kind = trimmedFeedback
       ? (classifyExplicitFeedback(trimmedFeedback) ?? classifyJudgments(judgments))

@@ -5,9 +5,11 @@ import { ReadPlaneError } from './contracts'
 import {
   diagnosisProposeInputSchema,
   evidenceRegisterInputSchema,
+  stageProposeInputSchema,
   type DiagnosisProposalDto,
   type EvidenceRegistrationDto,
   type GroundedDiagnosisGateway,
+  type StageProposalDto,
   type WritePlaneRepository,
 } from './write-contracts'
 
@@ -86,6 +88,25 @@ export class WorkbenchWriteCapabilityService {
     const parsed = parseInput(evidenceRegisterInputSchema, input)
     assertScopedSchool(parsed.schoolId, context.schoolId)
     return this.repository.registerEvidence({
+      schoolId: context.schoolId,
+      agentRunId: context.agentRunId,
+      input: parsed,
+    })
+  }
+
+  /**
+   * PRD 11. An initial Stage proposal for a school with no current Stage.
+   *
+   * The school scope comes from the capability token; the repository refuses
+   * the write when the school already has a planned or active Stage, so the
+   * tool can never overwrite a Stage the consultant already settled on. The
+   * proposal is only ever `planned` — activation is the consultant's, through
+   * the Workbench UI (SPEC 25).
+   */
+  async stagePropose(context: WriteCapabilityContext, input: unknown): Promise<StageProposalDto> {
+    const parsed = parseInput(stageProposeInputSchema, input)
+    assertScopedSchool(parsed.schoolId, context.schoolId)
+    return this.repository.saveStageProposal({
       schoolId: context.schoolId,
       agentRunId: context.agentRunId,
       input: parsed,

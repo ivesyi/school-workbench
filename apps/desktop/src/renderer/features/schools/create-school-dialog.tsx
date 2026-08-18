@@ -58,7 +58,6 @@ export function CreateSchoolDialog({
               id="school-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="南山实验学校"
               autoFocus
               maxLength={120}
             />

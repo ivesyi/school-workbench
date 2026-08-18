@@ -14,6 +14,7 @@ function settings(
 ): AssistantSettingsView {
   return {
     selected: 'codex',
+    localTools: [],
     options: [{ key: 'codex', label: 'Codex', availability, detail }],
   }
 }
@@ -85,6 +86,12 @@ describe('what the consultant sees while an assistant works', () => {
     for (const word of FORBIDDEN_WORDS) {
       expect(everything, word).not.toContain(word)
     }
+  })
+
+  it('does not mislabel an MCP startup report as a school data connection failure', () => {
+    expect(assistantFailureNote('WORKBENCH_MCP_STARTUP_FAILED')).toBe(
+      'AI 助手这次没有成功开始分析。你写的内容还在，可以稍后再点击重试。',
+    )
   })
 
   it('offers a retry when a run failed, and never claims to have written anything down', () => {

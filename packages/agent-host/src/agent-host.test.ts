@@ -223,8 +223,9 @@ describe('agent host lifecycle', () => {
     expect(prompt.prompt[0]?.text).toContain('你正在辅助学校变革陪跑顾问。')
     expect(prompt.prompt[0]?.text).toContain('必须主动寻找相反证据。')
     expect(prompt.prompt[0]?.text).toContain('你没有权限替顾问确认最终判断。')
-    // The SPEC text mentions diagnosis_propose even though the write plane does
-    // not exist yet. It is injected as written, not edited down.
+    // SPEC 26 tells an agent it may propose the starting stage when the school
+    // has none yet (PRD 11). It is injected as written, not edited down.
+    expect(prompt.prompt[0]?.text).toContain('使用 stage_propose 提议一个，供顾问确认。')
     expect(prompt.prompt[0]?.text).toContain('再使用 diagnosis_propose。')
     expect(prompt.prompt[1]?.text).toBe('今天的中层会议里，任务拆解还是主要由校长完成。')
   })

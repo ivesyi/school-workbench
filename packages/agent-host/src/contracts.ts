@@ -46,10 +46,14 @@ export const workbenchReadToolNames = [
 export type WorkbenchReadToolName = (typeof workbenchReadToolNames)[number]
 
 /**
- * SPEC 18's two write tools. `feishu_ensure_ready` is the tenth and belongs to
+ * SPEC 18's three write tools. `feishu_ensure_ready` is the tenth and belongs to
  * the Feishu slice, so it is deliberately absent.
  */
-export const workbenchWriteToolNames = ['evidence_register', 'diagnosis_propose'] as const
+export const workbenchWriteToolNames = [
+  'evidence_register',
+  'diagnosis_propose',
+  'stage_propose',
+] as const
 
 export type WorkbenchWriteToolName = (typeof workbenchWriteToolNames)[number]
 

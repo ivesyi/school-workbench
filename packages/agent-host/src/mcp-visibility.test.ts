@@ -105,10 +105,11 @@ describe('workbench MCP tool visibility', () => {
     for (const forbidden of forbiddenAgentToolNames) {
       expect(visibility.visibleTools).not.toContain(forbidden)
     }
-    // The two SPEC 18 write tools are part of the surface now; the four SPEC 25
-    // capabilities never are.
+    // The three SPEC 18 write tools are part of the surface now; the four
+    // SPEC 25 capabilities never are.
     expect(visibility.visibleTools).toContain('evidence_register')
     expect(visibility.visibleTools).toContain('diagnosis_propose')
+    expect(visibility.visibleTools).toContain('stage_propose')
     expect(visibility.visibleTools).not.toContain('feishu_ensure_ready')
   }, 30_000)
 

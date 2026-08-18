@@ -25,15 +25,20 @@ export const readScopes = [
 export type ReadScope = (typeof readScopes)[number]
 
 /**
- * SPEC 18 freezes the Workbench MCP tool list. These are the two write tools;
+ * SPEC 18 freezes the Workbench MCP tool list. These are the three write tools;
  * `feishu_ensure_ready` is the tenth and belongs to the Feishu slice.
  */
-export const writeCapabilityNames = ['evidence_register', 'diagnosis_propose'] as const
+export const writeCapabilityNames = [
+  'evidence_register',
+  'diagnosis_propose',
+  'stage_propose',
+] as const
 
 export type WriteCapabilityName = (typeof writeCapabilityNames)[number]
 
-/** SPEC 17 write scopes. Listed in the SPEC's allow list from the start. */
-export const writeScopes = ['evidence.register', 'diagnosis.propose'] as const
+/** SPEC 17 write scopes. `stage.propose` proposes a starting stage for a school
+ * that has none; it never activates one, which stays with the consultant. */
+export const writeScopes = ['evidence.register', 'diagnosis.propose', 'stage.propose'] as const
 
 export type WriteScope = (typeof writeScopes)[number]
 
@@ -81,6 +86,7 @@ export const capabilityScope: Readonly<Record<CapabilityName, CapabilityScope>> 
   standards_get: 'standards.read',
   evidence_register: 'evidence.register',
   diagnosis_propose: 'diagnosis.propose',
+  stage_propose: 'stage.propose',
 })
 
 export function isReadCapabilityName(value: string): value is ReadCapabilityName {

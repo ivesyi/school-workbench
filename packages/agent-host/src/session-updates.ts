@@ -24,6 +24,13 @@ export type WorkbenchToolCallObservation = Readonly<{
    * about MCP wiring, so it is surfaced instead of being swallowed.
    */
   mcpStartupServerName: string | null
+  /**
+   * Raw text content of the synthetic startup report. codex-acp writes the real
+   * reason here — "failed to start: ..." versus "startup was cancelled." — which
+   * is what separates a genuine wiring failure from a server the runtime chose
+   * to cancel.
+   */
+  contentText: string
 }>
 
 export type ObservedSessionUpdate =
@@ -78,11 +85,23 @@ function readMcpStartupServerName(toolCallId: string | null): string | null {
 
 function readToolCall(update: Record<string, unknown>): WorkbenchToolCallObservation {
   const toolCallId = readString(update['toolCallId'])
+  let contentText = ''
+  const content = update['content']
+  if (Array.isArray(content)) {
+    for (const item of content) {
+      if (!isRecord(item)) continue
+      const nested = item['content']
+      if (!isRecord(nested) || nested['type'] !== 'text') continue
+      const text = readString(nested['text'])
+      if (text) contentText = text
+    }
+  }
   return Object.freeze({
     toolCallId,
     title: readString(update['title']),
     status: readString(update['status']),
     mcpStartupServerName: readMcpStartupServerName(toolCallId),
+    contentText,
   })
 }
 

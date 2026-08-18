@@ -1,5 +1,6 @@
 import type { SchoolService } from '@school-workbench/application'
 import {
+  archiveSchoolInputSchema,
   createSchoolInputSchema,
   schoolIdSchema,
   schoolIpcChannels,
@@ -14,6 +15,7 @@ export type SchoolIpcHandlers = {
   list(): Promise<SchoolView[]>
   create(input: unknown): Promise<SchoolView>
   get(id: unknown): Promise<SchoolView | null>
+  archive(input: unknown): Promise<void>
 }
 
 export function createSchoolIpcHandlers(service: SchoolService): SchoolIpcHandlers {
@@ -29,6 +31,9 @@ export function createSchoolIpcHandlers(service: SchoolService): SchoolIpcHandle
       const school = await service.get(schoolIdSchema.parse(id))
       return school ? schoolViewSchema.parse(school) : null
     },
+    async archive(input) {
+      await service.archive(archiveSchoolInputSchema.parse(input).schoolId)
+    },
   }
 }
 
@@ -36,4 +41,5 @@ export function registerSchoolIpc(ipcMain: IpcMain, handlers: SchoolIpcHandlers)
   ipcMain.handle(schoolIpcChannels.list, () => handlers.list())
   ipcMain.handle(schoolIpcChannels.create, (_event, input: unknown) => handlers.create(input))
   ipcMain.handle(schoolIpcChannels.get, (_event, id: unknown) => handlers.get(id))
+  ipcMain.handle(schoolIpcChannels.archive, (_event, input: unknown) => handlers.archive(input))
 }

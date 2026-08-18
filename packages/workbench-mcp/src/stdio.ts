@@ -18,6 +18,7 @@ import {
 import {
   diagnosisProposeInputSchema,
   evidenceRegisterInputSchema,
+  stageProposeInputSchema,
 } from '@school-workbench/workbench-read-plane/write-contracts'
 
 const ENV_KEYS = ['SWB_ENDPOINT', 'SWB_TOKEN', 'SWB_SCHOOL_ID', 'SWB_AGENT_RUN_ID'] as const
@@ -42,6 +43,8 @@ const WRITE_TOOL_DESCRIPTIONS: Readonly<Record<WriteCapabilityName, string>> = O
     'Record a piece of material you actually used, the observations you read off it, and the claims those observations support or contradict. Returns the identifiers to cite later. Registering the same material again returns the identifiers it already has.',
   diagnosis_propose:
     'Submit one structured professional judgement for the consultant to review. Cite only identifiers returned by evidence_register or read from this workbench. Rejections come back as a list of specific findings you can correct and resubmit.',
+  stage_propose:
+    'When the school has no current stage yet, propose the starting stage for the consultant to confirm: a short title, a summary, a focus, and one goal per the five dimensions (leadership, key_tasks, structure, culture, capability). Only ever propose when stage_current reports no stage; the consultant confirms it in the workbench.',
 })
 
 /**
@@ -318,6 +321,15 @@ function createServer(config: BootstrapConfig): McpServer {
       annotations: WRITE_ANNOTATIONS,
     },
     handler('diagnosis_propose'),
+  )
+  server.registerTool(
+    'stage_propose',
+    {
+      description: WRITE_TOOL_DESCRIPTIONS.stage_propose,
+      inputSchema: stageProposeInputSchema,
+      annotations: WRITE_ANNOTATIONS,
+    },
+    handler('stage_propose'),
   )
 
   return server

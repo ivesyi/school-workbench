@@ -84,8 +84,9 @@ export function assistantFailureNote(failureCode: string | null): string {
     case 'RUNTIME_UNSUPPORTED':
       return 'AI 助手的版本和工作台对不上，这次没能开始。你写的内容还在，更新之后可以直接重试。'
     case 'WORKBENCH_MCP_TOOLS_INVISIBLE':
+      return 'AI 助手没有拿到学校资料接口，因此这次没有开始分析。你写的内容还在，可以稍后重试。'
     case 'WORKBENCH_MCP_STARTUP_FAILED':
-      return 'AI 助手这次没能连上这所学校的资料。你写的内容还在，可以过一会儿再重试。'
+      return 'AI 助手这次没有成功开始分析。你写的内容还在，可以稍后再点击重试。'
     default:
       return 'AI 助手这次没能完成。你写的内容还在，可以过一会儿再重试。'
   }

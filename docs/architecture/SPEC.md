@@ -580,6 +580,7 @@ evidence.read
 evidence.register
 diagnosis.read
 diagnosis.propose
+stage.propose
 standards.read
 feishu.ensure_ready
 ```
@@ -616,6 +617,8 @@ evidence_register
 diagnosis_list
 
 diagnosis_propose
+
+stage_propose
 
 standards_get
 
@@ -699,6 +702,30 @@ Domain Service：
 Agent 必须结构化提交。
 
 ---
+
+# 23.1 stage_propose
+
+PRD 11：如果学校没有当前阶段，Agent 根据已有情况提议。
+
+```text
+stage_propose(title, summary, focus, targets{五维})
+```
+
+Domain Service：
+
+- 校验学校；
+- 只有当学校**没有** `planned` 或 `active` Stage 时才允许写入（fail closed）；
+- 生成 `stages.status = planned` 与五条 `stage_targets.status = draft`；
+- 不落任何 `stage_judgments` 关联——全新学校没有已确认判断可关联。
+
+`stage_propose` 只建立提议，不激活。激活仍然只有顾问在 Workbench UI 点击确认后发生：
+
+```text
+planned → active
+draft   → confirmed
+```
+
+与 SPEC 25 一致：Agent 无法通过 MCP 激活阶段。
 
 # 24. Diagnosis strict Assessment Contract
 
@@ -792,6 +819,9 @@ stage_activate
 
 如果需要学校正式状态：
 使用 state_current。
+
+如果学校还没有当前阶段：
+使用 stage_propose 提议一个，供顾问确认。
 
 如果形成新的专业判断：
 先登记真正使用的依据，
@@ -1450,6 +1480,13 @@ targets = confirmed
 ```
 
 不新增 Proposal 表。
+
+两种进入 `planned` 的来源：
+
+- 有已确认判断的学校：Workbench 按判断整理出建议（顾问确认）；
+- 没有当前阶段也没有已确认判断的学校：Agent 通过 `stage_propose`（SPEC 23.1）提议首个阶段（PRD 11）。
+
+两者最终都走同一条确认路径：顾问在界面点「基本对」后 `stage = active`、`targets = confirmed`。
 
 ---
 

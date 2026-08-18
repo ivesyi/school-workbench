@@ -32,3 +32,18 @@ describe('school IPC handlers', () => {
     await expect(handlers.get(school.id)).resolves.toEqual(school)
   })
 })
+
+it('validates and forwards an archive request to the school service', async () => {
+  const archive = vi.fn().mockResolvedValue(undefined)
+  const service = {
+    create: vi.fn(),
+    list: vi.fn(),
+    get: vi.fn(),
+    archive,
+  } as unknown as SchoolService
+  const handlers = createSchoolIpcHandlers(service)
+
+  await handlers.archive({ schoolId: school.id })
+  expect(archive).toHaveBeenCalledWith(school.id)
+  await expect(handlers.archive({ schoolId: '' })).rejects.toThrow()
+})

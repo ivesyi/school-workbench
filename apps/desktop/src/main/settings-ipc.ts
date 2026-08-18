@@ -4,6 +4,7 @@ import {
   settingsIpcChannels,
   type AssistantChoice,
   type AssistantSettingsView,
+  type LocalToolStatusView,
 } from '@school-workbench/shared'
 import type { IpcMain } from 'electron'
 
@@ -37,11 +38,17 @@ export type SettingsDependencies = Readonly<{
   read(key: string): Promise<string | null>
   write(key: string, value: string): Promise<void>
   readiness(): AssistantReadiness
+  localToolStatuses(): readonly LocalToolStatusView[]
 }>
 
-function toView(selected: AssistantChoice, readiness: AssistantReadiness): AssistantSettingsView {
+function toView(
+  selected: AssistantChoice,
+  readiness: AssistantReadiness,
+  localTools: readonly LocalToolStatusView[],
+): AssistantSettingsView {
   return assistantSettingsViewSchema.parse({
     selected,
+    localTools: [...localTools],
     options: [
       {
         key: 'codex',
@@ -64,12 +71,16 @@ async function currentChoice(dependencies: SettingsDependencies): Promise<Assist
 export function createSettingsIpcHandlers(dependencies: SettingsDependencies): SettingsIpcHandlers {
   return {
     async getAssistant() {
-      return toView(await currentChoice(dependencies), dependencies.readiness())
+      return toView(
+        await currentChoice(dependencies),
+        dependencies.readiness(),
+        dependencies.localToolStatuses(),
+      )
     },
     async chooseAssistant(input) {
       const parsed = chooseAssistantInputSchema.parse(input)
       await dependencies.write(ASSISTANT_PREFERENCE_KEY, parsed.assistant)
-      return toView(parsed.assistant, dependencies.readiness())
+      return toView(parsed.assistant, dependencies.readiness(), dependencies.localToolStatuses())
     },
   }
 }

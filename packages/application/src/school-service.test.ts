@@ -38,6 +38,7 @@ function schoolRepository(): SchoolRepository {
     save: vi.fn(),
     findById: vi.fn().mockResolvedValue(school),
     listActive: vi.fn().mockResolvedValue([school]),
+    archive: vi.fn().mockResolvedValue(true),
   }
 }
 
@@ -61,5 +62,27 @@ describe('SchoolService read model', () => {
       currentStageId: 'stage-1',
       currentStageTitle: '让改进进入教师实践',
     })
+  })
+})
+
+describe('SchoolService archive', () => {
+  it('marks an active school as archived without deleting it', async () => {
+    const repository = schoolRepository()
+    const service = new SchoolService(repository)
+
+    await service.archive(school.id)
+
+    expect(repository.archive).toHaveBeenCalledWith(
+      school.id,
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    )
+  })
+
+  it('does not report success when the school is already archived or missing', async () => {
+    const repository = schoolRepository()
+    vi.mocked(repository.archive).mockResolvedValue(false)
+    const service = new SchoolService(repository)
+
+    await expect(service.archive(school.id)).rejects.toThrow('已归档或不存在')
   })
 })

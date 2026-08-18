@@ -118,8 +118,17 @@ export function SchoolWorkspacePage(): React.JSX.Element {
     }
   }, [api, schoolId])
 
-  const analysisAvailable = canStartAnalysis(assistant)
-  const blockedReason = unavailableReason(assistant)
+  const assistantAvailable = canStartAnalysis(assistant)
+  // A school with no current stage still accepts one sentence (PRD 11/51): the
+  // assistant reads it and proposes the starting stage. The only thing that
+  // blocks a new run is a stage suggestion already waiting for confirmation.
+  const stagePending = stageWorkspace.state === 'suggested'
+  const analysisAvailable = assistantAvailable && !stagePending
+  const blockedReason = !assistantAvailable
+    ? unavailableReason(assistant)
+    : stagePending
+      ? '请先确认或调整上方的阶段建议，再开始新的分析。'
+      : null
 
   async function refreshStage(): Promise<void> {
     try {
@@ -157,6 +166,22 @@ export function SchoolWorkspacePage(): React.JSX.Element {
         setReviewFeedback('')
         setEditing(false)
         setMessage('')
+        return
+      }
+      // A run can end without a judgement because the assistant proposed the
+      // school's first stage instead (PRD 11). Refresh the workspace so that
+      // proposal shows up for confirmation rather than reading as "nothing
+      // happened".
+      let refreshed: StageWorkspaceView
+      try {
+        refreshed = await api.stages.getWorkspace(schoolId)
+        setStageWorkspace(refreshed)
+      } catch {
+        refreshed = stageWorkspace
+      }
+      if (refreshed.state === 'suggested') {
+        setResultMessage('AI 助手根据你说的情况，先提议了一个当前阶段。请确认后再继续。')
+        setRetryable(false)
         return
       }
       setNote(assistantNote(run))

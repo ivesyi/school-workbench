@@ -32,3 +32,24 @@ describe('SqliteSchoolRepository', () => {
     secondDatabase.close()
   })
 })
+
+it('hides an archived school from the active list while retaining its row', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'school-workbench-db-'))
+  temporaryDirectories.push(directory)
+  const databasePath = join(directory, 'workbench.sqlite')
+  const migrationsFolder = resolve('packages/db/drizzle')
+  const database = openWorkbenchDatabase(databasePath, migrationsFolder)
+  const repository = new SqliteSchoolRepository(database.db)
+  const service = new SchoolService(repository)
+  const created = await service.create({ name: '南山实验学校' })
+
+  await service.archive(created.id)
+
+  await expect(service.list()).resolves.toEqual([])
+  await expect(repository.findById(created.id)).resolves.toMatchObject({
+    id: created.id,
+    archivedAt: expect.any(String),
+  })
+  await expect(service.archive(created.id)).rejects.toThrow('已归档或不存在')
+  database.close()
+})

@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
 export const schoolIdSchema = z.string().min(1)
-
 export const schoolNameSchema = z
   .string()
   .trim()
@@ -11,6 +10,12 @@ export const schoolNameSchema = z
 export const createSchoolInputSchema = z.object({
   name: schoolNameSchema,
 })
+
+export const archiveSchoolInputSchema = z
+  .object({
+    schoolId: schoolIdSchema,
+  })
+  .strict()
 
 export const schoolViewSchema = z.object({
   id: schoolIdSchema,
@@ -23,10 +28,12 @@ export const schoolViewSchema = z.object({
 export const schoolListSchema = z.array(schoolViewSchema)
 
 export type CreateSchoolInput = z.infer<typeof createSchoolInputSchema>
+export type ArchiveSchoolInput = z.infer<typeof archiveSchoolInputSchema>
 export type SchoolView = z.infer<typeof schoolViewSchema>
 
 export const schoolIpcChannels = {
   list: 'schools:list',
   create: 'schools:create',
   get: 'schools:get',
+  archive: 'schools:archive',
 } as const

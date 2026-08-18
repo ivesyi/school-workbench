@@ -135,9 +135,9 @@ describe('workbench-mcp stdio process', () => {
       const listed = await client.listTools()
       const toolNames = listed.tools.map((tool) => tool.name)
       expect(toolNames.sort()).toEqual([...capabilityNames].sort())
-      expect(listed.tools).toHaveLength(9)
+      expect(listed.tools).toHaveLength(10)
 
-      // Reads are annotated read-only; the two write tools must not be, or a
+      // Reads are annotated read-only; the three write tools must not be, or a
       // runtime is entitled to treat them as free of consequences.
       for (const tool of listed.tools) {
         const expectedReadOnly = (readCapabilityNames as readonly string[]).includes(tool.name)

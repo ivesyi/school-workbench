@@ -25,9 +25,21 @@ export const assistantOptionViewSchema = z.object({
   detail: z.string().min(1).nullable(),
 })
 
+export const localToolKeySchema = z.enum(['codex_cli', 'lark_cli'])
+export const localToolAvailabilitySchema = z.enum(['available', 'unavailable'])
+
+/** Local prerequisites only; this never implies a logged-in external account. */
+export const localToolStatusViewSchema = z.object({
+  key: localToolKeySchema,
+  label: z.string().min(1),
+  availability: localToolAvailabilitySchema,
+  detail: z.string().min(1),
+})
+
 export const assistantSettingsViewSchema = z.object({
   selected: assistantChoiceSchema,
   options: z.array(assistantOptionViewSchema).min(1),
+  localTools: z.array(localToolStatusViewSchema).length(2),
 })
 
 export const chooseAssistantInputSchema = z
@@ -55,5 +67,6 @@ export const preferenceKeySchema = z.enum(preferenceKeys)
 export type AssistantChoice = z.infer<typeof assistantChoiceSchema>
 export type AssistantOptionView = z.infer<typeof assistantOptionViewSchema>
 export type AssistantSettingsView = z.infer<typeof assistantSettingsViewSchema>
+export type LocalToolStatusView = z.infer<typeof localToolStatusViewSchema>
 export type ChooseAssistantInput = z.infer<typeof chooseAssistantInputSchema>
 export type PreferenceKey = z.infer<typeof preferenceKeySchema>

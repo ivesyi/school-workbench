@@ -1,9 +1,12 @@
+import { createAgentStageProposal, type StageRecommendationDraft } from '@school-workbench/domain'
 import type { MethodologyRegistry } from '@school-workbench/methodology'
 import {
   ReadPlaneError,
   type EvidenceRegistrationDto,
   type RegisterEvidenceCommand,
   type RegisteredRef,
+  type StageProposalCommand,
+  type StageProposalDto,
   type WritePlaneRepository,
 } from '@school-workbench/workbench-read-plane'
 import { createHash } from 'node:crypto'
@@ -310,6 +313,119 @@ export class SqliteWritePlaneRepository implements WritePlaneRepository {
         reused,
         observationFacts: Object.freeze(observationFacts.map((item) => Object.freeze(item))),
         claims: Object.freeze(claims.map((item) => Object.freeze(item))),
+      })
+    })
+
+    return run()
+  }
+
+  /**
+   * PRD 11. Persists an Agent-proposed starting Stage for a school with none.
+   *
+   * Refuses when the school already has a planned or active Stage: the tool
+   * only ever establishes the very first one, and activation stays with the
+   * consultant through the Workbench UI (SPEC 25). The stage is written as
+   * `planned` with five `draft` targets and no judgment links — on a brand-new
+   * school there are no confirmed judgments to link to.
+   */
+  async saveStageProposal(command: StageProposalCommand): Promise<StageProposalDto> {
+    const { schoolId, input } = command
+    const client = this.database.client
+
+    const run = client.transaction((): StageProposalDto => {
+      const school = client
+        .prepare('SELECT id, archived_at FROM schools WHERE id = ?')
+        .get(schoolId) as { id: string; archived_at: string | null } | undefined
+      if (!school || school.archived_at) {
+        throw new ReadPlaneError('SCHOOL_NOT_FOUND', 'Scoped school was not found')
+      }
+
+      const blockingStage = client
+        .prepare("SELECT id FROM stages WHERE school_id = ? AND status IN ('planned', 'active')")
+        .get(schoolId) as { id: string } | undefined
+      if (blockingStage) {
+        throw new ReadPlaneError(
+          'READ_STALE',
+          'This school already has a pending or current Stage, so a new proposal cannot be grounded',
+        )
+      }
+
+      const nextSequenceRow = client
+        .prepare('SELECT COALESCE(MAX(sequence), 0) AS maxSequence FROM stages WHERE school_id = ?')
+        .get(schoolId) as { maxSequence: number }
+      const sequence = Number(nextSequenceRow.maxSequence) + 1
+
+      const draft: StageRecommendationDraft = {
+        title: input.title,
+        summary: input.summary,
+        focus: input.focus,
+        targets: {
+          leadership: input.targets.leadership,
+          key_tasks: input.targets.key_tasks,
+          structure: input.targets.structure,
+          culture: input.targets.culture,
+          capability: input.targets.capability,
+        },
+      }
+      const recommendation = createAgentStageProposal(schoolId, draft, sequence, {
+        createId: this.newId,
+        now: () => new Date(this.now()),
+      })
+
+      const createdAt = recommendation.stage.createdAt
+      client
+        .prepare(
+          `INSERT INTO stages (
+             id, school_id, title, summary, focus, sequence, status, starts_at, ends_at,
+             adjustment_feedback, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, 'planned', NULL, NULL, NULL, ?, ?)`,
+        )
+        .run(
+          recommendation.stage.id,
+          schoolId,
+          recommendation.stage.title,
+          recommendation.stage.summary,
+          recommendation.stage.focus,
+          sequence,
+          createdAt,
+          createdAt,
+        )
+      for (const target of recommendation.targets) {
+        client
+          .prepare(
+            `INSERT INTO stage_targets (
+               id, stage_id, school_id, dimension_key, title, description, status,
+               sequence, created_at, updated_at
+             ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+          )
+          .run(
+            target.id,
+            recommendation.stage.id,
+            schoolId,
+            target.dimensionKey,
+            target.title,
+            target.description,
+            target.sequence,
+            createdAt,
+            createdAt,
+          )
+      }
+
+      return Object.freeze({
+        stageId: recommendation.stage.id,
+        title: recommendation.stage.title,
+        summary: recommendation.stage.summary,
+        focus: recommendation.stage.focus,
+        status: 'planned' as const,
+        targets: Object.freeze(
+          recommendation.targets.map((target) =>
+            Object.freeze({
+              dimensionKey: target.dimensionKey,
+              title: target.title,
+              description: target.description,
+            }),
+          ),
+        ),
       })
     })
 

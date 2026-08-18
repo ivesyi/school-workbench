@@ -1,5 +1,6 @@
 import {
   acceptedJudgmentListSchema,
+  archiveSchoolInputSchema,
   adjustStageInputSchema,
   agentIpcChannels,
   agentProgressEventSchema,
@@ -48,6 +49,9 @@ const api: WorkbenchApi = {
         schoolIdSchema.parse(id),
       )
       return result === null ? null : schoolViewSchema.parse(result)
+    },
+    async archive(input) {
+      await ipcRenderer.invoke(schoolIpcChannels.archive, archiveSchoolInputSchema.parse(input))
     },
   },
   judgments: {

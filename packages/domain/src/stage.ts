@@ -92,14 +92,13 @@ function assertTargetSet(targets: StageTarget[], stage: Stage): void {
   }
 }
 
-export function createStageRecommendation(
+function buildStageRecommendation(
   schoolId: string,
   draft: StageRecommendationDraft,
   judgmentIds: string[],
   sequence: number,
-  dependencies: StageFactoryDependencies = defaultDependencies,
+  dependencies: StageFactoryDependencies,
 ): StageRecommendation {
-  if (judgmentIds.length === 0) throw new Error('没有正式判断时不能形成阶段建议')
   if (!Number.isInteger(sequence) || sequence < 1) throw new Error('阶段顺序必须从 1 开始')
 
   const createdAt = dependencies.now().toISOString()
@@ -136,6 +135,35 @@ export function createStageRecommendation(
   return { stage, targets, judgmentIds: [...judgmentIds] }
 }
 
+export function createStageRecommendation(
+  schoolId: string,
+  draft: StageRecommendationDraft,
+  judgmentIds: string[],
+  sequence: number,
+  dependencies: StageFactoryDependencies = defaultDependencies,
+): StageRecommendation {
+  if (judgmentIds.length === 0) throw new Error('没有正式判断时不能形成阶段建议')
+  return buildStageRecommendation(schoolId, draft, judgmentIds, sequence, dependencies)
+}
+
+/**
+ * An initial stage proposed by the Agent for a school that has no current stage
+ * and no confirmed judgments yet (PRD 11).
+ *
+ * Unlike {@link createStageRecommendation} this carries no judgment links: on a
+ * brand-new school there is nothing to link to. The provenance is the planned
+ * stage itself — it stays a proposal until the consultant confirms it, exactly
+ * like a judgment-derived recommendation.
+ */
+export function createAgentStageProposal(
+  schoolId: string,
+  draft: StageRecommendationDraft,
+  sequence: number,
+  dependencies: StageFactoryDependencies = defaultDependencies,
+): StageRecommendation {
+  return buildStageRecommendation(schoolId, draft, [], sequence, dependencies)
+}
+
 export function adjustStageRecommendation(
   recommendation: StageRecommendation,
   draft: StageRecommendationDraft,
@@ -147,7 +175,6 @@ export function adjustStageRecommendation(
   if (recommendation.targets.some((target) => target.status !== 'draft')) {
     throw new Error('已经确认的阶段目标不能再调整')
   }
-  if (judgmentIds.length === 0) throw new Error('没有正式判断时不能调整阶段建议')
 
   const updatedAt = adjustedAt.toISOString()
   const stage: Stage = {

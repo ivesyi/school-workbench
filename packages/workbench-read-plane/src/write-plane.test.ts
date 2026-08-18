@@ -25,6 +25,7 @@ import {
   proposedCandidateSchema,
   type EvidenceRegistrationDto,
   type GroundedDiagnosisGateway,
+  type StageProposalCommand,
   type WritePlaneRepository,
 } from './write-contracts'
 import { WorkbenchWriteCapabilityService, WritePlaneProtocolError } from './write-service'
@@ -51,9 +52,38 @@ const registration: EvidenceRegistrationDto = Object.freeze({
   claims: Object.freeze([Object.freeze({ ref: 'c1', id: 'claim-1', reused: false })]),
 })
 
+const stageProposal = Object.freeze({
+  stageId: 'stage-1',
+  title: '建立共同推动改进的组织基础',
+  summary: '我理解这个学校目前大致处于“建立共同推动改进的组织基础”的阶段。',
+  focus: '这个阶段现在最需要看到：中层开始独立承担关键任务。',
+  status: 'planned' as const,
+  targets: Object.freeze([
+    Object.freeze({ dimensionKey: 'leadership', title: '领导力', description: '目标 1' }),
+    Object.freeze({ dimensionKey: 'key_tasks', title: '关键任务', description: '目标 2' }),
+    Object.freeze({ dimensionKey: 'structure', title: '结构与机制', description: '目标 3' }),
+    Object.freeze({ dimensionKey: 'culture', title: '文化', description: '目标 4' }),
+    Object.freeze({ dimensionKey: 'capability', title: '能力', description: '目标 5' }),
+  ]),
+})
+
+const validStageProposalInput = Object.freeze({
+  title: '建立共同推动改进的组织基础',
+  summary: '我理解这个学校目前大致处于“建立共同推动改进的组织基础”的阶段。',
+  focus: '这个阶段现在最需要看到：中层开始独立承担关键任务。',
+  targets: {
+    leadership: { title: '领导力', description: '目标 1' },
+    key_tasks: { title: '关键任务', description: '目标 2' },
+    structure: { title: '结构与机制', description: '目标 3' },
+    culture: { title: '文化', description: '目标 4' },
+    capability: { title: '能力', description: '目标 5' },
+  },
+})
+
 function repositoryStub(overrides: Partial<WritePlaneRepository> = {}): WritePlaneRepository {
   return {
     registerEvidence: async () => registration,
+    saveStageProposal: async () => stageProposal,
     buildAssessmentInput: async () => ({ protocolVersion: 1 }),
     ...overrides,
   }
@@ -115,10 +145,10 @@ const validRegisterInput = {
 }
 
 describe('SPEC 17 capability scopes', () => {
-  it('adds exactly the two write scopes the SPEC always allowed', () => {
-    expect([...writeScopes]).toEqual(['evidence.register', 'diagnosis.propose'])
+  it('adds exactly the three write scopes the SPEC always allowed', () => {
+    expect([...writeScopes]).toEqual(['evidence.register', 'diagnosis.propose', 'stage.propose'])
     expect([...capabilityScopes]).toEqual([...readScopes, ...writeScopes])
-    expect(capabilityScopes).toHaveLength(8)
+    expect(capabilityScopes).toHaveLength(9)
   })
 
   it('never maps a capability to a scope SPEC 17 forbids', () => {
@@ -161,8 +191,8 @@ describe('SPEC 25 forbidden capabilities', () => {
       expect((capabilityNames as readonly string[]).includes(forbidden)).toBe(false)
       expect(Object.hasOwn(capabilityScope, forbidden)).toBe(false)
     }
-    // SPEC 18 freezes ten tools; this slice serves nine of them.
-    expect(capabilityNames).toHaveLength(9)
+    // SPEC 18 freezes eleven tools; this slice serves ten of them.
+    expect(capabilityNames).toHaveLength(10)
     expect((capabilityNames as readonly string[]).includes('feishu_ensure_ready')).toBe(false)
   })
 })
@@ -270,6 +300,55 @@ describe('write capability service', () => {
     ).rejects.toThrowError(/does not match the scoped school/u)
   })
 
+  it('delegates a stage proposal to persistence under the scoped school', async () => {
+    let command: StageProposalCommand | undefined
+    const service = new WorkbenchWriteCapabilityService(
+      repositoryStub({
+        saveStageProposal: async (c) => {
+          command = c
+          return stageProposal
+        },
+      }),
+      gatewayStub(),
+    )
+    const result = await service.stagePropose(
+      { schoolId: SCHOOL, agentRunId: RUN },
+      validStageProposalInput,
+    )
+    expect(result.stageId).toBe('stage-1')
+    expect(result.status).toBe('planned')
+    expect(result.targets).toHaveLength(5)
+    expect(command?.schoolId).toBe(SCHOOL)
+    expect(command?.agentRunId).toBe(RUN)
+    expect(command?.input.title).toBe(validStageProposalInput.title)
+  })
+
+  it('refuses a stage proposal that names a different school', async () => {
+    const service = new WorkbenchWriteCapabilityService(repositoryStub(), gatewayStub())
+    await expect(
+      service.stagePropose(
+        { schoolId: SCHOOL, agentRunId: RUN },
+        { ...validStageProposalInput, schoolId: 'school-2' },
+      ),
+    ).rejects.toThrowError(/does not match the scoped school/u)
+  })
+
+  it('refuses a stage proposal that misses a dimension target', async () => {
+    const service = new WorkbenchWriteCapabilityService(repositoryStub(), gatewayStub())
+    const withoutLeadership = {
+      key_tasks: validStageProposalInput.targets.key_tasks,
+      structure: validStageProposalInput.targets.structure,
+      culture: validStageProposalInput.targets.culture,
+      capability: validStageProposalInput.targets.capability,
+    }
+    await expect(
+      service.stagePropose(
+        { schoolId: SCHOOL, agentRunId: RUN },
+        { ...validStageProposalInput, targets: withoutLeadership },
+      ),
+    ).rejects.toThrowError(/Capability input failed strict validation/u)
+  })
+
   it('re-throws anything that is not a protocol rejection', async () => {
     const service = new WorkbenchWriteCapabilityService(
       repositoryStub(),
@@ -367,6 +446,15 @@ describe('loopback write routing', () => {
         candidate: candidateFixture(),
       })
       expect(proposed.status).toBe(200)
+
+      const stageProposed = await callCapability(
+        plane,
+        'stage_propose',
+        grant.token,
+        validStageProposalInput,
+      )
+      expect(stageProposed.status).toBe(200)
+      expect((stageProposed.payload.data as { status: string }).status).toBe('planned')
 
       for (const forbidden of forbiddenCapabilityNames) {
         const refused = await callCapability(plane, forbidden, grant.token, {})

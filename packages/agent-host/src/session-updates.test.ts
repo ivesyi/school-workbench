@@ -28,6 +28,7 @@ describe('session update classification', () => {
         title: 'mcp.example.state_current',
         status: 'pending',
         mcpStartupServerName: null,
+        contentText: '',
       },
     })
   })

@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createAgentIpcHandlers, registerAgentIpc, type AgentRunner } from './agent-ipc'
 import { assistantReadiness, runAgentOnce } from './agent-runtime'
+import { localToolStatuses } from './local-tool-status'
 import { agentIpcChannels, type AgentProgressEvent } from '@school-workbench/shared'
 import { createJudgmentIpcHandlers, registerJudgmentIpc } from './judgment-ipc'
 import { createMethodologyIpcHandlers, registerMethodologyIpc } from './methodology-ipc'
@@ -176,6 +177,7 @@ app.whenReady().then(() => {
       read: (key) => preferencesRepository.get(key),
       write: (key, value) => preferencesRepository.set(key, value),
       readiness: () => readiness,
+      localToolStatuses: () => localToolStatuses(),
     }),
   )
 
