@@ -50,6 +50,8 @@ describe('SchoolListPage', () => {
         }),
         chooseAssistant: vi.fn(),
         checkConnection: vi.fn(),
+        saveModelChannel: vi.fn(),
+        clearModelChannel: vi.fn(),
       },
       agent: {
         run: vi.fn(),
@@ -106,6 +108,8 @@ describe('SchoolListPage archive action', () => {
         getAssistant: vi.fn(),
         chooseAssistant: vi.fn(),
         checkConnection: vi.fn(),
+        saveModelChannel: vi.fn(),
+        clearModelChannel: vi.fn(),
       },
       agent: { run: vi.fn(), onProgress: vi.fn().mockReturnValue(() => undefined) },
     }
@@ -149,7 +153,13 @@ describe('SchoolListPage recovery guidance', () => {
       stages: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
       states: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
       methodology: { getReviewWorkbench: vi.fn(), signOff: vi.fn() },
-      settings: { getAssistant: vi.fn(), chooseAssistant: vi.fn(), checkConnection: vi.fn() },
+      settings: {
+        getAssistant: vi.fn(),
+        chooseAssistant: vi.fn(),
+        checkConnection: vi.fn(),
+        saveModelChannel: vi.fn(),
+        clearModelChannel: vi.fn(),
+      },
       agent: { run: vi.fn(), onProgress: vi.fn().mockReturnValue(() => undefined) },
     }
 

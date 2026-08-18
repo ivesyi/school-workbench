@@ -17,6 +17,14 @@ function settings(
     selected: 'codex',
     localTools: [],
     runtimeVersions: [],
+    modelChannel: {
+      baseUrl: null,
+      model: null,
+      hasApiKey: false,
+      secretStorageAvailable: true,
+      configured: false,
+      detail: '还没填。',
+    },
     options: [{ key: 'codex', label: 'Codex', availability, detail }],
   }
 }
@@ -173,6 +181,43 @@ describe('the other assistants a consultant could switch to', () => {
   it('offers nothing when there is only one assistant', () => {
     expect(switchableAssistants(settings())).toEqual([])
     expect(switchableAssistants(null)).toEqual([])
+  })
+
+  it('finally has something to offer now that a second assistant exists', () => {
+    // WS1 built this control for the day there was more than one assistant.
+    // With the built-in one ready, a failed Codex run can offer it — and still
+    // only because a person clicks it. Nothing here switches on its own.
+    const both: AssistantSettingsView = {
+      ...settings(),
+      selected: 'codex',
+      options: [
+        { key: 'codex', label: 'Codex', availability: 'ready', detail: null },
+        { key: 'builtin', label: '工作台自带助手', availability: 'ready', detail: null },
+      ],
+    }
+    expect(switchableAssistants(both).map((option) => option.label)).toEqual(['工作台自带助手'])
+
+    // And the other way round, because they are peers.
+    expect(
+      switchableAssistants({ ...both, selected: 'builtin' }).map((option) => option.label),
+    ).toEqual(['Codex'])
+  })
+
+  it('does not offer the second assistant while its model connection is missing', () => {
+    const halfReady: AssistantSettingsView = {
+      ...settings(),
+      selected: 'codex',
+      options: [
+        { key: 'codex', label: 'Codex', availability: 'ready', detail: null },
+        {
+          key: 'builtin',
+          label: '工作台自带助手',
+          availability: 'unavailable',
+          detail: '还没填 AI 模型连接。',
+        },
+      ],
+    }
+    expect(switchableAssistants(halfReady)).toEqual([])
   })
 
   it('offers the other assistants that could actually run', () => {

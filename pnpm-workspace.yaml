@@ -2,7 +2,17 @@ packages:
   - apps/*
   - packages/*
 
+# Which dependencies may run install scripts on a developer's machine.
+#
+# `@google/genai` and `protobufjs` arrive through the pinned harness's provider
+# layer, which hard-depends on every provider SDK it can speak to. This product
+# talks to one OpenAI-compatible endpoint and never loads those modules, so
+# neither has any reason to run code at install time. Both are refused rather
+# than approved: an unused dependency is the last one that should be allowed a
+# script.
 allowBuilds:
+  '@google/genai': false
   better-sqlite3: true
   electron: true
   esbuild: true
+  protobufjs: false

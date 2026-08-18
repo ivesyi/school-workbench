@@ -80,9 +80,23 @@ describe('the guide the consultant reads first', () => {
   it('describes switching assistant as a choice, never as something automatic', () => {
     expect(guide).toContain('换个助手重试')
     expect(guide).toContain('永远不会自己替你换助手')
-    // Only Codex is integrated, so the guide must not imply the control is
-    // there today.
-    expect(guide).toContain('现在只有 Codex 一个')
+    // Two assistants exist now, so the control can genuinely appear. The guide
+    // must say when it does not — and must not describe either as a fallback
+    // for the other (PRD 15).
+    expect(guide).toContain('只有一个能用时这块不会出现')
+    expect(guide).toContain('两个是平等的，不分主备')
+  })
+
+  it('explains the second assistant by what it needs, not by what runs it', () => {
+    expect(guide).toContain('工作台自带助手')
+    expect(guide).toContain('AI 模型连接')
+    // The key handling is the part a consultant has to be able to trust, so it
+    // is stated where they set it up rather than left to a design document.
+    expect(guide).toContain('系统钥匙串')
+    expect(guide).toContain('拒绝保存')
+    for (const word of ['pi', 'harness', 'provider', 'safeStorage', 'OpenAI']) {
+      expect(guide, word).not.toContain(word)
+    }
   })
 
   it('says a version notice is a notice, not a block', () => {

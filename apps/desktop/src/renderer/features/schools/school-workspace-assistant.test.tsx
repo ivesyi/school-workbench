@@ -173,6 +173,8 @@ function api(
       }),
       chooseAssistant: vi.fn(),
       checkConnection: vi.fn(),
+      saveModelChannel: vi.fn(),
+      clearModelChannel: vi.fn(),
     },
     agent: {
       run: vi.fn().mockResolvedValue(agentRun()),

@@ -13,16 +13,18 @@ import {
   SqliteStageRepository,
   SqliteStateRepository,
 } from '@school-workbench/db'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createAgentIpcHandlers, registerAgentIpc, type AgentRunner } from './agent-ipc'
-import { assistantReadiness, runAgentOnce } from './agent-runtime'
+import { assistantReadiness, builtinAssistantReadiness, runAgentOnce } from './agent-runtime'
+import { createModelChannelStore, type ModelChannelStore } from './model-channel-store'
 import { checkAssistantConnection, NOT_STARTED_VIEW } from './connection-check-runtime'
 import { localToolStatuses, runtimeVersions } from './local-tool-status'
 import {
   agentIpcChannels,
   type AgentProgressEvent,
+  type AssistantChoice,
   type AssistantConnectionCheckView,
 } from '@school-workbench/shared'
 import { createJudgmentIpcHandlers, registerJudgmentIpc } from './judgment-ipc'
@@ -52,7 +54,8 @@ if (testUserDataDirectory && !app.isPackaged) {
 let closeDatabase: (() => void) | undefined
 let readPlane: ReadPlaneRuntime | undefined
 let agentRunner: AgentRunner | null = null
-let connectionChecker: (() => Promise<AssistantConnectionCheckView>) | null = null
+let connectionChecker:
+  ((assistant: AssistantChoice) => Promise<AssistantConnectionCheckView>) | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -122,6 +125,17 @@ app.whenReady().then(() => {
   // capabilities must not be taken down by an unreadable pack file.
   const agentRuntimeRepository = new SqliteAgentRuntimeRepository(database)
   const preferencesRepository = new SqlitePreferencesRepository(database)
+  // The key the built-in assistant needs is held by the operating system's own
+  // secret store, never by the preferences table in the clear.
+  const modelChannel: ModelChannelStore = createModelChannelStore(
+    preferencesRepository,
+    safeStorage,
+  )
+
+  async function chosenAssistant(): Promise<AssistantChoice> {
+    const stored = await preferencesRepository.get('default_assistant')
+    return stored === 'builtin' ? 'builtin' : 'codex'
+  }
 
   function broadcastProgress(event: AgentProgressEvent): void {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -132,17 +146,23 @@ app.whenReady().then(() => {
   // Whether an assistant could be started at all. It is a question about this
   // computer, not about a running agent, so it is answered from paths rather
   // than by starting anything.
-  let readiness: AssistantReadiness = {
+  let codexReadiness: AssistantReadiness = {
     ready: false,
     detail: '工作台还在启动，稍等一下再看。',
   }
+  // Answered fresh each time settings are opened, because the built-in
+  // assistant becomes ready the moment a model connection is filled in — no
+  // restart, and nothing cached from launch to contradict what was just saved.
+  let modelChannelConfigured = false
   void startWorkbenchReadPlane({ database, methodology: methodologyRuntime })
     .then((runtime) => {
       readPlane = runtime
-      readiness = assistantReadiness(currentDirectory)
-      agentRunner = (input) =>
+      codexReadiness = assistantReadiness(currentDirectory)
+      agentRunner = async (input) =>
         runAgentOnce(
           {
+            assistant: await chosenAssistant(),
+            resolveModelChannel: () => modelChannel.readConfig(),
             readPlane: runtime.plane,
             writeService: runtime.writeService,
             endpoint: runtime.endpoint,
@@ -158,15 +178,19 @@ app.whenReady().then(() => {
         )
       // The connection test shares the read plane so it exercises the same
       // wiring a real run would, and is given nothing that could write.
-      connectionChecker = () =>
-        checkAssistantConnection({
-          readPlane: runtime.plane,
-          endpoint: runtime.endpoint,
-          mainDirectory: currentDirectory,
-          execPath: process.execPath,
-          userDataDirectory: app.getPath('userData'),
-          onDiagnostic: (message) => process.stderr.write(`${message}\n`),
-        })
+      connectionChecker = (assistant) =>
+        checkAssistantConnection(
+          {
+            readPlane: runtime.plane,
+            endpoint: runtime.endpoint,
+            mainDirectory: currentDirectory,
+            execPath: process.execPath,
+            userDataDirectory: app.getPath('userData'),
+            resolveModelChannel: () => modelChannel.readConfig(),
+            onDiagnostic: (message) => process.stderr.write(`${message}\n`),
+          },
+          assistant,
+        )
       // Deliberately reports readiness only. The port and the capability tokens
       // never leave this process.
       process.stderr.write('workbench read plane ready\n')
@@ -193,12 +217,25 @@ app.whenReady().then(() => {
     createSettingsIpcHandlers({
       read: (key) => preferencesRepository.get(key),
       write: (key, value) => preferencesRepository.set(key, value),
-      readiness: () => readiness,
+      readiness: (assistant) =>
+        assistant === 'builtin'
+          ? builtinAssistantReadiness(modelChannelConfigured)
+          : codexReadiness,
       localToolStatuses: () => localToolStatuses(),
       runtimeVersions: () => runtimeVersions(currentDirectory),
-      checkConnection: async () =>
+      modelChannel: {
+        ...modelChannel,
+        // Reading the view is also when the workbench learns whether the
+        // built-in assistant can be offered, so the two can never disagree.
+        readView: async () => {
+          const view = await modelChannel.readView()
+          modelChannelConfigured = view.configured
+          return view
+        },
+      },
+      checkConnection: async (assistant) =>
         connectionChecker
-          ? connectionChecker()
+          ? connectionChecker(assistant)
           : {
               state: 'failed' as const,
               ...NOT_STARTED_VIEW,

@@ -145,6 +145,8 @@ function baseApi(): WorkbenchApi {
       }),
       chooseAssistant: vi.fn(),
       checkConnection: vi.fn(),
+      saveModelChannel: vi.fn(),
+      clearModelChannel: vi.fn(),
     },
     agent: {
       run: vi.fn().mockResolvedValue(assistantRun),

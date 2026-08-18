@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   compareVersions,
   parseReportedVersion,
+  pinnedBuiltinHarnessVersion,
   verifiedRuntimeVersions,
   versionStanding,
 } from './runtime-versions'
@@ -18,6 +19,30 @@ describe('the versions this product has been verified against', () => {
     ]
     expect(pinned).toBe(verifiedRuntimeVersions.codex_acp.verifiedFrom)
     expect(pinned).toBe(verifiedRuntimeVersions.codex_acp.verifiedUntil)
+  })
+
+  it('records the harness version both manifests actually pin, exactly', () => {
+    // The whole argument for a controlled harness is that the version cannot
+    // move on its own. Two manifests pin it — the package that imports it and
+    // the app that ships it — and a constant that disagreed with either would
+    // put a version nobody runs into the database and onto the settings page.
+    for (const manifestPath of ['packages/agent-host/package.json', 'apps/desktop/package.json']) {
+      const manifest: unknown = JSON.parse(readFileSync(resolve(manifestPath), 'utf8'))
+      const dependencies =
+        (manifest as { dependencies?: Record<string, string> }).dependencies ?? {}
+      for (const name of ['@earendil-works/pi-agent-core', '@earendil-works/pi-ai']) {
+        // Exact, not a range: `^` or `~` here would mean the lockfile decides
+        // which harness a build runs, which is the failure this replaces.
+        expect(dependencies[name], `${manifestPath} → ${name}`).toBe(pinnedBuiltinHarnessVersion)
+      }
+    }
+  })
+
+  it('keeps the pinned harness out of the verified ranges until somebody verifies it', () => {
+    // The two entries in that table describe artefacts outside this repository
+    // and grow only after a real end-to-end run. The pinned harness has had no
+    // such run, so it must not have acquired a range that implies otherwise.
+    expect(Object.keys(verifiedRuntimeVersions)).toEqual(['codex_acp', 'codex_cli'])
   })
 
   it('reads as a range, oldest first', () => {

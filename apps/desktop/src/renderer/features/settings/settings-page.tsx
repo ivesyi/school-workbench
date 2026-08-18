@@ -3,6 +3,7 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
+  Input,
   Separator,
 } from '@school-workbench/experience'
 import type {
@@ -22,13 +23,24 @@ export function SettingsPage(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
   const [checkResult, setCheckResult] = useState<AssistantConnectionCheckView | null>(null)
+  const [channelBaseUrl, setChannelBaseUrl] = useState('')
+  const [channelModel, setChannelModel] = useState('')
+  // Never seeded from what is stored, because what is stored is never read
+  // back. An empty box means "type a new one", which is the only thing a
+  // consultant can do with a key the workbench cannot show them.
+  const [channelApiKey, setChannelApiKey] = useState('')
+  const [savingChannel, setSavingChannel] = useState(false)
+  const [channelMessage, setChannelMessage] = useState<string | null>(null)
 
   useEffect(() => {
     let current = true
     void api.settings
       .getAssistant()
       .then((result) => {
-        if (current) setAssistant(result)
+        if (!current) return
+        setAssistant(result)
+        setChannelBaseUrl(result.modelChannel.baseUrl ?? '')
+        setChannelModel(result.modelChannel.model ?? '')
       })
       .catch(() => {
         if (current) setError('暂时读不到 AI 助手的设置。')
@@ -69,6 +81,53 @@ export function SettingsPage(): React.JSX.Element {
       setError('这次没能完成连接测试，请稍后再试一次。')
     } finally {
       setChecking(false)
+    }
+  }
+
+  /**
+   * Saves the model connection.
+   *
+   * The key leaves this component once, on its way to the operating system's
+   * secret store, and is cleared from the form straight afterwards. Nothing
+   * reads it back, so nothing here can put it on screen again.
+   */
+  async function saveModelChannel(): Promise<void> {
+    if (savingChannel) return
+    setSavingChannel(true)
+    setChannelMessage(null)
+    try {
+      const result = await api.settings.saveModelChannel({
+        baseUrl: channelBaseUrl.trim(),
+        model: channelModel.trim(),
+        apiKey: channelApiKey,
+      })
+      setChannelApiKey('')
+      setChannelMessage(result.saved ? '已保存。' : result.problem)
+      // The assistant list depends on this, so it is re-read rather than
+      // guessed at: an assistant that just became usable should say so.
+      setAssistant(await api.settings.getAssistant())
+    } catch {
+      setChannelMessage('这次没能保存，请检查填写内容后再试一次。')
+    } finally {
+      setSavingChannel(false)
+    }
+  }
+
+  async function clearModelChannel(): Promise<void> {
+    if (savingChannel) return
+    setSavingChannel(true)
+    setChannelMessage(null)
+    try {
+      const next = await api.settings.clearModelChannel()
+      setAssistant(next)
+      setChannelBaseUrl('')
+      setChannelModel('')
+      setChannelApiKey('')
+      setChannelMessage('已清除。')
+    } catch {
+      setChannelMessage('这次没能清除，请稍后再试一次。')
+    } finally {
+      setSavingChannel(false)
     }
   }
 
@@ -177,6 +236,77 @@ export function SettingsPage(): React.JSX.Element {
               {error}
             </p>
           ) : null}
+        </div>
+      </section>
+
+      <section className="mt-6 overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="px-6 py-5">
+          <h2 className="font-medium">AI 模型连接</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            「工作台自带助手」用这个连接去问模型。选 Codex
+            的话这里可以不填。密钥由这台电脑的系统钥匙串保管，工作台不会把它显示出来，也不会写进日志。
+          </p>
+          {assistant === null ? (
+            <p className="mt-4 text-sm text-muted-foreground">正在读取…</p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              <p className="text-sm text-muted-foreground">{assistant.modelChannel.detail}</p>
+              <label className="block">
+                <span className="block text-sm font-medium">模型地址</span>
+                <Input
+                  className="mt-1"
+                  value={channelBaseUrl}
+                  placeholder="https://…"
+                  aria-label="模型地址"
+                  onChange={(event) => setChannelBaseUrl(event.target.value)}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium">模型名称</span>
+                <Input
+                  className="mt-1"
+                  value={channelModel}
+                  aria-label="模型名称"
+                  onChange={(event) => setChannelModel(event.target.value)}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium">密钥</span>
+                <Input
+                  className="mt-1"
+                  type="password"
+                  value={channelApiKey}
+                  aria-label="密钥"
+                  placeholder={
+                    assistant.modelChannel.hasApiKey ? '已保存，要换的话在这里填新的' : ''
+                  }
+                  onChange={(event) => setChannelApiKey(event.target.value)}
+                />
+              </label>
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  disabled={savingChannel || !assistant.modelChannel.secretStorageAvailable}
+                  onClick={() => void saveModelChannel()}
+                >
+                  {savingChannel ? '正在保存…' : '保存'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={savingChannel}
+                  onClick={() => void clearModelChannel()}
+                >
+                  清除
+                </Button>
+              </div>
+              {channelMessage ? (
+                <p className="text-sm text-muted-foreground" role="status">
+                  {channelMessage}
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
       </section>
 

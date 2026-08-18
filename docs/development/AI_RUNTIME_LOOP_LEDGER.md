@@ -365,6 +365,85 @@ SCREEN 2026-08-18T06:09:25.742Z  (进度条已消失)
 
 ---
 
+## 15. 受控 harness WS2（2026-08-19，基于 `c10db94`）
+
+**动因**（承 §14）：codex CLI 是顾问装的、自动升级、私有语法会漂移，宿主层三节链不受产品控制。§14 做的三件加固全是事后手段——让人更快看清坏在哪，不能让它不坏。本轮补的是结构上的另一条路：**受控 harness**，推理循环 = pin 在产品 lockfile 里、跑在工作台进程内的库。
+
+**架构前提（未变，本轮未触碰）**：多助手平级，**不做降级 / 路由 / 主备 / 自动切换**；切换永远由人手动完成；strict 契约唯一通道不变；Agent 是必需能力，fail-closed 不变。默认助手仍是 Codex——它是唯一有真模型端到端验收记录的（§11）。
+
+### 15.1 驱动选型：前提修正两条
+
+任务书写的包名 `@mariozechner/pi-agent-core` **已停更**：该 scope 最后一版 0.73.1，2026-05-07 发布。项目搬到了 org，活的是 **`@earendil-works/pi-agent-core` / `@earendil-works/pi-ai`**，同一个 repo（`earendil-works/pi`），最新 0.84.2 发于 2026-08-14。本轮按 earendil-works 这条线 pin。旁证：DeepSeek 自己的 `dsh-llm-pi-ai` 依赖的也是 `@earendil-works/pi-ai`。
+
+第二条修正：`pi-ai` 把 `openai`、`@google/genai`、`@anthropic-ai/sdk`、`@aws-sdk/client-bedrock-runtime` 全部列为**硬依赖**（不是 optional）。实测 `npm install @earendil-works/pi-agent-core@0.84.2 @earendil-works/pi-ai@0.84.2` = **94 包 / 92MB**，并带两个 install script（`@google/genai`、`protobufjs`）。产品只走 OpenAI 兼容一条路，其余三个 SDK 从不加载；两个 install script 在 `pnpm-workspace.yaml` 的 `allowBuilds` 里**显式设为 false**。
+
+### 15.2 六件交付
+
+| 件  | 做了什么                                                                                                                                                                                                                  |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Harness 接口分层**：`packages/agent-host/src/harness/contracts.ts` 定义 `HarnessDriver`（输入=任务+能力令牌授予，输出=统一运行结果+失败分类+进度事件）。跨线的东西刻意极少；ACP 会话、子进程、provider SDK 全在驱动一侧 |
+| 2   | **codex 路径已经在走这个接口**：`harness/acp-adapter.ts` 是**纯投影**，`AgentHost` 一行未动，产品现在真的从 `HarnessRunResult` 读结果。接口能容下 codex 从承诺变成在跑的事实                                              |
+| 3   | **pi 进程内驱动** `packages/agent-host/src/harness-pi/`：`runAgentLoop` 组装最小循环，**只挂我们的十个领域工具**，pi 的 read/write/edit/bash/终端 UI 一个不挂                                                             |
+| 4   | **工具注册走同一条治理通路**：十个工具由 `workbench-read-plane` 的同一批 zod 契约编译出参数 schema，调用走同一个 loopback + 同一个能力令牌 + 同样两个 scoping header。read plane 分辨不出两个助手                         |
+| 5   | **模型渠道进设置页**：OpenAI 兼容 base URL + 模型名 + 密钥。密钥经 Electron `safeStorage` 加密后存偏好表，**从不回读到任何界面**；这台机器没有系统密钥保管服务时 `save()` 什么都不写并如实报告                            |
+| 6   | **助手选择扩为两项**：`assistantChoiceSchema = ['codex','builtin']`；`builtin` ready 判定 = 驱动可装配（真建一次工具集，跑 SPEC 18/25 契约检查）+ 渠道配置齐全。连接测试对它跑同样的六态语义                              |
+
+顾问看到的名字定为 **「工作台自带助手」**。理由：它描述的是**推理跑在哪**（产品自己进程内，不用另外装东西），这正好是顾问需要区分的那一点——另一个选项 Codex 要顾问自己装、自己登录。名字里不出现 pi / harness / provider / OpenAI 之类实现词，有测试锁住这条。
+
+### 15.3 pi 白送了什么 / 我们自建了什么
+
+**pi 白送（0 行自建）**：agent 循环本体（含流式 chunk 装配、工具调用调度与结果回灌、消息历史与 provider 报文双向转换、中断语义）；`streamFn` 这个天然的假模型注入口；**`fauxProvider` + `setResponses` 脚本化假模型**（假 LLM 测试设施白送一半）；OpenAI 兼容 provider（`createProvider` + `openAICompletionsApi()`，自定义端点约 10 行）；typebox 参数校验。
+
+**我们自建**（`packages/agent-host` 新增 `harness/` 2 个 + `harness-pi/` 5 个源文件，非测试代码合计 1085 行）：Harness 接口与 codex 投影适配器；十个工作台工具的 pi 侧注册与 loopback 桥接（含错误载荷逐字回传）；SPEC 18/25 契约断言；模型渠道构造与 fail-closed 判定；运行结果 → Agent Run 状态/失败分类映射；轮次上限；连接测试的六态映射。产品侧另加机密存储、设置页渠道 UI、助手路由。
+
+**手写最小 loop 的对比**（若不用 pi）：需自建流式装配、工具调度、报文转换、错误与中断语义、上下文压缩，粗估 800–1500 行且属于会**静默出错**的代码。本轮判断：不值得自己写，除非依赖体量成为部署硬约束。
+
+### 15.4 本轮验证数字（主会话可复跑）
+
+- `pnpm typecheck` 绿 · `pnpm lint` 绿 · `pnpm format` 绿
+- `pnpm test`：**80 files / 503 tests**（基线 74 / 450）
+- `pnpm build` 绿 · `pnpm test:e2e`：**16 passed**（基线 16）
+
+新增测试覆盖（全部实跑通过）：
+
+- **真 SQLite 端到端**（`apps/desktop/src/main/builtin-assistant-run.integration.test.ts`）：真迁移 + 真 loopback（真端口）+ 真能力令牌 + 真 assessment gate + 真方法论 pack + 真 pi 循环，脚本化模型走完「读学校 → 取准则 → 看历史 → 登记依据 → 提交判断」，`diagnosis_proposals` 落一条 `proposed`、`accepted_judgments` 为 0、四句进度文案按序推进；另含自纠一轮（被拒的候选写 0 行，`self_correction_rounds` = 1）
+- **越权被拒**：只带 read scope 的令牌调 `evidence_register` → `AUTH_SCOPE_DENIED`，`evidence` 表零行；跨校令牌读不到本校；SPEC 25 四个禁用能力在工具集里不存在且 loopback 直接 404
+- **工具面一致性**（`workbench-tool-parity.test.ts`）：起真的 MCP server 子进程列真的工具，逐项比对十个工具的名称、描述、参数 schema，全等
+- **机密不落明文**（`model-channel-store.test.ts`）：存后全表值不含密钥原文、只有带前缀的密文；`readView()` 序列化后不含密钥；无密钥保管服务时一个字节都不写；存下来的值解不开时当作没有密钥（不回退读明文）
+- **诚实失败**：无渠道配置 → `MODEL_CHANNEL_NOT_CONFIGURED`，不碰学校数据、不问任何模型
+- **连接测试**：`builtin` 路径跑完全表行数逐表相等（与 §14.2 对 codex 的同一断言）；文案指向「填模型连接」而不是「装 Codex」
+- **pin 一致性**：`pinnedBuiltinHarnessVersion` 必须等于两份 manifest 里的 exact pin（禁 `^`/`~`）
+- **codex 零回归**：既有全部测试未改语义地通过
+
+### 15.5 未做 / 未验证（如实记）
+
+- **真模型端到端没有跑过。** 用户尚未配置火山方舟渠道，本轮全部证据来自脚本化模型。设置页的版本行因此标着「此版本未经产品验证」，**这行字只能靠真跑一次消掉，不许改常量**。验收步骤见 ADR-004 草稿第 7 节。
+- **没有用真 app 手点过一次**：设置页填渠道 → 保存 → 选「工作台自带助手」→ 运行连接测试 → 从工作台打一句话。机制与自动化测试就位，真机验收留给主会话。
+- **参数预校验会做类型强转**：pi 在调工具前用 typebox 校验并强转（`"5"` → `5`，可空字段的 `null` 被删）。codex 路径没有这一层。强转后仍要过 loopback 的同一批 zod，因此不构成完整性漏洞，但两个助手对模型格式毛刺的容忍度确实不同。
+- **`workbench_tools_cancelled` 这一态在 builtin 路径上永远落不到**（没有 MCP 子进程可被取消），连接测试如实报告，不假装覆盖六态。
+- **工具描述文案在 `harness-pi/workbench-tools.ts` 里重述了一遍**（`workbench-mcp` 是进程入口，import 会起 server）。parity 测试锁住不漂移；更干净的终局是下沉到 `workbench-read-plane/contracts`，那要动本轮边界外的包。
+- **92MB 依赖未做瘦身**。若打包体积成问题，选项是自写 OpenAI 兼容 provider 顶掉 `pi-ai`（`pi-agent-core` 硬依赖它，不能简单删）。
+
+### 15.6 dsh 作为备选驱动：本轮实测留档
+
+改向前按 dsh 版任务书做过一轮只读实测（未落入仓库，工作树在改向时已确认干净）。这些事实留档，将来若要把 dsh 加成第三个驱动不用重做：
+
+- **核心确实可以薄嵌**。`@deepseek-ai/dsh-agent-loop` 只 inject 五个服务（`agents` / `sessions` / `llm` / `tools` / `systemPrompt`）。只装这五个包实测 **20 个包 / 3.0MB**，全部第一方（外加 cosmokit、standard-schema），零原生依赖、零 install script；web UI、bash/fs/pwsh 工具、telemetry 全都不必挂载。实测跑通了带工具调用的完整循环。
+- **官方没有 MCP 客户端插件**（`dsh-tool-mcp` 确认 404），工具需要自己桥接——与 pi 的情况相同。
+- **两个坑**：Cordis 的服务注册比 `ctx.fiber.await()` 晚一个 tick，组装必须循环等待服务就位；`session-telemetry-otel` 默认 `DISABLED` 但仍挂载，最小组装里直接不挂它更干净。
+- **不选它的理由不是「不行」**，是成熟度（0.1.0-rc.7，开源 5 天）与嵌入形态（要手工装配一整个 IoC 容器，而 pi 的循环是一个可以直接调用的纯函数）。
+
+### 15.7 codex 路径适配 Harness 接口的路线
+
+本轮已完成第一步（纯投影适配器，`AgentHost` 未改）。若将来要走完：
+
+1. **把 `AgentHost` 包成 `CodexHarnessDriver implements HarnessDriver`**：构造函数吃 launcher + 路径解析，`run(task, observers)` 内部做现在 `runCodexAssistant` 做的事，末尾仍走 `harnessResultFromAcpOutcome`。纯搬运，无行为变化。
+2. **把 `runAgentOnce` 里的 `assistant === 'builtin' ? … : …` 换成驱动注册表查表**。此时新增第三个驱动（如 dsh）不需要动组合根的控制流。
+3. **连接测试同样收进接口**（加一个可选的 `probeConnection`），把 `connection-check-runtime.ts` 里的两条分支收敛成一条。
+4. 不要做的事：把 `mcpStartupReportedFailure` 这类某个 ACP bridge 特有的诊断提升进接口。它是特定实现对特定子进程的断言，`AgentHost` 已经据此做完决定并折进 `failure`。
+
+---
+
 ## 13. 本轮明确没做（顾问已列，不得顺手扩范围）
 
 飞书授权与 lark-cli｜文件 / 音频 ingestion｜教师实践纵切｜DeepSeek Harness｜Congruence 与 Role Standards Pack｜RAG / 向量库｜打包、签名、公证、自动更新。

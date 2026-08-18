@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@agentclientprotocol/codex-acp": "1.4.0",
+    "@earendil-works/pi-agent-core": "0.84.2",
+    "@earendil-works/pi-ai": "0.84.2",
     "@school-workbench/agent-host": "workspace:*",
     "@school-workbench/application": "workspace:*",
     "@school-workbench/db": "workspace:*",

@@ -1,15 +1,19 @@
 import {
   CodexAcpRuntimeLauncher,
+  pinnedBuiltinHarnessVersion,
   resolveCodexAcpEntry,
   resolveSystemCodexPath,
   resolveWorkbenchMcpEntry,
   runAssistantConnectionCheck,
+  runBuiltinAssistantConnectionCheck,
   type AcpRuntimeLauncher,
   type AssistantConnectionCheckResult,
   type ConnectionCheckOutcome,
+  type ModelChannelConfig,
+  type PiHarnessChannel,
   type verifyWorkbenchMcpTools,
 } from '@school-workbench/agent-host'
-import type { AssistantConnectionCheckView } from '@school-workbench/shared'
+import type { AssistantChoice, AssistantConnectionCheckView } from '@school-workbench/shared'
 import { readScopes, type WorkbenchLoopbackReadPlane } from '@school-workbench/workbench-read-plane'
 import { randomUUID } from 'node:crypto'
 
@@ -59,6 +63,17 @@ export type ConnectionCheckDependencies = Readonly<{
       cwd: string
     }>,
   ) => AcpRuntimeLauncher
+  /**
+   * The built-in assistant's model connection. Only read on that path; the
+   * Codex probe never asks for it, because Codex brings its own account.
+   */
+  resolveModelChannel?: () => Promise<ModelChannelConfig | null>
+  /**
+   * Test seam, alongside `createLauncher`. Production builds a real
+   * OpenAI-compatible channel; a test supplies a scripted model so the probe's
+   * own wiring can be exercised without money, network or a key.
+   */
+  createModelChannel?: (config: ModelChannelConfig) => PiHarnessChannel
 }>
 
 type Copy = Readonly<{ headline: string; detail: string }>
@@ -108,11 +123,40 @@ export const NOT_STARTED_VIEW: Copy = Object.freeze({
   detail: '工作台还在启动，稍等一下再测一次。',
 })
 
+/**
+ * Where the two assistants genuinely differ, in the consultant's words.
+ *
+ * Same six outcomes, different thing to do about three of them: Codex is
+ * software to install and log into, the built-in assistant is a model
+ * connection to fill in. Telling somebody to install Codex when the actual
+ * problem is an empty settings field is the kind of wrong-but-plausible advice
+ * that costs an afternoon.
+ */
+const BUILTIN_COPY: Partial<Record<ConnectionCheckOutcome, Copy>> = Object.freeze({
+  runtime_unavailable: {
+    headline: '这次没有连上',
+    detail:
+      '工作台自带助手还没有可用的 AI 模型连接，测试没能开始。在设置里填好模型地址、模型名称和密钥之后再测一次。',
+  },
+  model_backend_unreachable: {
+    headline: '这次没有连上',
+    detail:
+      '模型连接填好了，但对方没有回应。这是 AI 模型服务那边的问题，不是你的操作或学校资料的问题。常见原因是地址或密钥填得不对，或者模型服务这会儿用不了。',
+  },
+  workbench_tools_unavailable: {
+    headline: '这次没有连上',
+    detail:
+      '工作台这次没能把学校资料交到 AI 助手手上。这是工作台自身的问题，不是你的操作或学校资料的问题。更新工作台之后再测。',
+  },
+})
+
 export function describeConnectionCheck(
   result: AssistantConnectionCheckResult,
   checkedAt: Date,
+  assistant: AssistantChoice = 'codex',
 ): AssistantConnectionCheckView {
-  const copy = COPY[result.outcome]
+  const copy =
+    (assistant === 'builtin' ? BUILTIN_COPY[result.outcome] : undefined) ?? COPY[result.outcome]
   return Object.freeze({
     state: result.outcome === 'ok' ? ('ok' as const) : ('failed' as const),
     headline: copy.headline,
@@ -124,7 +168,9 @@ export function describeConnectionCheck(
 
 export async function checkAssistantConnection(
   dependencies: ConnectionCheckDependencies,
+  assistant: AssistantChoice = 'codex',
 ): Promise<AssistantConnectionCheckView> {
+  if (assistant === 'builtin') return checkBuiltinAssistantConnection(dependencies)
   const environment = dependencies.environment ?? process.env
   const now = dependencies.now ?? (() => new Date())
 
@@ -190,6 +236,58 @@ export async function checkAssistantConnection(
     )
     dependencies.onDiagnostic?.(`connection check: ${result.outcome} — ${result.detail}`)
     return describeConnectionCheck(result, now())
+  } finally {
+    // The token dies with the probe, not with its lifetime.
+    dependencies.readPlane.revokeToken(grant.token)
+  }
+}
+
+/**
+ * The same test for the built-in assistant.
+ *
+ * Given exactly what the Codex probe is given, and just as deliberately not
+ * given anything else: read scopes only, identities belonging to no school, and
+ * a token revoked the moment the probe ends. There is no repository, no
+ * judgement service and no real school id anywhere in this function, so no
+ * Agent Run, session row or domain row can appear because somebody pressed the
+ * button.
+ */
+async function checkBuiltinAssistantConnection(
+  dependencies: ConnectionCheckDependencies,
+): Promise<AssistantConnectionCheckView> {
+  const now = dependencies.now ?? (() => new Date())
+  const probeSchoolId = `connection-check-${randomUUID()}`
+  const probeRunId = `connection-check-${randomUUID()}`
+  const grant = dependencies.readPlane.issueToken({
+    schoolId: probeSchoolId,
+    agentRunId: probeRunId,
+    scopes: readScopes,
+  })
+
+  try {
+    const result = await runBuiltinAssistantConnectionCheck(
+      {
+        resolveChannel: dependencies.resolveModelChannel ?? (async () => null),
+        harnessVersion: pinnedBuiltinHarnessVersion,
+        ...(dependencies.createModelChannel
+          ? { createChannel: dependencies.createModelChannel }
+          : {}),
+      },
+      {
+        grant: {
+          endpoint: dependencies.endpoint,
+          token: grant.token,
+          schoolId: probeSchoolId,
+          agentRunId: probeRunId,
+        },
+        ...(dependencies.timeoutMs === undefined ? {} : { timeoutMs: dependencies.timeoutMs }),
+      },
+      {
+        ...(dependencies.onDiagnostic ? { onDiagnostic: dependencies.onDiagnostic } : {}),
+      },
+    )
+    dependencies.onDiagnostic?.(`connection check: ${result.outcome} — ${result.detail}`)
+    return describeConnectionCheck(result, now(), 'builtin')
   } finally {
     // The token dies with the probe, not with its lifetime.
     dependencies.readPlane.revokeToken(grant.token)

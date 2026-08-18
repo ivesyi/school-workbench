@@ -5,6 +5,8 @@ import type {
   AssistantConnectionCheckView,
   AssistantSettingsView,
   ChooseAssistantInput,
+  ModelChannelSaveResult,
+  SaveModelChannelInput,
 } from './preferences'
 import type { ArchiveSchoolInput, CreateSchoolInput, SchoolView } from './schools'
 import type { AdjustStageInput, ConfirmStageInput, StageWorkspaceView } from './stages'
@@ -43,6 +45,13 @@ export type WorkbenchApi = {
      * what happened. Started by a person, never on launch.
      */
     checkConnection(): Promise<AssistantConnectionCheckView>
+    /**
+     * Stores the model connection the built-in assistant uses. The key goes
+     * into the operating system's secret store and is never read back.
+     */
+    saveModelChannel(input: SaveModelChannelInput): Promise<ModelChannelSaveResult>
+    /** Forgets the model connection, key included. */
+    clearModelChannel(): Promise<AssistantSettingsView>
   }
   agent: {
     run(input: RunAgentInput): Promise<AgentRunView>

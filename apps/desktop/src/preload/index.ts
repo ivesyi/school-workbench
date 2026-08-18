@@ -8,7 +8,9 @@ import {
   assistantConnectionCheckViewSchema,
   assistantSettingsViewSchema,
   chooseAssistantInputSchema,
+  modelChannelSaveResultSchema,
   runAgentInputSchema,
+  saveModelChannelInputSchema,
   settingsIpcChannels,
   adjustStateInputSchema,
   confirmStageInputSchema,
@@ -145,6 +147,20 @@ const api: WorkbenchApi = {
     async checkConnection() {
       const result: unknown = await ipcRenderer.invoke(settingsIpcChannels.checkConnection)
       return assistantConnectionCheckViewSchema.parse(result)
+    },
+    async saveModelChannel(input) {
+      const result: unknown = await ipcRenderer.invoke(
+        settingsIpcChannels.saveModelChannel,
+        saveModelChannelInputSchema.parse(input),
+      )
+      // The result is validated like every other reply, and the schema has no
+      // field the key could arrive in: what comes back says whether one is
+      // stored, never what it is.
+      return modelChannelSaveResultSchema.parse(result)
+    },
+    async clearModelChannel() {
+      const result: unknown = await ipcRenderer.invoke(settingsIpcChannels.clearModelChannel)
+      return assistantSettingsViewSchema.parse(result)
     },
   },
   agent: {

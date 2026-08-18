@@ -15,6 +15,15 @@ const connectionCheckOk: AssistantConnectionCheckView = {
   checkedAt: '2026-08-18T00:00:00.000Z',
 }
 
+const emptyChannel: AssistantSettingsView['modelChannel'] = {
+  baseUrl: null,
+  model: null,
+  hasApiKey: false,
+  secretStorageAvailable: true,
+  configured: false,
+  detail: '还没填。填好模型地址、模型名称和密钥之后，工作台自带助手就能用了。',
+}
+
 function store(initial: Record<string, string> = {}) {
   const values = new Map(Object.entries(initial))
   return {
@@ -25,7 +34,16 @@ function store(initial: Record<string, string> = {}) {
     },
     localToolStatuses: () => localTools,
     runtimeVersions: async () => versions,
-    checkConnection: vi.fn(async () => connectionCheckOk),
+    checkConnection: vi.fn(async (assistant: 'codex' | 'builtin') => {
+      void assistant
+      return connectionCheckOk
+    }),
+    modelChannel: {
+      readView: async () => emptyChannel,
+      readConfig: async () => null,
+      save: vi.fn(async () => ({ saved: true, problem: null })),
+      clear: vi.fn(async () => undefined),
+    },
   }
 }
 
@@ -52,6 +70,13 @@ const versions: AssistantSettingsView['runtimeVersions'] = [
     standing: 'verified',
     note: null,
   },
+  {
+    key: 'builtin_harness',
+    label: '工作台自带助手的推理组件',
+    version: '0.84.2',
+    standing: 'verified',
+    note: null,
+  },
 ]
 const ready: AssistantReadiness = { ready: true, detail: null }
 const notReady: AssistantReadiness = {
@@ -60,7 +85,7 @@ const notReady: AssistantReadiness = {
 }
 
 describe('choosing a default assistant', () => {
-  it('defaults to the one assistant that exists, because analysis needs one', () => {
+  it('defaults to the assistant that has a verified end-to-end run behind it', () => {
     expect(DEFAULT_ASSISTANT).toBe('codex')
   })
 
@@ -69,10 +94,35 @@ describe('choosing a default assistant', () => {
     const view = await handlers.getAssistant()
 
     expect(view.selected).toBe('codex')
-    // DeepSeek Harness is a later slice; nothing offers what does not exist.
-    expect(view.options.map((option) => option.key)).toEqual(['codex'])
-    expect(view.options.map((option) => option.label)).toEqual(['Codex'])
+    expect(view.options.map((option) => option.key)).toEqual(['codex', 'builtin'])
+    expect(view.options.map((option) => option.label)).toEqual(['Codex', '工作台自带助手'])
     expect(view.localTools).toEqual(localTools)
+  })
+
+  it('names the second assistant by where it runs, never by the library behind it', async () => {
+    const handlers = createSettingsIpcHandlers({ ...store(), readiness: () => ready })
+    const view = await handlers.getAssistant()
+    const builtin = view.options.find((option) => option.key === 'builtin')
+
+    expect(builtin?.label).toBe('工作台自带助手')
+    for (const word of ['pi', 'harness', 'provider', 'agent-core', 'OpenAI', 'SDK']) {
+      expect(builtin?.label ?? '', word).not.toContain(word)
+    }
+  })
+
+  it('lets the consultant pick either one, with no fallback between them', async () => {
+    const backing = store()
+    const handlers = createSettingsIpcHandlers({
+      ...backing,
+      // The built-in assistant is not ready; choosing it must still work, and
+      // must not quietly land on the other one.
+      readiness: (assistant) => (assistant === 'codex' ? ready : notReady),
+    })
+
+    const saved = await handlers.chooseAssistant({ assistant: 'builtin' })
+    expect(saved.selected).toBe('builtin')
+    expect(backing.values.get(ASSISTANT_PREFERENCE_KEY)).toBe('builtin')
+    expect((await handlers.getAssistant()).selected).toBe('builtin')
   })
 
   it('remembers the choice', async () => {
@@ -101,7 +151,7 @@ describe('choosing a default assistant', () => {
       })
       const view = await handlers.getAssistant()
       expect(view.selected).toBe(DEFAULT_ASSISTANT)
-      expect(view.options).toHaveLength(1)
+      expect(view.options).toHaveLength(2)
     }
   })
 
@@ -129,7 +179,11 @@ describe('version information (reported, never enforced)', () => {
   it('reports what is installed alongside the assistant choice', async () => {
     const handlers = createSettingsIpcHandlers({ ...store(), readiness: () => ready })
     const view = await handlers.getAssistant()
-    expect(view.runtimeVersions.map((item) => item.key)).toEqual(['codex_cli', 'codex_acp'])
+    expect(view.runtimeVersions.map((item) => item.key)).toEqual([
+      'codex_cli',
+      'codex_acp',
+      'builtin_harness',
+    ])
     expect(view.runtimeVersions.every((item) => item.note === null)).toBe(true)
   })
 
@@ -167,6 +221,17 @@ describe('the connection test', () => {
 
     expect(await handlers.checkConnection()).toEqual(connectionCheckOk)
     expect(backing.checkConnection).toHaveBeenCalledTimes(1)
+    // The test is run against whichever assistant is actually selected, never
+    // against a different one that happens to be ready.
+    expect(backing.checkConnection).toHaveBeenCalledWith('codex')
+  })
+
+  it('tests the assistant that is selected, not the default one', async () => {
+    const backing = store()
+    const handlers = createSettingsIpcHandlers({ ...backing, readiness: () => ready })
+    await handlers.chooseAssistant({ assistant: 'builtin' })
+    await handlers.checkConnection()
+    expect(backing.checkConnection).toHaveBeenCalledWith('builtin')
   })
 
   it('refuses to pass on a result the consultant could not read', async () => {
@@ -176,5 +241,80 @@ describe('the connection test', () => {
       checkConnection: async () => ({ state: 'nope' }) as unknown as AssistantConnectionCheckView,
     })
     await expect(handlers.checkConnection()).rejects.toThrow()
+  })
+})
+
+describe('the model connection the built-in assistant uses', () => {
+  it('stores it and reports it back without the key', async () => {
+    const backing = store()
+    const saved: AssistantSettingsView['modelChannel'] = {
+      baseUrl: 'https://example.test/v1',
+      model: 'some-model',
+      hasApiKey: true,
+      secretStorageAvailable: true,
+      configured: true,
+      detail: '已填好，工作台自带助手可以直接使用。',
+    }
+    const handlers = createSettingsIpcHandlers({
+      ...backing,
+      readiness: () => ready,
+      modelChannel: { ...backing.modelChannel, readView: async () => saved },
+    })
+
+    const result = await handlers.saveModelChannel({
+      baseUrl: 'https://example.test/v1',
+      model: 'some-model',
+      apiKey: 'sk-secret-value',
+    })
+
+    expect(result.saved).toBe(true)
+    expect(backing.modelChannel.save).toHaveBeenCalledWith({
+      baseUrl: 'https://example.test/v1',
+      model: 'some-model',
+      apiKey: 'sk-secret-value',
+    })
+    // The reply carries no field the key could travel in, so the renderer
+    // cannot receive it even by accident.
+    expect(JSON.stringify(result)).not.toContain('sk-secret-value')
+    expect(result.channel.hasApiKey).toBe(true)
+  })
+
+  it('reports a machine that cannot keep a secret rather than storing one anyway', async () => {
+    const backing = store()
+    const handlers = createSettingsIpcHandlers({
+      ...backing,
+      readiness: () => ready,
+      modelChannel: {
+        ...backing.modelChannel,
+        save: vi.fn(async () => ({
+          saved: false,
+          problem: '这台电脑没有可用的系统密钥保管服务。',
+        })),
+      },
+    })
+
+    const result = await handlers.saveModelChannel({
+      baseUrl: 'https://example.test/v1',
+      model: 'some-model',
+      apiKey: 'sk-secret-value',
+    })
+
+    expect(result.saved).toBe(false)
+    expect(result.problem).toContain('系统密钥保管服务')
+  })
+
+  it('refuses input it cannot trust', async () => {
+    const handlers = createSettingsIpcHandlers({ ...store(), readiness: () => ready })
+    await expect(
+      handlers.saveModelChannel({ baseUrl: '', model: 'm', apiKey: 'k' }),
+    ).rejects.toThrow()
+    await expect(handlers.saveModelChannel({ baseUrl: 'https://x', model: 'm' })).rejects.toThrow()
+  })
+
+  it('forgets the whole connection when asked', async () => {
+    const backing = store()
+    const handlers = createSettingsIpcHandlers({ ...backing, readiness: () => ready })
+    await handlers.clearModelChannel()
+    expect(backing.modelChannel.clear).toHaveBeenCalledTimes(1)
   })
 })

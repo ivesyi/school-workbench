@@ -47,8 +47,31 @@ function view(
         standing: 'unverified',
         note: '此版本未经产品验证。',
       },
+      {
+        key: 'builtin_harness',
+        label: '工作台自带助手的推理组件',
+        version: '0.84.2',
+        standing: 'unverified',
+        note: '此版本未经产品验证。',
+      },
     ],
-    options: [{ key: 'codex', label: 'Codex', availability, detail }],
+    modelChannel: {
+      baseUrl: null,
+      model: null,
+      hasApiKey: false,
+      secretStorageAvailable: true,
+      configured: false,
+      detail: '还没填。填好模型地址、模型名称和密钥之后，工作台自带助手就能用了。',
+    },
+    options: [
+      { key: 'codex', label: 'Codex', availability, detail },
+      {
+        key: 'builtin',
+        label: '工作台自带助手',
+        availability: 'unavailable',
+        detail: '还没填 AI 模型连接。在下面填好模型地址、模型名称和密钥就能用。',
+      },
+    ],
   }
 }
 
@@ -80,6 +103,8 @@ function api(settings: Partial<WorkbenchApi['settings']> = {}): WorkbenchApi {
       getAssistant: vi.fn().mockResolvedValue(view()),
       chooseAssistant: vi.fn().mockResolvedValue(view()),
       checkConnection: vi.fn().mockResolvedValue(passedCheck),
+      saveModelChannel: vi.fn(),
+      clearModelChannel: vi.fn(),
       ...settings,
     },
     agent: { run: vi.fn(), onProgress: vi.fn().mockReturnValue(() => undefined) },
@@ -101,13 +126,17 @@ function renderPage(workbench: WorkbenchApi): void {
 afterEach(cleanup)
 
 describe('choosing a default AI assistant in settings', () => {
-  it('shows the assistant in use, and offers no way to work without one (PRD 15)', async () => {
+  it('shows both assistants as peers, and offers no way to work without one (PRD 15)', async () => {
     renderPage(api())
 
     const radios = await screen.findAllByRole('radio')
-    expect(radios).toHaveLength(1)
+    expect(radios).toHaveLength(2)
     expect(radios[0]).toBeChecked()
     expect(screen.getByRole('radio', { name: /Codex/ })).toBeInTheDocument()
+    // Listed even though it is not usable yet, with the reason attached — a
+    // hidden assistant is one the consultant cannot fix or later pick.
+    expect(screen.getByRole('radio', { name: /工作台自带助手/ })).toBeInTheDocument()
+    expect(screen.getByText(/还没填 AI 模型连接/)).toBeInTheDocument()
     expect(screen.queryByText(/暂不使用/)).not.toBeInTheDocument()
   })
 
@@ -218,16 +247,101 @@ describe('version information in settings', () => {
     expect(await screen.findByText('版本信息')).toBeInTheDocument()
     expect(screen.getByText('0.147.0')).toBeInTheDocument()
     expect(screen.getByText('9.9.9')).toBeInTheDocument()
-    expect(screen.getByText('此版本未经产品验证。')).toBeInTheDocument()
+    // Both the ACP bridge and the pinned built-in harness are unverified in
+    // this fixture, and each says so on its own row.
+    expect(screen.getAllByText('此版本未经产品验证。')).toHaveLength(2)
+    expect(screen.getByText('工作台自带助手的推理组件')).toBeInTheDocument()
+    expect(screen.getByText('0.84.2')).toBeInTheDocument()
   })
 
   it('does not turn an unverified version into a block', async () => {
     renderPage(api())
-    await screen.findByText('此版本未经产品验证。')
+    await screen.findAllByText('此版本未经产品验证。')
     // The assistant is still the chosen one and still usable; nothing on the
     // page tells the consultant to stop or to upgrade before continuing.
     expect(screen.getByRole('radio', { name: /Codex/ })).toBeChecked()
     expect(screen.queryByText(/都还能照常查看，只是不能开始新的分析/)).not.toBeInTheDocument()
     expect(screen.getByText(/版本不影响工作台怎么运行/)).toBeInTheDocument()
+  })
+})
+
+describe('the model connection the built-in assistant uses', () => {
+  it('never shows a stored key, and offers a box to replace it', async () => {
+    const configured = view()
+    configured.modelChannel = {
+      baseUrl: 'https://example.test/v1',
+      model: 'some-model',
+      hasApiKey: true,
+      secretStorageAvailable: true,
+      configured: true,
+      detail: '已填好，工作台自带助手可以直接使用。',
+    }
+    renderPage(api({ getAssistant: vi.fn().mockResolvedValue(configured) }))
+
+    expect(await screen.findByText('AI 模型连接')).toBeInTheDocument()
+    expect(screen.getByLabelText('模型地址')).toHaveValue('https://example.test/v1')
+    expect(screen.getByLabelText('模型名称')).toHaveValue('some-model')
+    // The key box is empty and says why: there is nothing to show, because
+    // nothing reads a stored key back.
+    expect(screen.getByLabelText('密钥')).toHaveValue('')
+    expect(screen.getByPlaceholderText('已保存，要换的话在这里填新的')).toBeInTheDocument()
+  })
+
+  it('sends what was typed once, and clears it from the form afterwards', async () => {
+    const saveModelChannel = vi.fn().mockResolvedValue({
+      saved: true,
+      problem: null,
+      channel: {
+        baseUrl: 'https://example.test/v1',
+        model: 'some-model',
+        hasApiKey: true,
+        secretStorageAvailable: true,
+        configured: true,
+        detail: '已填好，工作台自带助手可以直接使用。',
+      },
+    })
+    renderPage(api({ saveModelChannel }))
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByLabelText('模型地址'), 'https://example.test/v1')
+    await user.type(screen.getByLabelText('模型名称'), 'some-model')
+    await user.type(screen.getByLabelText('密钥'), 'sk-typed-secret')
+    await user.click(screen.getByRole('button', { name: '保存' }))
+
+    expect(saveModelChannel).toHaveBeenCalledWith({
+      baseUrl: 'https://example.test/v1',
+      model: 'some-model',
+      apiKey: 'sk-typed-secret',
+    })
+    // Not left sitting in the form afterwards, and nowhere on the page.
+    expect(screen.getByLabelText('密钥')).toHaveValue('')
+    expect(document.body.textContent ?? '').not.toContain('sk-typed-secret')
+  })
+
+  it('says plainly when this computer cannot keep a key, and refuses to try', async () => {
+    const refusing = view()
+    refusing.modelChannel = {
+      baseUrl: null,
+      model: null,
+      hasApiKey: false,
+      secretStorageAvailable: false,
+      configured: false,
+      detail:
+        '这台电脑没有可用的系统密钥保管服务，工作台不会把密钥明文存下来。请先启用系统钥匙串后再填一次。',
+    }
+    renderPage(api({ getAssistant: vi.fn().mockResolvedValue(refusing) }))
+
+    expect(await screen.findByText(/不会把密钥明文存下来/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '保存' })).toBeDisabled()
+  })
+
+  it('explains what the connection is for without naming the machinery', async () => {
+    renderPage(api())
+    await screen.findByText('AI 模型连接')
+    const section = document.body.textContent ?? ''
+    expect(section).toContain('系统钥匙串保管')
+    for (const word of ['pi', 'OpenAI', 'provider', 'harness', 'API base']) {
+      expect(section, word).not.toContain(word)
+    }
   })
 })

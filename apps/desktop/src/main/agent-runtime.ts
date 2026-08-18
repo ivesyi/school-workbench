@@ -2,10 +2,17 @@ import {
   AgentHost,
   AgentHostError,
   CodexAcpRuntimeLauncher,
+  createWorkbenchAgentTools,
+  harnessResultFromAcpOutcome,
+  PiHarnessDriver,
+  pinnedBuiltinHarnessVersion,
   resolveCodexAcpEntry,
   resolveSystemCodexPath,
   resolveWorkbenchMcpEntry,
-  type AgentRunOutcome,
+  type AgentRunStatus,
+  type HarnessRunResult,
+  type ModelChannelConfig,
+  type PiHarnessChannel,
 } from '@school-workbench/agent-host'
 import type { JudgmentService } from '@school-workbench/application'
 import type { SqliteAgentRuntimeRepository } from '@school-workbench/db'
@@ -13,6 +20,7 @@ import type {
   AgentProgressPhase,
   AgentRunOutcomeValue,
   AgentRunView,
+  AssistantChoice,
   RunAgentInput,
 } from '@school-workbench/shared'
 import {
@@ -23,13 +31,31 @@ import {
 import { randomUUID } from 'node:crypto'
 
 /**
- * The runtime this slice drives. SPEC 8 lists DeepSeek Harness as well, but this
- * slice only wires Codex; nothing here is written for a runtime that is not
- * being integrated.
+ * The runtimes this workbench drives, one row each in `runtime_profiles`.
+ *
+ * Two peers, not a primary and a spare. Which one a run uses comes from the
+ * consultant's standing choice and nothing else: no code below picks one,
+ * ranks them, or moves to the other after a failure (PRD 15).
  */
 export const codexRuntimeProfile = Object.freeze({
   key: 'codex',
   displayName: 'Codex',
+})
+
+/**
+ * The controlled harness. `displayName` lands in a database column, not on
+ * screen; the consultant-facing label lives in the settings view.
+ */
+export const builtinRuntimeProfile = Object.freeze({
+  key: 'builtin',
+  displayName: '工作台自带助手',
+})
+
+export const runtimeProfiles: Readonly<
+  Record<AssistantChoice, { key: string; displayName: string }>
+> = Object.freeze({
+  codex: codexRuntimeProfile,
+  builtin: builtinRuntimeProfile,
 })
 
 /**
@@ -90,6 +116,25 @@ export function nextProgressPhase(
 }
 
 export type AgentRuntimeDependencies = Readonly<{
+  /**
+   * Which assistant this run uses — the consultant's standing choice, read
+   * once when the run is dispatched.
+   */
+  assistant: AssistantChoice
+  /**
+   * The built-in assistant's model connection, resolved at the moment it is
+   * needed so a connection filled in mid-session works without a restart.
+   * Never called on the Codex path.
+   */
+  resolveModelChannel?: () => Promise<ModelChannelConfig | null>
+  /**
+   * Test seam, mirroring `createLauncher` on the connection check. Production
+   * builds a real OpenAI-compatible channel from the stored connection; a test
+   * supplies a scripted model so the whole run — loop, tools, capability
+   * token, loopback, assessment gate, SQLite — can be exercised without a
+   * network, a key or money.
+   */
+  createModelChannel?: (config: ModelChannelConfig) => PiHarnessChannel
   readPlane: WorkbenchLoopbackReadPlane
   writeService: WorkbenchWriteCapabilityService
   endpoint: string
@@ -108,8 +153,50 @@ export type AgentRuntimeDependencies = Readonly<{
   onProgress?: (phase: AgentProgressPhase) => void
 }>
 
+export type AssistantReadinessResult = Readonly<{ ready: boolean; detail: string | null }>
+
 /**
- * Whether an assistant could be started on this computer.
+ * Whether the built-in assistant could be started on this computer.
+ *
+ * Two questions, and they fail differently on purpose. *Can this build assemble
+ * the harness at all* is answered by really building the tool set against a
+ * throwaway grant — that compiles every parameter schema and runs the SPEC 18 /
+ * SPEC 25 contract check, so a broken build is caught here rather than in front
+ * of a consultant who just typed a paragraph. *Is there a model to talk to* is
+ * the ordinary, expected "not yet", and it says what to do about it.
+ *
+ * Neither question can be answered by pressing on and hoping, which is why
+ * neither is left to the run.
+ */
+export function builtinAssistantReadiness(
+  modelChannelConfigured: boolean,
+): AssistantReadinessResult {
+  try {
+    createWorkbenchAgentTools({
+      // Belongs to no school and is never sent anywhere: the tool set is built
+      // and thrown away without a request being made.
+      endpoint: 'http://127.0.0.1:1/internal/v1',
+      token: 'a'.repeat(43),
+      schoolId: 'readiness-probe',
+      agentRunId: 'readiness-probe',
+    })
+  } catch {
+    return Object.freeze({
+      ready: false,
+      detail: '工作台自带助手在这个版本里没能装配起来，请更新工作台。',
+    })
+  }
+  if (!modelChannelConfigured) {
+    return Object.freeze({
+      ready: false,
+      detail: '还没填 AI 模型连接。在下面填好模型地址、模型名称和密钥就能用。',
+    })
+  }
+  return Object.freeze({ ready: true, detail: null })
+}
+
+/**
+ * Whether Codex could be started on this computer.
  *
  * Answered from what is installed, not by starting anything: the consultant
  * needs to know before typing whether waiting is worth it. Whether Codex is
@@ -119,7 +206,7 @@ export type AgentRuntimeDependencies = Readonly<{
 export function assistantReadiness(
   mainDirectory: string,
   environment: NodeJS.ProcessEnv = process.env,
-): Readonly<{ ready: boolean; detail: string | null }> {
+): AssistantReadinessResult {
   try {
     resolveWorkbenchMcpEntry(mainDirectory, environment)
   } catch {
@@ -150,8 +237,9 @@ export async function runAgentOnce(
   dependencies: AgentRuntimeDependencies,
   input: RunAgentInput,
 ): Promise<AgentRunView> {
-  const environment = dependencies.environment ?? process.env
-  const runtimeProfileId = await dependencies.repository.ensureRuntimeProfile(codexRuntimeProfile)
+  const runtimeProfileId = await dependencies.repository.ensureRuntimeProfile(
+    runtimeProfiles[dependencies.assistant],
+  )
   const run = await dependencies.repository.createRun({
     schoolId: input.schoolId,
     runId: randomUUID(),
@@ -172,57 +260,36 @@ export async function runAgentOnce(
   // way off, and PRD 16 is about the wait, not about the result.
   dependencies.onProgress?.('understanding')
 
-  let outcome: AgentRunOutcome
+  const onWorkbenchToolCall = (tool: string): void => {
+    const next = nextProgressPhase(phase, tool)
+    if (!next) return
+    phase = next
+    dependencies.onProgress?.(next)
+  }
+  const onStatus = (status: AgentRunStatus): void => {
+    void dependencies.repository.setRunStatus(run.id, status).catch(() => undefined)
+  }
+
+  let outcome: HarnessRunResult
   try {
-    const mcpEntry = resolveWorkbenchMcpEntry(dependencies.mainDirectory, environment)
-    const codexAcpEntry = resolveCodexAcpEntry(dependencies.mainDirectory, environment)
-    const systemCodexPath = resolveSystemCodexPath(environment)
-
-    const host = new AgentHost(
-      new CodexAcpRuntimeLauncher({
-        entryPath: codexAcpEntry.path,
-        execPath: dependencies.execPath,
-        systemCodexPath,
-        environment,
-        // The bridge process itself runs in the user data directory: it never
-        // receives the session workspace, which belongs to the agent.
-        cwd: dependencies.userDataDirectory,
-      }),
-      {
-        ...(dependencies.onDiagnostic ? { onDiagnostic: dependencies.onDiagnostic } : {}),
-        onStatus: (status) => {
-          void dependencies.repository.setRunStatus(run.id, status).catch(() => undefined)
-        },
-        onWorkbenchToolCall: (tool) => {
-          const next = nextProgressPhase(phase, tool)
-          if (!next) return
-          phase = next
-          dependencies.onProgress?.(next)
-        },
-      },
-    )
-
-    // Stop waiting eventually. The consultant is watching this happen.
+    // Stop waiting eventually, whichever harness is driving. The consultant is
+    // watching this happen.
     const deadline = new AbortController()
-    const timer = setTimeout(() => deadline.abort(), AGENT_RUN_TIMEOUT_MS)
-    timer.unref?.()
+    const runTimer = setTimeout(() => deadline.abort(), AGENT_RUN_TIMEOUT_MS)
+    runTimer.unref?.()
     try {
-      outcome = await host.run({
-        schoolId: input.schoolId,
-        agentRunId: run.id,
-        consultantMessage: input.message,
-        mcp: {
-          command: dependencies.execPath,
-          entryPath: mcpEntry.path,
-          endpoint: dependencies.endpoint,
-          token: grant.token,
-          extraEnv: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }],
-        },
-        forbiddenWorkspaceRoots: [dependencies.userDataDirectory],
-        signal: deadline.signal,
-      })
+      outcome =
+        dependencies.assistant === 'builtin'
+          ? await runBuiltinAssistant(dependencies, input, run.id, grant.token, deadline.signal, {
+              onStatus,
+              onWorkbenchToolCall,
+            })
+          : await runCodexAssistant(dependencies, input, run.id, grant.token, deadline.signal, {
+              onStatus,
+              onWorkbenchToolCall,
+            })
     } finally {
-      clearTimeout(timer)
+      clearTimeout(runTimer)
     }
   } catch (error) {
     dependencies.readPlane.revokeToken(grant.token)
@@ -259,12 +326,12 @@ export async function runAgentOnce(
   const sessionId = await dependencies.repository.recordSession({
     schoolId: input.schoolId,
     runtimeProfileId,
-    acpSessionId: outcome.acpSessionId,
-    cwd: outcome.workspaceCwd ?? '',
-    compatibility: outcome.compatibility.compatibility,
-    protocolVersion: outcome.compatibility.protocolVersion,
-    agentName: outcome.compatibility.agentName,
-    agentVersion: outcome.compatibility.agentVersion,
+    acpSessionId: outcome.session.externalSessionId,
+    cwd: outcome.session.cwd ?? '',
+    compatibility: outcome.session.compatibility,
+    protocolVersion: outcome.session.protocolVersion,
+    agentName: outcome.session.agentName,
+    agentVersion: outcome.session.agentVersion,
     closedAt: new Date().toISOString(),
   })
   await dependencies.repository.attachRunToSession(run.id, sessionId)
@@ -293,8 +360,8 @@ export async function runAgentOnce(
           }
         : null,
     usedWorkbenchTools: outcome.usedWorkbenchTools,
-    unrecognisedUpdateKinds: [...outcome.unrecognisedUpdateTags],
-    runtimeCompatibility: outcome.compatibility.compatibility,
+    unrecognisedUpdateKinds: [...outcome.unrecognisedRuntimeSignals],
+    runtimeCompatibility: outcome.session.compatibility,
     failureCode: outcome.failure?.code ?? null,
     failureMessage: outcome.failure?.message ?? null,
   })
@@ -309,10 +376,114 @@ export async function runAgentOnce(
  * afterwards — the judgement is already safely recorded and reviewable.
  */
 export function describeOutcome(
-  status: AgentRunOutcome['status'],
+  status: HarnessRunResult['status'],
   submitted: 'proposal' | 'insufficient_evidence' | 'none',
 ): AgentRunOutcomeValue {
   if (submitted === 'proposal') return 'proposal_ready'
   if (submitted === 'insufficient_evidence') return 'needs_more_evidence'
   return status === 'completed' ? 'no_new_judgment' : 'failed'
+}
+
+type RunObservers = Readonly<{
+  onStatus: (status: AgentRunStatus) => void
+  onWorkbenchToolCall: (tool: string) => void
+}>
+
+/**
+ * The Codex run, unchanged.
+ *
+ * Every line below was moved here verbatim from the body of `runAgentOnce`;
+ * nothing about how Codex is launched, prompted or torn down is different. The
+ * only new thing is the last line, which projects the outcome onto the Harness
+ * shape so the code after the call does not have to know which assistant ran.
+ */
+async function runCodexAssistant(
+  dependencies: AgentRuntimeDependencies,
+  input: RunAgentInput,
+  runId: string,
+  token: string,
+  signal: AbortSignal,
+  observers: RunObservers,
+): Promise<HarnessRunResult> {
+  const environment = dependencies.environment ?? process.env
+  const mcpEntry = resolveWorkbenchMcpEntry(dependencies.mainDirectory, environment)
+  const codexAcpEntry = resolveCodexAcpEntry(dependencies.mainDirectory, environment)
+  const systemCodexPath = resolveSystemCodexPath(environment)
+
+  const host = new AgentHost(
+    new CodexAcpRuntimeLauncher({
+      entryPath: codexAcpEntry.path,
+      execPath: dependencies.execPath,
+      systemCodexPath,
+      environment,
+      // The bridge process itself runs in the user data directory: it never
+      // receives the session workspace, which belongs to the agent.
+      cwd: dependencies.userDataDirectory,
+    }),
+    {
+      ...(dependencies.onDiagnostic ? { onDiagnostic: dependencies.onDiagnostic } : {}),
+      onStatus: observers.onStatus,
+      onWorkbenchToolCall: observers.onWorkbenchToolCall,
+    },
+  )
+
+  return harnessResultFromAcpOutcome(
+    await host.run({
+      schoolId: input.schoolId,
+      agentRunId: runId,
+      consultantMessage: input.message,
+      mcp: {
+        command: dependencies.execPath,
+        entryPath: mcpEntry.path,
+        endpoint: dependencies.endpoint,
+        token,
+        extraEnv: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }],
+      },
+      forbiddenWorkspaceRoots: [dependencies.userDataDirectory],
+      signal,
+    }),
+  )
+}
+
+/**
+ * The built-in assistant run.
+ *
+ * Notice how little there is: no subprocess to launch, no throwaway working
+ * directory to create and delete, no protocol to negotiate, no MCP descriptor
+ * to build and verify. All of that exists on the Codex path to get a capability
+ * grant safely across a process boundary, and here there is no boundary to
+ * cross — the grant is handed straight to the tool set, which still spends it
+ * through the same loopback endpoint under the same scopes.
+ */
+async function runBuiltinAssistant(
+  dependencies: AgentRuntimeDependencies,
+  input: RunAgentInput,
+  runId: string,
+  token: string,
+  signal: AbortSignal,
+  observers: RunObservers,
+): Promise<HarnessRunResult> {
+  const resolveModelChannel = dependencies.resolveModelChannel ?? (async () => null)
+  const driver = new PiHarnessDriver({
+    resolveChannel: resolveModelChannel,
+    harnessVersion: pinnedBuiltinHarnessVersion,
+    ...(dependencies.createModelChannel ? { createChannel: dependencies.createModelChannel } : {}),
+  })
+  return driver.run(
+    {
+      grant: {
+        endpoint: dependencies.endpoint,
+        token,
+        schoolId: input.schoolId,
+        agentRunId: runId,
+      },
+      consultantMessage: input.message,
+      signal,
+    },
+    {
+      ...(dependencies.onDiagnostic ? { onDiagnostic: dependencies.onDiagnostic } : {}),
+      onStatus: observers.onStatus,
+      onWorkbenchToolCall: observers.onWorkbenchToolCall,
+    },
+  )
 }

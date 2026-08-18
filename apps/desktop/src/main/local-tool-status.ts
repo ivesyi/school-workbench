@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 import {
   parseReportedVersion,
+  pinnedBuiltinHarnessVersion,
   resolveCodexAcpEntry,
   resolveSystemCodexPath,
   versionStanding,
@@ -127,6 +128,32 @@ const VERSION_LABELS: Readonly<Record<VerifiedRuntimeKey, string>> = Object.free
   codex_acp: '工作台与 Codex 之间的连接组件',
 })
 
+const BUILTIN_HARNESS_LABEL = '工作台自带助手的推理组件'
+
+/**
+ * The pinned harness's row.
+ *
+ * Built by hand rather than through `describeVersion` because the question is
+ * different. For Codex the question is "which of the versions that exist in the
+ * world has anybody checked", and the answer is a range. Here the version is
+ * whatever this build pins, so there is nothing to compare it against — the
+ * only open question is whether a real analysis has ever been driven through
+ * it, and the honest answer today is no.
+ *
+ * It says `unverified` for exactly that reason, and it goes back to saying
+ * something else only when the acceptance run in the ledger has been done. That
+ * is a run somebody performs, not a constant somebody edits.
+ */
+function describeBuiltinHarnessVersion(): RuntimeVersionView {
+  return Object.freeze({
+    key: 'builtin_harness' as const,
+    label: BUILTIN_HARNESS_LABEL,
+    version: pinnedBuiltinHarnessVersion,
+    standing: 'unverified' as const,
+    note: UNVERIFIED_NOTE,
+  })
+}
+
 const UNVERIFIED_NOTE = '此版本未经产品验证。'
 const UNKNOWN_NOTE = '暂时读不到这个版本号。'
 
@@ -165,5 +192,6 @@ export async function runtimeVersions(
   return Object.freeze([
     describeVersion('codex_cli', codexVersion),
     describeVersion('codex_acp', readCodexAcpVersion(mainDirectory, environment, exists)),
+    describeBuiltinHarnessVersion(),
   ])
 }

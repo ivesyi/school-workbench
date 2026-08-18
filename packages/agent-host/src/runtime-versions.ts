@@ -46,6 +46,30 @@ export const verifiedRuntimeVersions = Object.freeze({
 
 export type VerifiedRuntimeKey = keyof typeof verifiedRuntimeVersions
 
+/**
+ * The version of the controlled harness the built-in assistant runs on.
+ *
+ * Deliberately *not* a member of `verifiedRuntimeVersions`, and the difference
+ * is the whole point of the distinction that table draws. Those two entries are
+ * ranges because the artefacts they describe are outside this repository: the
+ * consultant installs Codex and it moves on its own, so "which versions has
+ * anybody checked" is a real, open question with a range for an answer.
+ *
+ * This one is a single value because the library is pinned in this
+ * repository's lockfile. There is no range to keep: whatever this string says
+ * is exactly what runs, until somebody here edits the pin and the acceptance
+ * run below is repeated.
+ *
+ * **It is not verified yet.** No end-to-end run against a real model has been
+ * carried out on it — the model connection had not been configured when the
+ * harness landed — so the settings page reports it as unverified and says so.
+ * Widening that claim requires the same acceptance run §14.3 of the ledger
+ * demands of every other runtime: configure a model connection, drive one real
+ * analysis from the workbench through to a judgement in Human Review, then
+ * record the run in the ledger. Editing this file is not how that happens.
+ */
+export const pinnedBuiltinHarnessVersion = '0.84.2'
+
 /** Where a reported version sits against the verified range. */
 export type VersionStanding = 'verified' | 'unverified' | 'unknown'
 

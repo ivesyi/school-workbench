@@ -9,10 +9,26 @@ import { z } from 'zod'
  * workbench still shows every school, judgement and state it already holds — it
  * simply cannot start new analysis.
  *
- * Only Codex is integrated today, so this reads as a list of one. It stays an
- * enum because PRD 15 is written for the day there is more than one.
+ * The two are **peers**, and PRD 15 means that literally: neither is a fallback
+ * for the other, nothing ranks them, and nothing switches between them after a
+ * failure. Which one runs is a standing choice a person made.
+ *
+ * They differ in where the reasoning runs, and that difference is what a
+ * consultant is actually choosing between:
+ *
+ *  - `codex` — a command-line tool the consultant installed and logged into.
+ *    The workbench never sees a credential, and never sees the tool coming
+ *    either: it updates on its own schedule (ledger §14).
+ *  - `builtin` — a model loop inside the workbench itself, pinned to an exact
+ *    version by this repository. Nothing to install and nothing that moves
+ *    underneath, in exchange for the model connection becoming something the
+ *    consultant configures here.
+ *
+ * `builtin` is deliberately not named after the library it is built on. Which
+ * library that is can change without the consultant's choice meaning anything
+ * different, and the label they see never mentions one.
  */
-export const assistantChoiceSchema = z.enum(['codex'])
+export const assistantChoiceSchema = z.enum(['codex', 'builtin'])
 
 export const assistantAvailabilitySchema = z.enum(['ready', 'unavailable'])
 
@@ -36,7 +52,7 @@ export const localToolStatusViewSchema = z.object({
   detail: z.string().min(1),
 })
 
-export const runtimeVersionKeySchema = z.enum(['codex_cli', 'codex_acp'])
+export const runtimeVersionKeySchema = z.enum(['codex_cli', 'codex_acp', 'builtin_harness'])
 
 /**
  * Where an installed version sits against the versions this product has been
@@ -60,11 +76,51 @@ export const runtimeVersionViewSchema = z.object({
   note: z.string().min(1).nullable(),
 })
 
+/**
+ * The model connection the built-in assistant talks through.
+ *
+ * **The key is never in here.** This shape is what the settings page reads back
+ * and renders, and a secret that is never read back cannot be leaked by a
+ * surface that renders it. Whether one is stored is a boolean; changing it
+ * means typing a new one.
+ */
+export const modelChannelViewSchema = z.object({
+  /** The endpoint, which is not a secret and is worth showing back. */
+  baseUrl: z.string().min(1).nullable(),
+  model: z.string().min(1).nullable(),
+  hasApiKey: z.boolean(),
+  /**
+   * Whether this computer can keep a key safely at all. When it cannot, the
+   * workbench refuses to store one rather than falling back to plain text.
+   */
+  secretStorageAvailable: z.boolean(),
+  /** All three parts present, so the built-in assistant can be used. */
+  configured: z.boolean(),
+  /** One plain sentence about where this stands. */
+  detail: z.string().min(1),
+})
+
+export const saveModelChannelInputSchema = z
+  .object({
+    baseUrl: z.string().trim().min(1).max(2000),
+    model: z.string().trim().min(1).max(200),
+    apiKey: z.string().trim().min(1).max(4000),
+  })
+  .strict()
+
+export const modelChannelSaveResultSchema = z.object({
+  saved: z.boolean(),
+  /** Why it was not saved, in the consultant's words. Null when it was. */
+  problem: z.string().min(1).nullable(),
+  channel: modelChannelViewSchema,
+})
+
 export const assistantSettingsViewSchema = z.object({
   selected: assistantChoiceSchema,
   options: z.array(assistantOptionViewSchema).min(1),
   localTools: z.array(localToolStatusViewSchema).length(2),
-  runtimeVersions: z.array(runtimeVersionViewSchema).length(2),
+  runtimeVersions: z.array(runtimeVersionViewSchema).length(3),
+  modelChannel: modelChannelViewSchema,
 })
 
 /**
@@ -99,6 +155,8 @@ export const settingsIpcChannels = {
   getAssistant: 'settings:get-assistant',
   chooseAssistant: 'settings:choose-assistant',
   checkConnection: 'settings:check-connection',
+  saveModelChannel: 'settings:save-model-channel',
+  clearModelChannel: 'settings:clear-model-channel',
 } as const
 
 /**
@@ -108,7 +166,21 @@ export const settingsIpcChannels = {
  * preference needs no schema change, but adding a *key* is still a deliberate
  * edit here rather than something any caller can invent.
  */
-export const preferenceKeys = ['default_assistant'] as const
+export const preferenceKeys = [
+  'default_assistant',
+  /**
+   * The built-in assistant's model connection.
+   *
+   * The endpoint and the model id are ordinary settings. The key is not: it is
+   * stored under `model_channel_api_key` **encrypted by the operating system's
+   * own secret store**, never as the value a consultant typed. A build that
+   * cannot reach that store refuses to save a key at all rather than writing
+   * one here in the clear — see `model-channel-store.ts`.
+   */
+  'model_channel_base_url',
+  'model_channel_model',
+  'model_channel_api_key',
+] as const
 
 export const preferenceKeySchema = z.enum(preferenceKeys)
 
@@ -122,4 +194,7 @@ export type RuntimeVersionView = z.infer<typeof runtimeVersionViewSchema>
 export type AssistantConnectionCheckState = z.infer<typeof assistantConnectionCheckStateSchema>
 export type AssistantConnectionCheckView = z.infer<typeof assistantConnectionCheckViewSchema>
 export type ChooseAssistantInput = z.infer<typeof chooseAssistantInputSchema>
+export type ModelChannelView = z.infer<typeof modelChannelViewSchema>
+export type SaveModelChannelInput = z.infer<typeof saveModelChannelInputSchema>
+export type ModelChannelSaveResult = z.infer<typeof modelChannelSaveResultSchema>
 export type PreferenceKey = z.infer<typeof preferenceKeySchema>

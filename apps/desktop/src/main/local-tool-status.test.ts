@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { pinnedBuiltinHarnessVersion } from '@school-workbench/agent-host'
 import { localToolStatuses, readCodexAcpVersion, runtimeVersions } from './local-tool-status'
 
 describe('local tool status checks', () => {
@@ -79,11 +80,27 @@ describe('the versions installed on this computer', () => {
 
   it('says unknown when a tool cannot answer, instead of guessing', async () => {
     const versions = await runtimeVersions('/app/out/main', { PATH: '/tools' }, () => false)
-    for (const item of versions) {
+    // The two external pieces are what can go missing. The pinned harness is
+    // part of this build, so its version is never unknown — it is reported
+    // below instead.
+    for (const item of versions.filter((entry) => entry.key !== 'builtin_harness')) {
       expect(item.version, item.key).toBeNull()
       expect(item.standing, item.key).toBe('unknown')
       expect(item.note, item.key).toBe('暂时读不到这个版本号。')
     }
+  })
+
+  it('reports the pinned harness version, and does not claim it has been verified', async () => {
+    const versions = await runtimeVersions('/app/out/main', { PATH: '/tools' }, () => false)
+    const builtin = versions.find((item) => item.key === 'builtin_harness')
+
+    // Pinned in this repository's lockfile, so it is always known — there is
+    // no machine on which this build runs a different one.
+    expect(builtin?.version).toBe(pinnedBuiltinHarnessVersion)
+    // And no end-to-end run against a real model has been done on it yet, so
+    // the page says exactly that rather than implying somebody checked.
+    expect(builtin?.standing).toBe('unverified')
+    expect(builtin?.note).toBe('此版本未经产品验证。')
   })
 
   it('names the pieces in words a consultant can read', async () => {

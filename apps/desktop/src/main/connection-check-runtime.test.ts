@@ -1,3 +1,10 @@
+import {
+  createModels,
+  fauxAssistantMessage,
+  fauxProvider,
+  fauxText,
+  type Model,
+} from '@earendil-works/pi-ai'
 import type { AcpRuntimeConnection, AcpRuntimeLauncher } from '@school-workbench/agent-host'
 import { openWorkbenchDatabase, type WorkbenchDatabase } from '@school-workbench/db'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -232,6 +239,101 @@ describe('the connection test as the application runs it', () => {
       '南山实验学校',
       'RUNTIME_NOT_FOUND',
     ]) {
+      expect(shown, word).not.toContain(word)
+    }
+  })
+})
+
+/**
+ * A scripted model behind the built-in assistant's probe.
+ *
+ * Everything else — the read plane, the capability token, the driver, the tool
+ * set, the database — is the real thing.
+ */
+function scriptedChannel(text: string) {
+  const faux = fauxProvider({ provider: 'probe-faux', models: [{ id: 'probe-model' }] })
+  faux.setResponses([fauxAssistantMessage([fauxText(text)])])
+  const models = createModels()
+  models.setProvider(faux.provider)
+  return () => ({ models, model: faux.getModel() as Model<string> })
+}
+
+describe('the same connection test, for the built-in assistant', () => {
+  it('adds nothing at all to the workbench database either', async () => {
+    runtime = await startWorkbenchReadPlane({
+      database,
+      methodology: Promise.resolve({ state: 'unavailable', detail: 'not loaded in this test' }),
+    })
+    const before = rowCounts()
+    expect(before['schools']).toBeGreaterThan(0)
+
+    const view = await checkAssistantConnection(
+      {
+        readPlane: runtime.plane,
+        endpoint: runtime.endpoint,
+        mainDirectory: resolve('apps/desktop/out/main'),
+        execPath: process.execPath,
+        userDataDirectory: scratchRoot(),
+        resolveModelChannel: async () => ({
+          baseUrl: 'https://example.invalid/v1',
+          model: 'probe-model',
+          apiKey: 'probe-key',
+        }),
+        createModelChannel: scriptedChannel('可以'),
+      },
+      'builtin',
+    )
+
+    expect(view.state).toBe('ok')
+    expect(rowCounts()).toEqual(before)
+  })
+
+  it('tells the consultant to fill in the model connection, not to install Codex', async () => {
+    runtime = await startWorkbenchReadPlane({
+      database,
+      methodology: Promise.resolve({ state: 'unavailable', detail: 'not loaded in this test' }),
+    })
+    const before = rowCounts()
+
+    const view = await checkAssistantConnection(
+      {
+        readPlane: runtime.plane,
+        endpoint: runtime.endpoint,
+        mainDirectory: resolve('apps/desktop/out/main'),
+        execPath: process.execPath,
+        userDataDirectory: scratchRoot(),
+        // Nothing configured, which is the ordinary starting state.
+        resolveModelChannel: async () => null,
+      },
+      'builtin',
+    )
+
+    expect(view.state).toBe('failed')
+    expect(view.detail).toContain('模型地址')
+    // The Codex advice would be actively misleading here.
+    expect(view.detail).not.toContain('Codex')
+    expect(rowCounts()).toEqual(before)
+  })
+
+  it('never puts machinery in front of the consultant on this path either', async () => {
+    runtime = await startWorkbenchReadPlane({
+      database,
+      methodology: Promise.resolve({ state: 'unavailable', detail: 'not loaded in this test' }),
+    })
+    const view = await checkAssistantConnection(
+      {
+        readPlane: runtime.plane,
+        endpoint: runtime.endpoint,
+        mainDirectory: resolve('apps/desktop/out/main'),
+        execPath: process.execPath,
+        userDataDirectory: scratchRoot(),
+        resolveModelChannel: async () => null,
+      },
+      'builtin',
+    )
+
+    const shown = `${view.headline}\n${view.detail}`
+    for (const word of ['ACP', 'MCP', 'stdio', 'token', 'scope', 'pi', 'harness', 'provider']) {
       expect(shown, word).not.toContain(word)
     }
   })

@@ -121,6 +121,19 @@ export const agentHostErrorCodes = [
   'SESSION_WORKSPACE_INVALID',
   'MCP_DESCRIPTOR_INVALID',
   'RUN_TRANSITION_INVALID',
+  /**
+   * The three ways a *controlled* harness — one that runs inside this process
+   * rather than as somebody else's command-line tool — fails.
+   *
+   * They are separate codes rather than one because they land on different
+   * people. `MODEL_CHANNEL_NOT_CONFIGURED` is something the consultant fixes in
+   * settings in a minute; `HARNESS_ASSEMBLY_FAILED` means this build is broken
+   * and only a new build fixes it; `MODEL_REQUEST_FAILED` is the model service
+   * on the other end, which is nobody here's fault and usually passes.
+   */
+  'MODEL_CHANNEL_NOT_CONFIGURED',
+  'HARNESS_ASSEMBLY_FAILED',
+  'MODEL_REQUEST_FAILED',
 ] as const
 
 export type AgentHostErrorCode = (typeof agentHostErrorCodes)[number]
