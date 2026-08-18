@@ -115,7 +115,7 @@ source_locator_json, sequence
 
 行为锚点不是自动分值。当前两个机器 Pack 没有可靠的人审行为锚点，因此 `behavior_anchors` 可为空，不为填表制造等级内容。
 
-机器可加载 Pack 当前使用 `status = review`，不是 `active`。现有 `PACK.md` 能证明 Human-review baseline，但不能证明对应 JSON 工程转译已经被顾问批准为 active runtime standard。激活前必须人工复核 stable ID、Criterion 文本、证据指导、适用边界/guardrail、来源定位、source fingerprint 与 canonical content hash。
+机器可加载 Pack 现在出厂即 `status = active`（Zero-Maintenance 决策 L10）：顾问零操作即可使用，需要时在「方法论内容审核」里标「需要修订」把某一份降回 `review`，下游随即 fail-closed（L11）。运行时状态只写 DB，不改写 `knowledge/` 下的 `pack.json`（L12）。内容漂移的处理见 L13：一次「同意」会被内容变化作废，一次「否决」不会。
 
 Construct 定义继续由版本化文件 Registry 持有；v1.2 持久化 schema 只冻结 Pack、Criterion 与 BehaviorAnchor 三类表，不为了本轮 foundation 额外制造 Construct 表。
 
@@ -337,8 +337,14 @@ Baseline State 纵切使用 forward migration 新增 `state_snapshots`、`dimens
 
 Methodology Registry Foundation 已用新的 forward migration 实现 `methodology_packs`、`methodology_criteria`、`behavior_anchors`，并增加文件 Registry 与 SQLite Repository seam。当前仅加载 Schooling by Design v1 与 Data Wise v3 的人审文本工程转译；两者均为 `review`。相同 `key + version + hash` 重复 sync 无副作用；相同版本内容变化拒绝覆盖；新版本可并存。原始 PDF 只通过 `references/SOURCE_MANIFEST.md` 的 SHA-256 追溯，不进入 runtime pack、测试夹具或安装产物。
 
-Assessment Contract + Quality Harness Foundation 已建立运行时无关的 strict protocol、active-only Methodology context builder、candidate validator 与 synthetic Golden Harness。它只证明 protocol correctness 与引用完整性，不代表顾问认可，也没有接现有产品 live flow。
+Assessment Contract + Quality Harness Foundation 已建立运行时无关的 strict protocol、active-only Methodology context builder、candidate validator 与 synthetic Golden Harness。它证明 protocol correctness 与引用完整性，不代表顾问对具体判断内容的认可。**它现在就是产品唯一的判断创建路径**：`AssessmentInput → AssessmentCandidate → validateAssessmentCandidate → GroundedDiagnosisService → immutable DiagnosisProposal`。
 
 Validated Diagnosis Persistence Seam 已用 forward migration 新增 `diagnosis_criteria` 与 `diagnosis_stage_targets`，并复用既有 `diagnosis_claims`。`GroundedDiagnosisService` 自行执行 Assessment validation，再由 SQLite Repository 在单事务内重新读取并核对学校、active Stage / confirmed Targets、Evidence / Fact / Claim / ClaimFact provenance 与 persisted active Methodology；成功后才写入 immutable Proposal 及 canonical FK relations。`insufficient_evidence` 可被持久记录，但不能被 accepted / modified，也不会形成 AcceptedJudgment。仓库中的 Schooling by Design / Data Wise Pack 文件仍保持 `review`；本轮测试只使用内存 active 副本与隔离 SQLite active fixture，不擅自激活产品 Pack。
 
-尚未实现阶段迁移、任意历史版本浏览/比较、教师实践或真实 Agent Runtime、MCP、飞书、RAG；Validated Diagnosis seam 尚未接 IPC/UI、现有 BaselineAssessmentEngine 或产品 live flow，Methodology 也尚未提供 `standards_get`。Congruence 与 Role Standards Pack 仍等待各自充分的人审结构化基线。这些能力继续按真实纵切增加，不为未实现能力制造额外基础设施。
+Agent Runtime 与 Workbench MCP 已经实现并接入产品：`agent_runtime_profiles` / `agent_sessions` / `agent_runs` 记录一次真实 ACP 运行；MCP 读面七个能力与写面 `evidence_register` / `diagnosis_propose` 都通过 loopback + 能力令牌服务，`standards_get` 已能返回版本化 Pack 内容。`app_preferences` 保存顾问在设置里选的默认助手。
+
+判断创建路径已收敛：**产品里不再存在第二条创建 DiagnosisProposal 的通路**。原先由 `BaselineAssessmentEngine` + `createProposalChain` + `JudgmentRepository.saveProposalChain` 组成的确定性兜底路径已整体删除，`judgments:submit-situation` 这条 IPC 通道也不再存在。写入 `diagnosis_proposals` 的代码在生产源码里只剩 `SqliteGroundedDiagnosisRepository` 一处，由架构测试锁死。`JudgmentRepository` 只剩读取与人工审核。
+
+尚未实现：阶段迁移、任意历史版本浏览/比较、教师实践纵切、飞书、RAG、DeepSeek Harness、打包签名与自动更新。Congruence 与 Role Standards Pack 仍等待各自充分的人审结构化基线。`counterEvidenceSearch` 的**声明与引用**由 Assessment Contract 强制并作为准入条件校验，但其 `summary` 文本目前不落库，因此审核界面只能呈现已登记的相反 Fact，不能回放 Agent 写的反证检索说明。**新建学校目前无法自力形成第一个 active Stage**（见下段），这是当前最重要的产品缺口。
+
+已知结构性缺口（需要顾问定夺）：grounded Proposal 要求 active Stage + confirmed Targets（`buildAssessmentInput` fail-closed），而 active Stage 目前由「已确认判断 → 阶段建议 → 顾问确认」推导（`StageService` + `BaselineStageRecommendationEngine`），于是一所全新学校形成闭环：没有判断就没有阶段，没有阶段就产不出判断。PRD 11 说这一步应由 Agent 依据「已有情况」提议，但 SPEC 18 冻结的 MCP 工具清单里没有对应的写面工具。修哪一边都要动冻结件。

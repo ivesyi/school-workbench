@@ -1,0 +1,98 @@
+# 这一轮真 Codex 运行调用过的全部工具（来源：Codex 自己的 session rollout 日志）
+# 源文件：/Users/yihu/.codex/sessions/2026/08/18/rollout-2026-08-18T14-04-30-01a01378-aacf-7c52-81da-643f7231f6cf.jsonl
+# ACP session：01a01378-aacf-7c52-81da-643f7231f6cf
+#
+# 工具调用总数：87
+#   工作台 MCP（school-workbench-internal-read-plane-3f9a1c）：66
+#   非工作台（Codex 自有 exec/wait + codex 内建 MCP server）：21
+# 实际广播出去的进度事件：3（understanding / comparing / drafting）
+#
+# 最后一列是按 apps/desktop/src/main/agent-runtime.ts 的 nextProgressPhase 重放的判定。
+
+2026-08-18T06:04:41.901Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:04:46.190Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:04:46.271Z  MCP       school-workbench-internal-read-plane-3f9a1c    state_current        ok   → 推进到 comparing
+2026-08-18T06:04:46.271Z  MCP       school-workbench-internal-read-plane-3f9a1c    school_context       ok   忽略（understanding 不晚于当前 comparing，只前进不后退）
+2026-08-18T06:04:54.180Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:04:54.222Z  MCP       school-workbench-internal-read-plane-3f9a1c    diagnosis_list       ERR  忽略（gathering 不晚于当前 comparing，只前进不后退）
+2026-08-18T06:04:54.223Z  MCP       school-workbench-internal-read-plane-3f9a1c    evidence_list        ERR  忽略（gathering 不晚于当前 comparing，只前进不后退）
+2026-08-18T06:04:54.226Z  MCP       school-workbench-internal-read-plane-3f9a1c    stage_current        ok   忽略（understanding 不晚于当前 comparing，只前进不后退）
+2026-08-18T06:04:59.095Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:04:59.142Z  MCP       school-workbench-internal-read-plane-3f9a1c    evidence_list        ok   忽略（gathering 不晚于当前 comparing，只前进不后退）
+2026-08-18T06:04:59.143Z  MCP       school-workbench-internal-read-plane-3f9a1c    diagnosis_list       ok   忽略（gathering 不晚于当前 comparing，只前进不后退）
+2026-08-18T06:05:06.064Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:05:10.491Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:05:41.649Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:05:41.687Z  MCP       school-workbench-internal-read-plane-3f9a1c    evidence_register    ok   → 推进到 drafting
+2026-08-18T06:05:41.707Z  MCP       school-workbench-internal-read-plane-3f9a1c    evidence_register    ok   忽略（drafting 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:05:41.726Z  MCP       school-workbench-internal-read-plane-3f9a1c    evidence_register    ok   忽略（drafting 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:06:23.811Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:06:23.863Z  MCP       school-workbench-internal-read-plane-3f9a1c    diagnosis_propose    ERR  忽略（drafting 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:06:34.142Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:06:34.183Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:06:38.022Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:06:44.916Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:06:44.964Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:06:44.980Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:06:44.992Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:06:49.438Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:06:50.057Z  MCP       codex                                          list_mcp_resources   ok   忽略（不是工作台的工具）
+2026-08-18T06:06:55.096Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:07:01.238Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:07:23.992Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:07:24.072Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.076Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.079Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.080Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.081Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.081Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.082Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.083Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.084Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.085Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.087Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.087Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.088Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.088Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.088Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.088Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.089Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.089Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.089Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.089Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.089Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.090Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.090Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.090Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.090Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.090Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.090Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.090Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.090Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.091Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.091Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.091Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.091Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.091Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.092Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.092Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.092Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.092Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.094Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.094Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.094Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.094Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.094Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.094Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.094Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.094Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.095Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:24.095Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ERR  忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:07:32.470Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:07:48.241Z  AGENT_OWN (codex 自有工具)                                   wait                 ok   忽略（不是工作台的工具）
+2026-08-18T06:08:10.846Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:08:18.168Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:08:18.228Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ok   忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:08:18.229Z  MCP       school-workbench-internal-read-plane-3f9a1c    standards_get        ok   忽略（gathering 不晚于当前 drafting，只前进不后退）
+2026-08-18T06:09:04.660Z  AGENT_OWN (codex 自有工具)                                   exec                 ok   忽略（不是工作台的工具）
+2026-08-18T06:09:04.711Z  MCP       school-workbench-internal-read-plane-3f9a1c    diagnosis_propose    ok   忽略（drafting 不晚于当前 drafting，只前进不后退）

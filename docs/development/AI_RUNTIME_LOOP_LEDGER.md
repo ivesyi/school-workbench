@@ -36,12 +36,12 @@ Agent Host ── ACP ──> codex-acp ──> Codex
 
 ## 1. 里程碑与状态
 
-| 里程碑                | 内容                                                                                                                                        | 状态                              | 证据                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **M0 方法论审核反转** | 默认已审核；顾问标「需要修订」即降回 review 且重启不回滚                                                                                    | **✅ 已完成并合并**               | commit `d33ab47`，已 `--no-ff` 合入 main（零冲突）；主会话复跑 45 files/175 tests、e2e 8 passed；真 app 连开两次验证否决不被 `syncRegistry` 推翻                                                                                                                                                                                                                                                                           |
-| **M1 真链路读通**     | `packages/agent-host` + ACP 生命周期 + 三张表六态 + runtime 兼容性判定 + loopback 在 Electron 里启动 + MCP 注入可见性验证 + Agent Bootstrap | **✅ 已完成（含 B1/B2/B3 修复）** | commit `1e68818` + 修复 `f811881`；合并后主会话复跑 **57 files / 269 tests、e2e 11 passed**；**主会话真 Codex 独立验证共 5 次**，含强制冷启动复现 B3 并确认已修；`standards_get` 在 Pack active 后真正返回内容（真 AI 拿到「实践可见性」）                                                                                                                                                                                 |
-| **M2 真链路写通**     | `evidence_register` + `diagnosis_propose` 两个写面 tool（SPEC 22/23/26 要求成对）+ 写 scope + 错误映射 + Workbench 侧组装 `AssessmentInput` | **✅ 已完成**                     | commit `8114f2a`；主会话复跑 **60 files / 300 tests、e2e 12 passed**；**主会话真 Codex 完整走通一轮**：读状态→取准则→主动找反证→登记依据→提交判断，落库 evidence/facts×3/claims×2/proposal(`proposed`)，引用真实准则 `data-wise@3 DW.C2.PRACTICE_VISIBILITY`，自纠 0 轮；Agent 提案**未**变成正式判断；**否决权端到端验证**：界面标「需要修订」→ Codex 拿到 `no_active_pack/persisted_not_active` 后停手、不换准则、不提交 |
-| **M3 产品面**         | PRD 15 设置选默认助手 + PRD 16 高层进度 UI + 工作台触发 + PRD 17 判断确认 + `HOW_TO_RUN.md`                                                 | **待主会话验收**                  | worker 复跑 **68 files / 346 tests、e2e 14 passed**；worker 两次真启动肉眼确认设置页/工作台/进度条/兜底提示与整页无技术词；**真 Codex 未跑**（按前两轮惯例留给主会话）                                                                                                                                                                                                                                                     |
+| 里程碑                | 内容                                                                                                                                        | 状态                                 | 证据                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M0 方法论审核反转** | 默认已审核；顾问标「需要修订」即降回 review 且重启不回滚                                                                                    | **✅ 已完成并合并**                  | commit `d33ab47`，已 `--no-ff` 合入 main（零冲突）；主会话复跑 45 files/175 tests、e2e 8 passed；真 app 连开两次验证否决不被 `syncRegistry` 推翻                                                                                                                                                                                                                                                                           |
+| **M1 真链路读通**     | `packages/agent-host` + ACP 生命周期 + 三张表六态 + runtime 兼容性判定 + loopback 在 Electron 里启动 + MCP 注入可见性验证 + Agent Bootstrap | **✅ 已完成（含 B1/B2/B3 修复）**    | commit `1e68818` + 修复 `f811881`；合并后主会话复跑 **57 files / 269 tests、e2e 11 passed**；**主会话真 Codex 独立验证共 5 次**，含强制冷启动复现 B3 并确认已修；`standards_get` 在 Pack active 后真正返回内容（真 AI 拿到「实践可见性」）                                                                                                                                                                                 |
+| **M2 真链路写通**     | `evidence_register` + `diagnosis_propose` 两个写面 tool（SPEC 22/23/26 要求成对）+ 写 scope + 错误映射 + Workbench 侧组装 `AssessmentInput` | **✅ 已完成**                        | commit `8114f2a`；主会话复跑 **60 files / 300 tests、e2e 12 passed**；**主会话真 Codex 完整走通一轮**：读状态→取准则→主动找反证→登记依据→提交判断，落库 evidence/facts×3/claims×2/proposal(`proposed`)，引用真实准则 `data-wise@3 DW.C2.PRACTICE_VISIBILITY`，自纠 0 轮；Agent 提案**未**变成正式判断；**否决权端到端验证**：界面标「需要修订」→ Codex 拿到 `no_active_pack/persisted_not_active` 后停手、不换准则、不提交 |
+| **M3 产品面**         | PRD 15 设置选默认助手 + PRD 16 高层进度 UI + 工作台触发 + PRD 17 判断确认 + PRD 18 判断详情 + `HOW_TO_RUN.md`                               | **✅ 已完成（含伪 Agent 兜底清除）** | 主会话在 Node 24.19.0 + pnpm 11.19.0 下复跑 **70 files / 375 tests、e2e 16 passed**、typecheck/lint/format/build 全绿；**真 Codex 从界面完整走通一遍**（详见 §11）：读学校 → 登记 3 份既有材料 + 7 条 Fact + 2 条 Claim（含 counter stance）→ 自纠 1 轮 → 提交引用 `data-wise@3 DW.C2.PRACTICE_VISIBILITY` 的 `proposed` Proposal → 进 HumanReview → 顾问点「认同」前 `accepted_judgments` 只有 2 条种子、点完变 3 条      |
 
 ### 各里程碑的验收线（不许修改）
 
@@ -60,7 +60,7 @@ pnpm typecheck && pnpm lint && pnpm format && pnpm test && pnpm build && pnpm te
 
 **M2 额外**：Pack 已 active 时能产出真候选；顾问否决 Pack 后同一条链路必须 fail-closed。
 
-**M3 额外**：手动走一遍「工作台打一句话 → 看到高层进度 → 判断进 HumanReview」。
+**M3 额外**：手动走一遍「工作台打一句话 → 看到高层进度 → 判断进 HumanReview」。**Agent 合理弃权时不许用兜底伪造通过**——补真材料重跑，或如实记为受阻。
 
 ---
 
@@ -109,6 +109,7 @@ pnpm typecheck && pnpm lint && pnpm format && pnpm test && pnpm build && pnpm te
 ## 5. 工作日志（每轮追加，只写已验证事实）
 
 - **2026-08-17** M0 派工（隔离 worktree，opus）→ 交答卷 → 主会话独立验收通过。复跑 45 files/175 tests、e2e 8 passed；`pack.json` 仅 `status` 一行变更；无二进制文件；`drizzle/` 零改动；`review.ts` 纯新增零删除行；`syncRegistry` 已按最新 sign-off 推导状态；`getLatestSignOff` 排序为 `signedAt DESC, id DESC`；自建独立 GUI 探针连开两次真 app，确认否决重启后仍在、页面零内部状态名泄漏。**遗留观感问题两处**（不阻塞）：单选按钮用系统默认蓝未走 primary token；`description == title` 在界面上表现为重复一行。
+- **2026-08-18** M3 主会话验收 + **伪 Agent 兜底清除**（顾问指令：Agent 是产品必需能力，不存在「不用 AI 也能完整工作」的模式）。删除 `BaselineAssessmentEngine` / `createProposalChain` / `JudgmentRepository.saveProposalChain` / `judgments:submit-situation` 整条非严格链路；助手选项去掉「暂不使用」，默认 Codex，旧存 `none` 安全回落；助手不可用 → 输入框禁用 + 「现在还不能开始新的分析」，失败 → 保留原文 + 「重试」，弃权 → 「目前依据不足，暂不形成判断」+ 下一步观察，三者都**不再产生任何判断**；审核详情补齐 PRD 18 全部条目 + 依据出处 + 阶段目标 + 版本化准则；「我想改一下」现在同时保存顾问反馈与最终文本。新增架构测试锁死「只有 `GroundedDiagnosisService` 能创建 Proposal」。复跑 70 files/375 tests、e2e 16 passed（Node 24.19.0）。**真 Codex 端到端验收通过**（§11）。
 - **2026-08-17** M1 派工（主工作树，opus）→ 因 API 529 中断 → SendMessage 续跑 → 交答卷（commit `1e68818`）→ 主会话独立验收。复跑 59 files/261 tests、e2e 10 passed；无二进制；`_journal.json` +7−0 纯追加；迁移 SQL 无 INSERT/DROP/ALTER、不触碰 `evidence`/`observation_facts`；MCP server 名无空白；`runtime-compatibility.ts` 无版本字面量；SPEC 25 禁止清单为显式常量；依赖精确 pin 且放置正确；`dev` 脚本已先构建 workbench-mcp。**worker 顶回我简报两处失实前提，均核实成立**（`DATABASE_SCHEMA.md` §11 无字段定义；SPEC 26 在 779 行而非 762-800）。**主会话真 Codex 独立验证 2 次**，链路全程真实打通。
 
 ---
@@ -202,7 +203,120 @@ pnpm typecheck && pnpm lint && pnpm format && pnpm test && pnpm build && pnpm te
 
 ### 10.3 当前进度快照（loop 每轮更新）
 
-- M0 ✅ 已合并 · M1 ✅ 已完成 · M2 ✅ 已完成 · M3 已交答卷，**待主会话验收**
-- 产品里现在有 AI 入口了：设置里能选默认助手，工作台打一句话就会触发，跑的时候有高层进度，跑完的判断进既有审核卡片
-- `HOW_TO_RUN.md` **已存在**（白话，扫过工程术语）
-- **10.1 判据 1/2/3/4/6 已由 worker 在真应用里肉眼确认到「不需要真 Codex 也能看见」的程度；判据 5（真 Codex 完整走通并留证据）仍待主会话执行**
+- M0 ✅ 已合并 · M1 ✅ · M2 ✅ · M3 ✅（真 Codex 验收通过）
+- 产品里的 AI 不再是「入口」，而是**唯一**的分析通路：工作台打一句话交给 Codex，跑的时候有高层进度，跑完的判断带完整依据与出处进审核卡片，顾问点头才算数
+- `HOW_TO_RUN.md` 已按新事实改写（不再声称「不用 AI 也能完整使用」，不再声称数据绝不离开本机）
+- **10.1 判据 1–6 全部满足**，判据 5 的真 Codex 证据见 §11
+- **但产品仍不能交给顾问自己从零开始用**：新建学校无法自力形成第一个 active Stage（§12），必须先由顾问定夺
+
+---
+
+## 11. M3 真 Codex 验收记录（主会话，2026-08-18）
+
+**怎么跑的**：`pnpm build` 后用真 Electron（临时 userData）起，全程走界面。学校历史（2 条已确认判断 + 3 份既有材料 / 5 条 Fact）**直接写进 SQLite**——原因见 §12：产品现在没有别的办法造出这个起点。阶段是在真界面上点「基本对」确认的。
+
+**看到的**：
+
+| 环节           | 证据                                                                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 设置           | 「默认 AI 助手 · Codex」已选中，页面上没有「暂不使用」                                                                                                   |
+| 触发           | 输入框打一段话 → 「提交情况」                                                                                                                            |
+| 进度           | 界面出现「正在理解学校现在的情况……」，全程无 Shell / Tool JSON / Token / 思维链 / Session ID / Codex 自己的运行时提示                                    |
+| Agent 读       | `agent_runs.status = completed`，`agent_sessions` 记 `codex-acp@1.4.0`、`compatibility = verified`、protocol 1                                           |
+| Agent 找反证   | 2 条 Claim 共 9 条 `claim_facts`，其中 2 条 stance = `counter`                                                                                           |
+| Agent 写       | `evidence` 3 条 `registered_by = agent`、`observation_facts` 7 条、`claims` 2 条，全部带 `agent_run_id`                                                  |
+| 严格校验       | `self_correction_rounds = 1`——第一版候选被 `ASSESSMENT_*` 拒了一次，Agent 自纠后才通过。**契约确实在挡**                                                 |
+| 判断落库       | `diagnosis_proposals` 1 条 `status = proposed`，`diagnosis_criteria` = `data-wise@3 / DW.C2.PRACTICE_VISIBILITY`，`diagnosis_stage_targets` 3 条         |
+| 进 HumanReview | 卡片显示「依据 3 条 · 有 2 条相反迹象」；展开后 PRD 18 的八个栏目齐全，另有建议行动、验证方式、以及出处（学校 / 阶段 / 三条阶段目标 / 准则名 + 第 3 版） |
+| 顾问权         | 点「认同」**之前** `accepted_judgments` = 2（只有种子），点完 = 3                                                                                        |
+
+耗时：一轮 3 分 44 秒（05:28:49 → 05:32:33）。
+
+**没验到的一条**：四句进度文案里，只肉眼确认了第一句真的出现在界面上；这一轮的完整推进序列没有被记录下来（脚本收集了但输出被截断）。**已于同日补跑，见 §11.1。**
+
+**观感小瑕疵**（不阻塞）：准则那一行渲染成「实践可见性（Data Wise … 第 3 版）：实践可见性」——Pack 里 `title` 与 `description` 同文，是 M0 就记过的老问题。
+
+---
+
+## 11.1 补验：四句进度文案的真实推进序列（主会话，2026-08-18，顾问批准补跑）
+
+第二次真 Codex 运行，只为把 §11 缺的那条补上。全套原始证据落盘在
+`docs/development/evidence/2026-08-18-m3-progress/`（含该目录的 `README.md`）。
+
+**怎么抓的**：在 renderer 里挂第二个 `agent.onProgress` 订阅者，记主进程**实际广播**的事件；同时每 400ms 读一次页面可见文本，
+只在那一行变化时记一条，记的是**顾问真正看到的**。两路都实时 append 到文件，不再依赖终端输出。工具调用侧则从 Codex 自己的
+session rollout 日志按 ACP session id 取回全量，再用 `nextProgressPhase` 重放判定。
+
+**序列原文**（`progress-timeline.log`）：
+
+```text
+submit at 2026-08-18T06:04:28.846Z
+SCREEN 2026-08-18T06:04:28.883Z  正在理解学校现在的情况……
+IPC    2026-08-18T06:04:28.887Z  phase=understanding
+SCREEN 2026-08-18T06:04:46.471Z  正在比较最近变化……
+IPC    2026-08-18T06:04:46.238Z  phase=comparing
+SCREEN 2026-08-18T06:05:41.801Z  正在整理需要你确认的判断……
+IPC    2026-08-18T06:05:41.680Z  phase=drafting
+SCREEN 2026-08-18T06:09:25.742Z  (进度条已消失)
+```
+
+**三条待验项的结论**：
+
+| 待验项               | 结论                   | 证据                                                                                                                                                                                                                 |
+| -------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 四句按序出现         | **否——这轮只出现三句** | `gathering`（正在寻找相关材料……）被跳过：Codex 首批工作台调用 `state_current` + `school_context` 同批到达，`state_current` 先把阶段推到 `comparing`；8 秒后才调 `evidence_list` / `diagnosis_list`，被「只前进」挡掉 |
+| 只前进不后退         | **是**                 | `school_context`、`stage_current`、`evidence_list`/`diagnosis_list`、47 次 `standards_get`、`diagnosis_propose` 全部在更晚时刻到达，文案一次未回退。逐行判定见 `agent-tool-calls.log`                                |
+| 只认工作台自己的工具 | **是**                 | 87 次工具调用中 21 次非工作台（Codex 自有 `exec` 19 + `wait` 1 + **Codex 内建 MCP server 的 `codex.list_mcp_resources` 1**），零进度事件。最后这条是真 MCP 调用，被 server 名锚定挡住，最有说服力                    |
+
+**这条要改口径**：PRD 16 列的是**允许显示的四句话**，不是保证依次走一遍的四拍。`HOW_TO_RUN.md` 里那段四行文案已相应改成
+「按它实际在做的事显示其中几句」，不再暗示四句都会出现。台账 §10.1 判据 3 仍然满足（顾问确实看到高层进度，且全程无技术噪声）。
+
+**这一轮同时复现了 §11 的全链路**（不是同一份数据，可作独立第二样本）：`agent_runs.status = completed`、
+`self_correction_rounds = 1`、Agent 登记 3 份材料 / 7 条 Fact / 11 条 `claim_facts`（其中 4 条 `counter`）、
+提交的 Proposal 引用 **`schooling-by-design@1 / SBD.C4.SYSTEM_ALIGNMENT`**（与上轮的 `data-wise@3` 不同，说明准则不是写死的）、
+顾问点「认同」前 `accepted_judgments` = 2、点完 = 3。耗时 4 分 57 秒。
+
+**顺带记下、不阻塞**：`standards_get` 在 06:06:34–06:07:24 被连调 47 次且全部返回错误，之后才成功两次；`diagnosis_propose`
+被契约拒过一次。功能正确但 Agent 在参数上摸索代价不小，工具描述值得后续看一眼。
+
+---
+
+## 12. 新增待顾问决定：新建学校起不了步（主会话 2026-08-18 发现）
+
+**现象**：删掉确定性兜底之后，一所**全新**学校永远拿不到第一条判断。
+
+**链条**（都已实读核实）：
+
+1. `SqliteWritePlaneRepository.buildAssessmentInput` 在没有 active Stage 时直接 `READ_STALE` fail-closed；有 Stage 但没有 confirmed Target 同样 fail-closed。
+2. `validateAssessmentCandidate` 对 `proposed` 候选强制 `ASSESSMENT_PROPOSED_STAGE_TARGET_REQUIRED`。
+3. active Stage 只能由 `StageService.getWorkspace` 从**已确认判断**推出建议、再由顾问确认而来；`BaselineStageRecommendationEngine` 在判断数为 0 时直接抛错。
+
+→ 没有判断就没有阶段，没有阶段就产不出判断。
+
+**为什么必须由顾问定**（撞第 6 节第 1、6 类）：
+
+- PRD 11 写的是「如果学校没有当前阶段，**Agent** 根据已有情况提议」——按 PRD，阶段本来就该由 Agent 提；
+- 但 SPEC 18 冻结的 Workbench MCP 工具清单里**没有**任何能让 Agent 提阶段的写面工具；
+- 现在这套「工作台用正则分类已确认判断来推阶段」（`BaselineStageRecommendationEngine`）本身也是一处**伪 Agent 专业推理**，与本轮「工作台不冒充 Agent」的决策同源，只是不在本轮指定范围内。
+
+三条可走的路，都碰冻结件：
+
+1. 扩 SPEC 18 加一个阶段提议写面工具，把 PRD 11 落实 → **改 SPEC**；
+2. 承认工作台可以在没有判断时给一个「起步阶段」，明确它是脚手架不是专业判断 → 改 PRD 12 的边界；
+3. 接受现状：产品只服务「已经有历史数据」的学校，新建学校必须先由维护者灌入起点 → 需要顾问明确认可。
+
+**在此之前**：`docs/development/HOW_TO_RUN.md` 的「建一所学校 → 说一条情况」这条路径，对**全新**学校是走不通的（写面 `buildAssessmentInput` 在没有 active Stage 时直接 `READ_STALE` fail-closed，Agent 连弃权都提交不了，界面上表现为「这次没有形成需要你确认的新判断」）。真 Codex 验收（§11、§11.1）用的都是灌了历史的学校。
+
+**指南已同步（2026-08-18，评审发现后当日修）**：`HOW_TO_RUN.md` 第三节开头补了一段说清「卡的是阶段不是材料」，以及全新学校目前需要维护者先放一次起点数据、再由顾问点「基本对」确认阶段；排障节把原来那条「目前依据不足」拆成两种情况（没有当前阶段 → 去确认阶段；有当前阶段但依据不足 → 补可核实材料）。指南不再许诺产品还做不到的事，但**缺口本身仍未修**，仍等本节的顾问决定。
+
+---
+
+## 13. 本轮明确没做（顾问已列，不得顺手扩范围）
+
+飞书授权与 lark-cli｜文件 / 音频 ingestion｜教师实践纵切｜DeepSeek Harness｜Congruence 与 Role Standards Pack｜RAG / 向量库｜打包、签名、公证、自动更新。
+
+另外三项**发现但未做**，留给顾问排期：
+
+- `counterEvidenceSearch.summary` 不落库：契约强制 Agent 声明并给出可审引用，但那段说明文本没有列可存，因此审核界面只能显示已登记的相反 Fact，显示不了「它到底查了什么」。补这条要加一次 forward migration。
+- PRD 19 的「系统建议改成……」（AI 按顾问反馈重写判断）**未实现**。现在是顾问自己写「哪里不准确」+ 自己写最终文本，两者与原判断一起存下来。别把它当成 PRD 19 已完成。
+- `BaselineStageRecommendationEngine`（阶段建议）与 `DeterministicStateAssessmentEngine`（学校状态五维草稿）仍是工作台自己的确定性推理，见 §12。

@@ -1,0 +1,171 @@
+{
+  "finished": true,
+  "agent_runs": [
+    {
+      "id": "76469335-749d-46ba-8b26-1b32a9254e6a",
+      "session_id": "96c49f3b-43cc-49bc-83a4-3ed6770e1864",
+      "school_id": "01M09QH84ATCK7FGY3SKNV5AYZ",
+      "status": "completed",
+      "created_at": "2026-08-18T06:04:28.874Z",
+      "updated_at": "2026-08-18T06:09:25.364Z",
+      "started_at": "2026-08-18T06:04:30.472Z",
+      "ended_at": "2026-08-18T06:09:25.364Z",
+      "self_correction_rounds": 1
+    }
+  ],
+  "agent_sessions": [
+    {
+      "id": "96c49f3b-43cc-49bc-83a4-3ed6770e1864",
+      "school_id": "01M09QH84ATCK7FGY3SKNV5AYZ",
+      "runtime_profile_id": "c60ad236-746d-448a-9fc8-5d8660d7d4ac",
+      "acp_session_id": "01a01378-aacf-7c52-81da-643f7231f6cf",
+      "cwd": "/var/folders/ds/c00b_k4n7_1dm9x397fb8kn80000gn/T/school-workbench-agent-run-8YrilW",
+      "compatibility": "verified",
+      "protocol_version": 1,
+      "agent_name": "@agentclientprotocol/codex-acp",
+      "agent_version": "1.4.0",
+      "created_at": "2026-08-18T06:09:25.364Z",
+      "closed_at": "2026-08-18T06:09:25.364Z"
+    }
+  ],
+  "agent_proposals": [
+    {
+      "id": "01M09QSPP20ZG4JTCH1RHT6V7K",
+      "agent_run_id": "76469335-749d-46ba-8b26-1b32a9254e6a",
+      "status": "proposed",
+      "title": "中层承接已出现局部自主，但尚未形成稳定机制"
+    }
+  ],
+  "agent_evidence": [
+    {
+      "id": "01M09QKGDN75MMME9HC49WEFX2",
+      "title": "《8月访校观察记录》",
+      "registered_by": "agent"
+    },
+    {
+      "id": "01M09QKGEB2XPE79TJ2HYET5D0",
+      "title": "《6月中层例会纪要》",
+      "registered_by": "agent"
+    },
+    {
+      "id": "01M09QKGEXSYEAGSEDMDCXFYJJ",
+      "title": "《7月中层例会纪要》",
+      "registered_by": "agent"
+    }
+  ],
+  "agent_fact_count": {
+    "c": 7
+  },
+  "claim_facts": [
+    {
+      "claim_id": "01M09QKGDP57WJ35CKJ0T9C788",
+      "fact_id": "01M09QKGDN1FJVDD95F7TP13RW",
+      "stance": "supporting",
+      "sequence": 0
+    },
+    {
+      "claim_id": "01M09QKGDP57WJ35CKJ0T9C788",
+      "fact_id": "01M09QKGDN7QS94W5SJ6NPPS7G",
+      "stance": "supporting",
+      "sequence": 1
+    },
+    {
+      "claim_id": "01M09QKGDP57WJ35CKJ0T9C788",
+      "fact_id": "01M09QKGDNH0FXCV5VKXJ42QW0",
+      "stance": "supporting",
+      "sequence": 2
+    },
+    {
+      "claim_id": "01M09QKGDP4DZS8CQVH4DC9G2P",
+      "fact_id": "01M09QKGDN1FJVDD95F7TP13RW",
+      "stance": "counter",
+      "sequence": 0
+    },
+    {
+      "claim_id": "01M09QKGDP4DZS8CQVH4DC9G2P",
+      "fact_id": "01M09QKGDN7QS94W5SJ6NPPS7G",
+      "stance": "counter",
+      "sequence": 1
+    },
+    {
+      "claim_id": "01M09QKGDP4DZS8CQVH4DC9G2P",
+      "fact_id": "01M09QKGDNH0FXCV5VKXJ42QW0",
+      "stance": "counter",
+      "sequence": 2
+    },
+    {
+      "claim_id": "01M09QKGEBETQ68SA3XVWYJYHC",
+      "fact_id": "01M09QKGEBDJYRWZANV68TK3BE",
+      "stance": "supporting",
+      "sequence": 0
+    },
+    {
+      "claim_id": "01M09QKGEBETQ68SA3XVWYJYHC",
+      "fact_id": "01M09QKGEBDE2Y0J7N9B5YKXS2",
+      "stance": "supporting",
+      "sequence": 1
+    },
+    {
+      "claim_id": "01M09QKGEX5NCBPCJ8GM67E682",
+      "fact_id": "01M09QKGEXZNTJTKW9XHM8WTEQ",
+      "stance": "supporting",
+      "sequence": 0
+    },
+    {
+      "claim_id": "01M09QKGEX5NCBPCJ8GM67E682",
+      "fact_id": "01M09QKGEX27BGEXXQS0GW1TGR",
+      "stance": "supporting",
+      "sequence": 1
+    },
+    {
+      "claim_id": "01M09QKGEXGHDCK05MK3EGD7Y1",
+      "fact_id": "01M09QKGEXZNTJTKW9XHM8WTEQ",
+      "stance": "counter",
+      "sequence": 0
+    }
+  ],
+  "diagnosis_criteria": [
+    {
+      "proposal_id": "01M09QSPP20ZG4JTCH1RHT6V7K",
+      "criterion_id": "schooling-by-design-v1::SBD.C4.SYSTEM_ALIGNMENT"
+    }
+  ],
+  "accepted_before_confirm": {
+    "c": 2
+  },
+  "ipcEvents": [
+    {
+      "schoolId": "01M09QH84ATCK7FGY3SKNV5AYZ",
+      "phase": "understanding",
+      "at": "2026-08-18T06:04:28.887Z"
+    },
+    {
+      "schoolId": "01M09QH84ATCK7FGY3SKNV5AYZ",
+      "phase": "comparing",
+      "at": "2026-08-18T06:04:46.238Z"
+    },
+    {
+      "schoolId": "01M09QH84ATCK7FGY3SKNV5AYZ",
+      "phase": "drafting",
+      "at": "2026-08-18T06:05:41.680Z"
+    }
+  ],
+  "screenSequence": [
+    {
+      "text": "正在理解学校现在的情况……",
+      "at": "2026-08-18T06:04:28.883Z"
+    },
+    {
+      "text": "正在比较最近变化……",
+      "at": "2026-08-18T06:04:46.471Z"
+    },
+    {
+      "text": "正在整理需要你确认的判断……",
+      "at": "2026-08-18T06:05:41.801Z"
+    },
+    {
+      "text": "(进度条已消失)",
+      "at": "2026-08-18T06:09:25.742Z"
+    }
+  ]
+}

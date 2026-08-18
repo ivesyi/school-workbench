@@ -1,0 +1,26 @@
+# M3 高层进度文案推进序列 — 真 Codex 运行原始记录
+# 收集方式：
+#   IPC   = renderer 侧第二个 agent.onProgress 订阅者收到的事件（主进程实际广播的东西）
+#   SCREEN= 每 400ms 读一次页面可见文本，只在那一行发生变化时记录（顾问真正看到的东西）
+submit at 2026-08-18T06:04:28.846Z
+SCREEN 2026-08-18T06:04:28.883Z  正在理解学校现在的情况……
+IPC    2026-08-18T06:04:28.887Z  phase=understanding  school=01M09QH84ATCK7FGY3SKNV5AYZ
+SCREEN 2026-08-18T06:04:46.471Z  正在比较最近变化……
+IPC    2026-08-18T06:04:46.238Z  phase=comparing  school=01M09QH84ATCK7FGY3SKNV5AYZ
+SCREEN 2026-08-18T06:05:41.801Z  正在整理需要你确认的判断……
+IPC    2026-08-18T06:05:41.680Z  phase=drafting  school=01M09QH84ATCK7FGY3SKNV5AYZ
+SCREEN 2026-08-18T06:09:25.742Z  (进度条已消失)
+
+# IPC 事件序列（主进程实际广播）
+  2026-08-18T06:04:28.887Z  understanding
+  2026-08-18T06:04:46.238Z  comparing
+  2026-08-18T06:05:41.680Z  drafting
+# 屏幕可见文案序列（顾问看到的）
+  2026-08-18T06:04:28.883Z  正在理解学校现在的情况……
+  2026-08-18T06:04:46.471Z  正在比较最近变化……
+  2026-08-18T06:05:41.801Z  正在整理需要你确认的判断……
+  2026-08-18T06:09:25.742Z  (进度条已消失)
+
+# ACP session: [{"id":"96c49f3b-43cc-49bc-83a4-3ed6770e1864","school_id":"01M09QH84ATCK7FGY3SKNV5AYZ","runtime_profile_id":"c60ad236-746d-448a-9fc8-5d8660d7d4ac","acp_session_id":"01a01378-aacf-7c52-81da-643f7231f6cf","cwd":"/var/folders/ds/c00b_k4n7_1dm9x397fb8kn80000gn/T/school-workbench-agent-run-8YrilW","compatibility":"verified","protocol_version":1,"agent_name":"@agentclientprotocol/codex-acp","agent_version":"1.4.0","created_at":"2026-08-18T06:09:25.364Z","closed_at":"2026-08-18T06:09:25.364Z"}]
+# accepted_judgments 在顾问点「认同」之前: {"c":2}
+# accepted_judgments 在顾问点「认同」之后: {"c":3}

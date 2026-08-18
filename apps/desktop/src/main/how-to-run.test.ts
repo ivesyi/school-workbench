@@ -52,4 +52,26 @@ describe('the guide the consultant reads first', () => {
     expect(guide).toContain('只有你说了算')
     expect(guide).toContain('codex login')
   })
+
+  it('never promises a workbench that works without an assistant', () => {
+    expect(guide).not.toContain('不用 AI 也能完整使用')
+    expect(guide).not.toMatch(/暂不使用 ?AI/)
+    // New analysis needs an assistant, and what remains possible without one is
+    // stated rather than implied.
+    expect(guide).toContain('新的分析必须有 AI 助手')
+    expect(guide).toContain('现在还不能开始新的分析')
+  })
+
+  it('never promises a judgement the workbench would write on the assistant behalf', () => {
+    expect(guide).not.toContain('我先把你说的这条记下来了')
+    expect(guide).toContain('不会替它写一条判断')
+    expect(guide).toContain('不会替它另外整理一条判断')
+  })
+
+  it('does not overstate where the consultant data goes', () => {
+    // Analysis is carried out by Codex, so "nothing ever leaves this computer"
+    // would be untrue.
+    expect(guide).not.toContain('没有上传到任何地方')
+    expect(guide).toContain('不完全留在本机')
+  })
 })
