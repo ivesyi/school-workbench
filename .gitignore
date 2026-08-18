@@ -11,9 +11,17 @@ test-results/
 *.sqlite-wal
 .DS_Store
 
+# Agent worktrees and local session scratch. Whole checkout copies live in
+# here — hundreds of megabytes of them — and none of it belongs in the repo.
+.claude/
+
 # Local research sources may be copyrighted or sensitive. Keep only the
 # reference index and integrity manifest under version control.
 references/books/*
 references/frameworks/*
 references/standards/*
 references/field-notes/*
+
+# Raw output from real acceptance runs is kept on purpose. It is the evidence
+# the loop ledger cites, so it wins over the blanket *.log rule above.
+!docs/development/evidence/**/*.log
