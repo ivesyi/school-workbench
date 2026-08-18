@@ -103,6 +103,18 @@ function agentRun(overrides: Partial<AgentRunView> = {}): AgentRunView {
   }
 }
 
+/** A run that failed for a reason the consultant can do nothing about. */
+function failedRun(): AgentRunView {
+  return agentRun({
+    status: 'failed',
+    outcome: 'failed',
+    proposal: null,
+    usedWorkbenchTools: false,
+    failureCode: 'RUNTIME_NOT_FOUND',
+    failureMessage: 'SWB_CODEX_ACP_ENTRY points at a path that does not exist',
+  })
+}
+
 const activeStage = {
   state: 'active' as const,
   stage: {
@@ -160,6 +172,7 @@ function api(
         ],
       }),
       chooseAssistant: vi.fn(),
+      checkConnection: vi.fn(),
     },
     agent: {
       run: vi.fn().mockResolvedValue(agentRun()),
@@ -390,6 +403,17 @@ describe('the workbench when the assistant can run', () => {
     }
   })
 
+  it('points at the connection test in settings after a failure', async () => {
+    const workbench = api('ready', { run: vi.fn().mockResolvedValue(failedRun()) })
+    renderPage(workbench)
+    await screen.findByText(/AI 助手会先看一遍/)
+    await say('中层会议上任务拆解还是校长在做。')
+
+    await screen.findByText(/AI 助手在这台电脑上还没准备好/)
+    expect(screen.getByText(/里跑一次「连接测试」/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '设置' })).toHaveAttribute('href', '/settings')
+  })
+
   it('says so plainly when the assistant call throws, and writes nothing down', async () => {
     const workbench = api('ready', {
       run: vi.fn().mockRejectedValue(new Error('ipc exploded at /Users/x/main.js')),
@@ -434,5 +458,88 @@ describe('the workbench when no assistant can run', () => {
 
     await screen.findByText('中层已经能够独立完成关键任务拆解。')
     expect(screen.getByText('已由你确认')).toBeInTheDocument()
+  })
+})
+
+/**
+ * Switching assistant after a failure.
+ *
+ * Only Codex is integrated today, so the second assistant here is invented: the
+ * control genuinely does not appear in the shipping product, and that is one of
+ * the things asserted below. The mechanism is still built and tested, because
+ * the alternative is discovering it does not work on the day a second assistant
+ * arrives.
+ */
+describe('changing assistant from the failure notice', () => {
+  const twoAssistants = {
+    selected: 'codex',
+    localTools: [],
+    runtimeVersions: [],
+    options: [
+      { key: 'codex', label: 'Codex', availability: 'ready', detail: null },
+      { key: 'another', label: '另一个助手', availability: 'ready', detail: null },
+    ],
+  }
+
+  const switched = { ...twoAssistants, selected: 'another' }
+
+  function withTwoAssistants(overrides: Partial<WorkbenchApi['agent']> = {}): WorkbenchApi {
+    const workbench = api('ready', overrides)
+    workbench.settings.getAssistant = vi.fn().mockResolvedValue(twoAssistants)
+    workbench.settings.chooseAssistant = vi.fn().mockResolvedValue(switched)
+    return workbench
+  }
+
+  it('offers nothing to switch to when only one assistant exists', async () => {
+    // The shipping case. The failure notice keeps exactly the shape it has now.
+    const workbench = api('ready', { run: vi.fn().mockResolvedValue(failedRun()) })
+    renderPage(workbench)
+    await screen.findByText(/AI 助手会先看一遍/)
+    await say('中层会议上任务拆解还是校长在做。')
+
+    await screen.findByText(/AI 助手在这台电脑上还没准备好/)
+    expect(screen.queryByText('换个助手重试')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument()
+    expect(workbench.settings.chooseAssistant).not.toHaveBeenCalled()
+  })
+
+  it('offers the other assistant once there is one, and never picks it itself', async () => {
+    const workbench = withTwoAssistants({ run: vi.fn().mockResolvedValue(failedRun()) })
+    renderPage(workbench)
+    await screen.findByText(/AI 助手会先看一遍/)
+    await say('中层会议上任务拆解还是校长在做。')
+
+    await screen.findByText(/AI 助手在这台电脑上还没准备好/)
+    expect(screen.getByText('换个助手重试')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '换成 另一个助手 重试' })).toBeInTheDocument()
+    // The failure did not move anybody anywhere on its own.
+    expect(workbench.settings.chooseAssistant).not.toHaveBeenCalled()
+    expect(workbench.agent.run).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves the choice and runs the same sentence again', async () => {
+    const run = vi.fn().mockResolvedValueOnce(failedRun()).mockResolvedValue(agentRun())
+    const workbench = withTwoAssistants({ run })
+    renderPage(workbench)
+    await screen.findByText(/AI 助手会先看一遍/)
+    await say('中层会议上任务拆解还是校长在做。')
+    await screen.findByText(/AI 助手在这台电脑上还没准备好/)
+
+    await userEvent.setup().click(screen.getByRole('button', { name: '换成 另一个助手 重试' }))
+
+    // Saved through the same setting the settings page writes, so the next run
+    // uses it too.
+    await waitFor(() => {
+      expect(workbench.settings.chooseAssistant).toHaveBeenCalledWith({ assistant: 'another' })
+    })
+    // And the consultant's own words were re-sent, not lost and not rewritten.
+    await waitFor(() => {
+      expect(run).toHaveBeenCalledTimes(2)
+    })
+    expect(run).toHaveBeenLastCalledWith({
+      schoolId: 'school-1',
+      message: '中层会议上任务拆解还是校长在做。',
+    })
+    await screen.findByText('改进实践已经开始可见，但还只发生在一个教研组。')
   })
 })

@@ -1,7 +1,11 @@
 import type { AgentProgressEvent, AgentRunView, RunAgentInput } from './agent'
 import type { AcceptedJudgmentView, ReviewDiagnosisInput, ReviewOutcomeView } from './judgments'
 import type { PackReviewWorkbenchView, SignOffPackInput } from './methodology'
-import type { AssistantSettingsView, ChooseAssistantInput } from './preferences'
+import type {
+  AssistantConnectionCheckView,
+  AssistantSettingsView,
+  ChooseAssistantInput,
+} from './preferences'
 import type { ArchiveSchoolInput, CreateSchoolInput, SchoolView } from './schools'
 import type { AdjustStageInput, ConfirmStageInput, StageWorkspaceView } from './stages'
 import type { AdjustStateInput, ConfirmStateInput, StateWorkspaceView } from './states'
@@ -34,6 +38,11 @@ export type WorkbenchApi = {
   settings: {
     getAssistant(): Promise<AssistantSettingsView>
     chooseAssistant(input: ChooseAssistantInput): Promise<AssistantSettingsView>
+    /**
+     * Really runs one throwaway turn against the chosen assistant and reports
+     * what happened. Started by a person, never on launch.
+     */
+    checkConnection(): Promise<AssistantConnectionCheckView>
   }
   agent: {
     run(input: RunAgentInput): Promise<AgentRunView>

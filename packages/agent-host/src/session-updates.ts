@@ -148,10 +148,17 @@ export function classifySessionUpdate(rawUpdate: unknown): ObservedSessionUpdate
  * Accumulates everything the host needs from one prompt turn. All inputs are
  * raw and untrusted; nothing here can throw.
  */
+export type McpStartupReport = Readonly<{
+  serverName: string
+  /** The runtime's own wording, kept verbatim. Never shown to a consultant. */
+  text: string
+}>
+
 export class SessionUpdateObserver {
   #text = ''
   readonly #unrecognisedTags: string[] = []
   readonly #failedMcpStartups: string[] = []
+  readonly #mcpStartupReports: McpStartupReport[] = []
   readonly #toolCallTitles: string[] = []
 
   observe(rawUpdate: unknown): ObservedSessionUpdate {
@@ -172,6 +179,25 @@ export class SessionUpdateObserver {
             !this.#failedMcpStartups.includes(toolCall.mcpStartupServerName)
           ) {
             this.#failedMcpStartups.push(toolCall.mcpStartupServerName)
+          }
+          // The report's own wording is kept as well, because "failed to
+          // start" and "startup was cancelled" arrive with the same status and
+          // are different problems. A later report replaces an earlier one for
+          // the same server: codex-acp sends `tool_call` and then
+          // `tool_call_update`, and the last word is the one that stands.
+          if (toolCall.status === 'failed') {
+            const at = this.#mcpStartupReports.findIndex(
+              (report) => report.serverName === toolCall.mcpStartupServerName,
+            )
+            // An update carrying no text must not erase the reason an earlier
+            // one gave.
+            const previous = at >= 0 ? this.#mcpStartupReports[at] : undefined
+            const report = Object.freeze({
+              serverName: toolCall.mcpStartupServerName,
+              text: toolCall.contentText || previous?.text || '',
+            })
+            if (at >= 0) this.#mcpStartupReports[at] = report
+            else this.#mcpStartupReports.push(report)
           }
           break
         }
@@ -201,6 +227,16 @@ export class SessionUpdateObserver {
   /** MCP servers codex-acp told us failed or cancelled startup. */
   get failedMcpStartups(): readonly string[] {
     return Object.freeze([...this.#failedMcpStartups])
+  }
+
+  /**
+   * The same reports with the runtime's own wording attached, so a caller can
+   * tell "failed to start" from "startup was cancelled". `failedMcpStartups`
+   * deliberately stays a bare list: the Agent Host treats both the same way and
+   * must keep doing so.
+   */
+  get mcpStartupReports(): readonly McpStartupReport[] {
+    return Object.freeze([...this.#mcpStartupReports])
   }
 
   get toolCallTitles(): readonly string[] {

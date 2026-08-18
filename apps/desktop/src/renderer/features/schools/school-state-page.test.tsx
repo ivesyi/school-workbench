@@ -157,6 +157,7 @@ function baseApi(stateView: StateWorkspaceView = draft): WorkbenchApi {
         options: [{ key: 'codex', label: 'Codex', availability: 'ready', detail: null }],
       }),
       chooseAssistant: vi.fn(),
+      checkConnection: vi.fn(),
     },
     agent: {
       run: vi.fn(),

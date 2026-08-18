@@ -5,6 +5,7 @@ import {
   agentIpcChannels,
   agentProgressEventSchema,
   agentRunViewSchema,
+  assistantConnectionCheckViewSchema,
   assistantSettingsViewSchema,
   chooseAssistantInputSchema,
   runAgentInputSchema,
@@ -140,6 +141,10 @@ const api: WorkbenchApi = {
         chooseAssistantInputSchema.parse(input),
       )
       return assistantSettingsViewSchema.parse(result)
+    },
+    async checkConnection() {
+      const result: unknown = await ipcRenderer.invoke(settingsIpcChannels.checkConnection)
+      return assistantConnectionCheckViewSchema.parse(result)
     },
   },
   agent: {

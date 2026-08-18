@@ -1,6 +1,7 @@
 import type {
   AgentProgressPhase,
   AgentRunView,
+  AssistantOptionView,
   AssistantSettingsView,
 } from '@school-workbench/shared'
 
@@ -47,6 +48,24 @@ export function unavailableReason(settings: AssistantSettingsView | null): strin
   if (canStartAnalysis(settings)) return null
   const chosen = settings.options.find((option) => option.key === settings.selected)
   return chosen?.detail ?? 'AI 助手在这台电脑上还没准备好，暂时不能开始新的分析。'
+}
+
+/**
+ * The other assistants that could be tried right now.
+ *
+ * Peers, not fallbacks (PRD 15). Nothing in the product picks one of these,
+ * ranks them, or moves to one after a failure — the list exists so a person can
+ * choose. It is empty whenever there is nothing to choose between, and the
+ * control that shows it disappears with it rather than offering a switch to
+ * nowhere.
+ */
+export function switchableAssistants(
+  settings: AssistantSettingsView | null,
+): readonly AssistantOptionView[] {
+  if (!settings) return []
+  return settings.options.filter(
+    (option) => option.key !== settings.selected && option.availability === 'ready',
+  )
 }
 
 /**

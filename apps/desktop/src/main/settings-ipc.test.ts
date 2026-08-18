@@ -1,11 +1,19 @@
-import type { AssistantSettingsView } from '@school-workbench/shared'
-import { describe, expect, it } from 'vitest'
+import type { AssistantConnectionCheckView, AssistantSettingsView } from '@school-workbench/shared'
+import { describe, expect, it, vi } from 'vitest'
 import {
   ASSISTANT_PREFERENCE_KEY,
   createSettingsIpcHandlers,
   DEFAULT_ASSISTANT,
   type AssistantReadiness,
 } from './settings-ipc'
+
+const connectionCheckOk: AssistantConnectionCheckView = {
+  state: 'ok',
+  headline: '连接正常',
+  detail: 'AI 助手在这台电脑上能正常回应，可以开始新的分析。',
+  durationSeconds: 4,
+  checkedAt: '2026-08-18T00:00:00.000Z',
+}
 
 function store(initial: Record<string, string> = {}) {
   const values = new Map(Object.entries(initial))
@@ -16,6 +24,8 @@ function store(initial: Record<string, string> = {}) {
       values.set(key, value)
     },
     localToolStatuses: () => localTools,
+    runtimeVersions: async () => versions,
+    checkConnection: vi.fn(async () => connectionCheckOk),
   }
 }
 
@@ -31,6 +41,16 @@ const localTools: AssistantSettingsView['localTools'] = [
     label: '飞书命令行工具',
     availability: 'unavailable',
     detail: '未检测到。启用飞书材料接入前需要先安装飞书命令行工具。',
+  },
+]
+const versions: AssistantSettingsView['runtimeVersions'] = [
+  { key: 'codex_cli', label: 'Codex', version: '0.147.0', standing: 'verified', note: null },
+  {
+    key: 'codex_acp',
+    label: '工作台与 Codex 之间的连接组件',
+    version: '1.4.0',
+    standing: 'verified',
+    note: null,
   },
 ]
 const ready: AssistantReadiness = { ready: true, detail: null }
@@ -102,5 +122,59 @@ describe('choosing a default assistant', () => {
     const view = await handlers.getAssistant()
     expect(view.selected).toBe('codex')
     expect(view.options.every((option) => option.availability === 'unavailable')).toBe(true)
+  })
+})
+
+describe('version information (reported, never enforced)', () => {
+  it('reports what is installed alongside the assistant choice', async () => {
+    const handlers = createSettingsIpcHandlers({ ...store(), readiness: () => ready })
+    const view = await handlers.getAssistant()
+    expect(view.runtimeVersions.map((item) => item.key)).toEqual(['codex_cli', 'codex_acp'])
+    expect(view.runtimeVersions.every((item) => item.note === null)).toBe(true)
+  })
+
+  it('never lets an unverified version take the assistant away', async () => {
+    const unverified: AssistantSettingsView['runtimeVersions'] = versions.map((item) => ({
+      ...item,
+      version: '99.0.0',
+      standing: 'unverified' as const,
+      note: '此版本未经产品验证。',
+    }))
+    const handlers = createSettingsIpcHandlers({
+      ...store(),
+      runtimeVersions: async () => unverified,
+      readiness: () => ready,
+    })
+    const view = await handlers.getAssistant()
+
+    // Said once, and then it changes nothing: the assistant is still selected
+    // and still ready. SPEC 62 keeps the verdict on what the runtime answers.
+    expect(view.runtimeVersions.every((item) => item.note === '此版本未经产品验证。')).toBe(true)
+    expect(view.selected).toBe('codex')
+    expect(view.options[0]?.availability).toBe('ready')
+  })
+})
+
+describe('the connection test', () => {
+  it('only runs when it is asked to, and hands back what happened', async () => {
+    const backing = store()
+    const handlers = createSettingsIpcHandlers({ ...backing, readiness: () => ready })
+
+    // Reading settings and choosing an assistant must never cost a real turn.
+    await handlers.getAssistant()
+    await handlers.chooseAssistant({ assistant: 'codex' })
+    expect(backing.checkConnection).not.toHaveBeenCalled()
+
+    expect(await handlers.checkConnection()).toEqual(connectionCheckOk)
+    expect(backing.checkConnection).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses to pass on a result the consultant could not read', async () => {
+    const handlers = createSettingsIpcHandlers({
+      ...store(),
+      readiness: () => ready,
+      checkConnection: async () => ({ state: 'nope' }) as unknown as AssistantConnectionCheckView,
+    })
+    await expect(handlers.checkConnection()).rejects.toThrow()
   })
 })

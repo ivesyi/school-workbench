@@ -1,10 +1,13 @@
 import {
+  assistantConnectionCheckViewSchema,
   assistantSettingsViewSchema,
   chooseAssistantInputSchema,
   settingsIpcChannels,
   type AssistantChoice,
+  type AssistantConnectionCheckView,
   type AssistantSettingsView,
   type LocalToolStatusView,
+  type RuntimeVersionView,
 } from '@school-workbench/shared'
 import type { IpcMain } from 'electron'
 
@@ -32,6 +35,13 @@ export type AssistantReadiness = Readonly<{
 export type SettingsIpcHandlers = {
   getAssistant(): Promise<AssistantSettingsView>
   chooseAssistant(input: unknown): Promise<AssistantSettingsView>
+  /**
+   * Really runs one throwaway turn against the chosen assistant.
+   *
+   * Deliberately only ever reached from a button. It costs a real turn, so
+   * nothing starts it on launch, and its answer is shown rather than acted on.
+   */
+  checkConnection(): Promise<AssistantConnectionCheckView>
 }
 
 export type SettingsDependencies = Readonly<{
@@ -39,16 +49,21 @@ export type SettingsDependencies = Readonly<{
   write(key: string, value: string): Promise<void>
   readiness(): AssistantReadiness
   localToolStatuses(): readonly LocalToolStatusView[]
+  /** Installed versions next to the ones this product was verified against. */
+  runtimeVersions(): Promise<readonly RuntimeVersionView[]>
+  checkConnection(): Promise<AssistantConnectionCheckView>
 }>
 
 function toView(
   selected: AssistantChoice,
   readiness: AssistantReadiness,
   localTools: readonly LocalToolStatusView[],
+  versions: readonly RuntimeVersionView[],
 ): AssistantSettingsView {
   return assistantSettingsViewSchema.parse({
     selected,
     localTools: [...localTools],
+    runtimeVersions: [...versions],
     options: [
       {
         key: 'codex',
@@ -75,12 +90,21 @@ export function createSettingsIpcHandlers(dependencies: SettingsDependencies): S
         await currentChoice(dependencies),
         dependencies.readiness(),
         dependencies.localToolStatuses(),
+        await dependencies.runtimeVersions(),
       )
     },
     async chooseAssistant(input) {
       const parsed = chooseAssistantInputSchema.parse(input)
       await dependencies.write(ASSISTANT_PREFERENCE_KEY, parsed.assistant)
-      return toView(parsed.assistant, dependencies.readiness(), dependencies.localToolStatuses())
+      return toView(
+        parsed.assistant,
+        dependencies.readiness(),
+        dependencies.localToolStatuses(),
+        await dependencies.runtimeVersions(),
+      )
+    },
+    async checkConnection() {
+      return assistantConnectionCheckViewSchema.parse(await dependencies.checkConnection())
     },
   }
 }
@@ -90,4 +114,5 @@ export function registerSettingsIpc(ipcMain: IpcMain, handlers: SettingsIpcHandl
   ipcMain.handle(settingsIpcChannels.chooseAssistant, (_event, input: unknown) =>
     handlers.chooseAssistant(input),
   )
+  ipcMain.handle(settingsIpcChannels.checkConnection, () => handlers.checkConnection())
 }

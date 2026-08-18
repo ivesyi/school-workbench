@@ -129,9 +129,11 @@ function apiWith(methodology: WorkbenchApi['methodology']): WorkbenchApi {
       getAssistant: vi.fn().mockResolvedValue({
         selected: 'codex',
         localTools: [],
+        runtimeVersions: [],
         options: [{ key: 'codex', label: 'Codex', availability: 'ready', detail: null }],
       }),
       chooseAssistant: vi.fn(),
+      checkConnection: vi.fn(),
     },
     agent: {
       run: vi.fn(),

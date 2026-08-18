@@ -9,6 +9,7 @@ import {
 import type {
   AcceptedJudgmentView,
   AgentProgressPhase,
+  AssistantChoice,
   AssistantSettingsView,
   JudgmentReviewView,
   ReviewDiagnosisInput,
@@ -19,7 +20,13 @@ import { ArrowLeft, CheckCircle2, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useWorkbenchApi } from '../../lib/workbench-api'
-import { assistantNote, canStartAnalysis, progressLabel, unavailableReason } from './assistant-flow'
+import {
+  assistantNote,
+  canStartAnalysis,
+  progressLabel,
+  switchableAssistants,
+  unavailableReason,
+} from './assistant-flow'
 
 type Abstention = Readonly<{
   unresolvedQuestions: readonly string[]
@@ -68,6 +75,8 @@ export function SchoolWorkspacePage(): React.JSX.Element {
   const [phase, setPhase] = useState<AgentProgressPhase | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [retryable, setRetryable] = useState(false)
+  const [runFailed, setRunFailed] = useState(false)
+  const [switching, setSwitching] = useState(false)
   const [abstention, setAbstention] = useState<Abstention | null>(null)
 
   useEffect(() => {
@@ -119,6 +128,10 @@ export function SchoolWorkspacePage(): React.JSX.Element {
   }, [api, schoolId])
 
   const assistantAvailable = canStartAnalysis(assistant)
+  // Peers, not fallbacks. Empty whenever there is nothing to choose between, so
+  // the control below disappears entirely rather than offering a switch to
+  // nowhere — which is what happens today, with one assistant integrated.
+  const otherAssistants = switchableAssistants(assistant)
   // A school with no current stage still accepts one sentence (PRD 11/51): the
   // assistant reads it and proposes the starting stage. The only thing that
   // blocks a new run is a stage suggestion already waiting for confirmation.
@@ -155,6 +168,7 @@ export function SchoolWorkspacePage(): React.JSX.Element {
     setResultMessage(null)
     setNote(null)
     setRetryable(false)
+    setRunFailed(false)
     setAbstention(null)
     setPhase('understanding')
 
@@ -187,13 +201,40 @@ export function SchoolWorkspacePage(): React.JSX.Element {
       setNote(assistantNote(run))
       setAbstention(run.abstention)
       setRetryable(run.outcome !== 'needs_more_evidence')
+      setRunFailed(run.outcome === 'failed')
     } catch {
       setNote('AI 助手这次没能完成。你写的内容还在，可以过一会儿再重试。')
       setRetryable(true)
+      setRunFailed(true)
     } finally {
       setPhase(null)
       setSubmitting(false)
     }
+  }
+
+  /**
+   * Switches to another assistant and runs the same sentence again.
+   *
+   * Not a fallback and not a route: the workbench never picks the next
+   * assistant, never tries one after another and never decides that a failure
+   * means a different assistant should be used. A person chooses here, and the
+   * choice is saved through exactly the same setting the settings page writes,
+   * so the next run uses it too (PRD 15).
+   */
+  async function switchAssistantAndRetry(next: AssistantChoice): Promise<void> {
+    if (submitting || switching) return
+    setSwitching(true)
+    setError(null)
+    try {
+      setAssistant(await api.settings.chooseAssistant({ assistant: next }))
+    } catch {
+      setError('这次没能换成另一个 AI 助手，请再试一次。')
+      return
+    } finally {
+      setSwitching(false)
+    }
+    // The consultant's words were never cleared, so this is the same sentence.
+    await submitSituation()
   }
 
   async function review(decision: ReviewDiagnosisInput['decision']): Promise<void> {
@@ -386,6 +427,36 @@ export function SchoolWorkspacePage(): React.JSX.Element {
                     {item}
                   </span>
                 ))}
+              </span>
+            ) : null}
+            {runFailed && otherAssistants.length > 0 ? (
+              <span className="mt-4 block">
+                <span className="block font-medium text-foreground">换个助手重试</span>
+                <span className="mt-1 block">
+                  也可以换一个 AI 助手，用你刚才写的那段话再跑一次。换哪个由你决定。
+                </span>
+                <span className="mt-3 flex flex-wrap gap-3">
+                  {otherAssistants.map((option) => (
+                    <Button
+                      key={option.key}
+                      type="button"
+                      variant="secondary"
+                      disabled={switching || submitting}
+                      onClick={() => void switchAssistantAndRetry(option.key)}
+                    >
+                      {switching ? '正在切换…' : `换成 ${option.label} 重试`}
+                    </Button>
+                  ))}
+                </span>
+              </span>
+            ) : null}
+            {runFailed ? (
+              <span className="mt-3 block text-xs">
+                还是不行的话，到
+                <Link to="/settings" className="mx-1 underline">
+                  设置
+                </Link>
+                里跑一次「连接测试」，就知道是不是 AI 助手那边的问题。
               </span>
             ) : null}
           </AlertDescription>

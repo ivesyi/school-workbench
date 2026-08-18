@@ -68,6 +68,28 @@ describe('the guide the consultant reads first', () => {
     expect(guide).toContain('不会替它另外整理一条判断')
   })
 
+  it('tells the consultant how to find out whether the assistant is reachable', () => {
+    expect(guide).toContain('运行连接测试')
+    // Two promises the button has to keep, stated where the consultant reads
+    // about it: no school material is used, and nothing is recorded.
+    expect(guide).toContain('不会用到任何学校的资料')
+    // And a failure is never turned into the consultant's fault.
+    expect(guide).toContain('不是你写错了什么，也不是学校资料有问题')
+  })
+
+  it('describes switching assistant as a choice, never as something automatic', () => {
+    expect(guide).toContain('换个助手重试')
+    expect(guide).toContain('永远不会自己替你换助手')
+    // Only Codex is integrated, so the guide must not imply the control is
+    // there today.
+    expect(guide).toContain('现在只有 Codex 一个')
+  })
+
+  it('says a version notice is a notice, not a block', () => {
+    expect(guide).toContain('此版本未经产品验证')
+    expect(guide).toContain('不会**因此不让你用')
+  })
+
   it('does not overstate where the consultant data goes', () => {
     // Analysis is carried out by Codex, so "nothing ever leaves this computer"
     // would be untrue.

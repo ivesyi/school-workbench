@@ -5,6 +5,7 @@ import {
   assistantNote,
   canStartAnalysis,
   progressLabel,
+  switchableAssistants,
   unavailableReason,
 } from './assistant-flow'
 
@@ -15,6 +16,7 @@ function settings(
   return {
     selected: 'codex',
     localTools: [],
+    runtimeVersions: [],
     options: [{ key: 'codex', label: 'Codex', availability, detail }],
   }
 }
@@ -143,5 +145,61 @@ describe('whether new analysis can start at all', () => {
       '这台电脑上还没有装好 Codex。',
     )
     expect(unavailableReason(settings('unavailable'))).toContain('不能开始新的分析')
+  })
+})
+
+describe('the other assistants a consultant could switch to', () => {
+  /**
+   * Only Codex is integrated today, so a second assistant has to be invented to
+   * test the mechanism at all. The cast is deliberate and confined to this file.
+   */
+  function manyAssistants(
+    options: readonly { key: string; availability: 'ready' | 'unavailable' }[],
+    selected = 'codex',
+  ): AssistantSettingsView {
+    return {
+      selected,
+      localTools: [],
+      runtimeVersions: [],
+      options: options.map((option) => ({
+        key: option.key,
+        label: option.key === 'codex' ? 'Codex' : '另一个助手',
+        availability: option.availability,
+        detail: null,
+      })),
+    } as unknown as AssistantSettingsView
+  }
+
+  it('offers nothing when there is only one assistant', () => {
+    expect(switchableAssistants(settings())).toEqual([])
+    expect(switchableAssistants(null)).toEqual([])
+  })
+
+  it('offers the other assistants that could actually run', () => {
+    const offered = switchableAssistants(
+      manyAssistants([
+        { key: 'codex', availability: 'ready' },
+        { key: 'another', availability: 'ready' },
+      ]),
+    )
+    expect(offered.map((option) => option.key)).toEqual(['another'])
+  })
+
+  it('never offers one that cannot start, and never offers the current one', () => {
+    expect(
+      switchableAssistants(
+        manyAssistants([
+          { key: 'codex', availability: 'ready' },
+          { key: 'another', availability: 'unavailable' },
+        ]),
+      ),
+    ).toEqual([])
+    // A chosen assistant that is itself down is still not something to "switch"
+    // to; the list is about the others.
+    expect(
+      switchableAssistants(manyAssistants([{ key: 'codex', availability: 'ready' }], 'codex')).map(
+        (option) => option.key,
+      ),
+    ).toEqual([])
   })
 })

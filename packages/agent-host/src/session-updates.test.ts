@@ -142,3 +142,48 @@ describe('session update observer', () => {
     expect(observer.failedMcpStartups).toEqual(['some-server'])
   })
 })
+
+describe('what the runtime said about an MCP startup', () => {
+  function startupReport(text: string): Record<string, unknown> {
+    return {
+      sessionUpdate: 'tool_call',
+      toolCallId: 'mcp_startup.some-server',
+      title: 'mcp__some-server__startup',
+      status: 'failed',
+      content: [{ type: 'content', content: { type: 'text', text } }],
+    }
+  }
+
+  it('keeps the wording, because "cancelled" and "failed" arrive the same way', () => {
+    // codex-acp reports both as a failed synthetic tool call. The only thing
+    // separating a tool server that broke from one the runtime tore down mid
+    // startup is this sentence.
+    const observer = new SessionUpdateObserver()
+    observer.observe(startupReport('startup was cancelled.'))
+    expect(observer.mcpStartupReports).toEqual([
+      { serverName: 'some-server', text: 'startup was cancelled.' },
+    ])
+  })
+
+  it('lets a later report correct an earlier one, and never blanks the reason', () => {
+    const observer = new SessionUpdateObserver()
+    observer.observe(startupReport(''))
+    observer.observe({
+      ...startupReport('failed to start: No such file or directory'),
+      sessionUpdate: 'tool_call_update',
+    })
+    observer.observe({ ...startupReport(''), sessionUpdate: 'tool_call_update' })
+
+    expect(observer.mcpStartupReports).toEqual([
+      { serverName: 'some-server', text: 'failed to start: No such file or directory' },
+    ])
+  })
+
+  it('leaves the Agent Host verdict on a startup failure alone', () => {
+    const observer = new SessionUpdateObserver()
+    observer.observe(startupReport('startup was cancelled.'))
+    // The host treats both kinds the same way and must keep doing so; the
+    // wording is an addition, not a change of verdict.
+    expect(observer.failedMcpStartups).toEqual(['some-server'])
+  })
+})

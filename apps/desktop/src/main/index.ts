@@ -18,8 +18,13 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createAgentIpcHandlers, registerAgentIpc, type AgentRunner } from './agent-ipc'
 import { assistantReadiness, runAgentOnce } from './agent-runtime'
-import { localToolStatuses } from './local-tool-status'
-import { agentIpcChannels, type AgentProgressEvent } from '@school-workbench/shared'
+import { checkAssistantConnection, NOT_STARTED_VIEW } from './connection-check-runtime'
+import { localToolStatuses, runtimeVersions } from './local-tool-status'
+import {
+  agentIpcChannels,
+  type AgentProgressEvent,
+  type AssistantConnectionCheckView,
+} from '@school-workbench/shared'
 import { createJudgmentIpcHandlers, registerJudgmentIpc } from './judgment-ipc'
 import { createMethodologyIpcHandlers, registerMethodologyIpc } from './methodology-ipc'
 import {
@@ -47,6 +52,7 @@ if (testUserDataDirectory && !app.isPackaged) {
 let closeDatabase: (() => void) | undefined
 let readPlane: ReadPlaneRuntime | undefined
 let agentRunner: AgentRunner | null = null
+let connectionChecker: (() => Promise<AssistantConnectionCheckView>) | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -150,6 +156,17 @@ app.whenReady().then(() => {
           },
           input,
         )
+      // The connection test shares the read plane so it exercises the same
+      // wiring a real run would, and is given nothing that could write.
+      connectionChecker = () =>
+        checkAssistantConnection({
+          readPlane: runtime.plane,
+          endpoint: runtime.endpoint,
+          mainDirectory: currentDirectory,
+          execPath: process.execPath,
+          userDataDirectory: app.getPath('userData'),
+          onDiagnostic: (message) => process.stderr.write(`${message}\n`),
+        })
       // Deliberately reports readiness only. The port and the capability tokens
       // never leave this process.
       process.stderr.write('workbench read plane ready\n')
@@ -178,6 +195,16 @@ app.whenReady().then(() => {
       write: (key, value) => preferencesRepository.set(key, value),
       readiness: () => readiness,
       localToolStatuses: () => localToolStatuses(),
+      runtimeVersions: () => runtimeVersions(currentDirectory),
+      checkConnection: async () =>
+        connectionChecker
+          ? connectionChecker()
+          : {
+              state: 'failed' as const,
+              ...NOT_STARTED_VIEW,
+              durationSeconds: 0,
+              checkedAt: new Date().toISOString(),
+            },
     }),
   )
 
@@ -212,6 +239,7 @@ app.on('before-quit', (event) => {
     ])
     readPlane = undefined
     agentRunner = null
+    connectionChecker = null
     closeDatabase?.()
     closeDatabase = undefined
     app.quit()

@@ -1,5 +1,15 @@
-import { Alert, AlertDescription, AlertTitle, Separator } from '@school-workbench/experience'
-import type { AssistantChoice, AssistantSettingsView } from '@school-workbench/shared'
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  Button,
+  Separator,
+} from '@school-workbench/experience'
+import type {
+  AssistantChoice,
+  AssistantConnectionCheckView,
+  AssistantSettingsView,
+} from '@school-workbench/shared'
 import { CheckCircle2, ChevronRight, CircleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -10,6 +20,8 @@ export function SettingsPage(): React.JSX.Element {
   const [assistant, setAssistant] = useState<AssistantSettingsView | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [checkResult, setCheckResult] = useState<AssistantConnectionCheckView | null>(null)
 
   useEffect(() => {
     let current = true
@@ -36,6 +48,27 @@ export function SettingsPage(): React.JSX.Element {
       setError('这次没能保存你的选择，请再试一次。')
     } finally {
       setSaving(false)
+    }
+  }
+
+  /**
+   * Really asks the assistant a trivial question and reports what came back.
+   *
+   * Only ever started here, by hand: it costs a real turn, so nothing runs it
+   * on launch. The answer is shown and nothing else — it never switches
+   * assistant, never retries, and never changes what the workbench will allow.
+   */
+  async function runConnectionCheck(): Promise<void> {
+    if (checking) return
+    setChecking(true)
+    setError(null)
+    setCheckResult(null)
+    try {
+      setCheckResult(await api.settings.checkConnection())
+    } catch {
+      setError('这次没能完成连接测试，请稍后再试一次。')
+    } finally {
+      setChecking(false)
     }
   }
 
@@ -108,6 +141,37 @@ export function SettingsPage(): React.JSX.Element {
             </p>
           ) : null}
 
+          <div className="mt-5 rounded-lg border border-border px-4 py-4">
+            <p className="text-sm font-medium">想确认它现在真的能用？</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              连接测试会真的让 AI
+              助手回答一个无关紧要的问题，看看它这会儿通不通。测试不会用到任何学校的资料，也不会留下任何记录。可能要等上一会儿。
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-3"
+              disabled={checking}
+              onClick={() => void runConnectionCheck()}
+            >
+              {checking ? '正在测试…' : '运行连接测试'}
+            </Button>
+            {checkResult ? (
+              <Alert
+                variant={checkResult.state === 'ok' ? 'quiet' : 'destructive'}
+                className="mt-4"
+              >
+                <AlertTitle>{checkResult.headline}</AlertTitle>
+                <AlertDescription>
+                  <span className="block">{checkResult.detail}</span>
+                  <span className="mt-2 block text-xs">
+                    这次测试用了 {checkResult.durationSeconds} 秒。
+                  </span>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+          </div>
+
           {error ? (
             <p className="mt-3 text-sm text-destructive" role="alert">
               {error}
@@ -153,6 +217,34 @@ export function SettingsPage(): React.JSX.Element {
                   </div>
                 )
               })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="mt-6 overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="px-6 py-5">
+          <h2 className="font-medium">版本信息</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            这里只是告诉你装的是哪个版本。版本不影响工作台怎么运行，也不会因为版本不同就不让你用。
+          </p>
+          {assistant === null ? (
+            <p className="mt-4 text-sm text-muted-foreground">正在读取…</p>
+          ) : (
+            <div className="mt-4 divide-y divide-border rounded-lg border border-border">
+              {assistant.runtimeVersions.map((item) => (
+                <div key={item.key} className="flex items-start justify-between gap-4 px-4 py-3">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{item.label}</span>
+                    {item.note ? (
+                      <span className="mt-1 block text-sm text-muted-foreground">{item.note}</span>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 text-sm text-muted-foreground">
+                    {item.version ?? '未知'}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </div>
