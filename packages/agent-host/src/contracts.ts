@@ -122,7 +122,7 @@ export const agentHostErrorCodes = [
   'MCP_DESCRIPTOR_INVALID',
   'RUN_TRANSITION_INVALID',
   /**
-   * The three ways a *controlled* harness — one that runs inside this process
+   * The ways a *controlled* harness — one that runs inside this process
    * rather than as somebody else's command-line tool — fails.
    *
    * They are separate codes rather than one because they land on different
@@ -130,10 +130,14 @@ export const agentHostErrorCodes = [
    * settings in a minute; `HARNESS_ASSEMBLY_FAILED` means this build is broken
    * and only a new build fixes it; `MODEL_REQUEST_FAILED` is the model service
    * on the other end, which is nobody here's fault and usually passes.
+   * `NO_EXPLICIT_OUTCOME` means the loop finished without submitting a
+   * judgement, an explicit abstention, or a stage proposal — silence is not
+   * a completed analysis.
    */
   'MODEL_CHANNEL_NOT_CONFIGURED',
   'HARNESS_ASSEMBLY_FAILED',
   'MODEL_REQUEST_FAILED',
+  'NO_EXPLICIT_OUTCOME',
 ] as const
 
 export type AgentHostErrorCode = (typeof agentHostErrorCodes)[number]

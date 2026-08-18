@@ -5,7 +5,12 @@ import {
   type ConnectionCheckOutcome,
 } from '../connection-check'
 import type { HarnessCapabilityGrant } from '../harness/contracts'
-import { PiHarnessDriver, piHarnessAgentName, type PiHarnessDependencies } from './driver'
+import {
+  CONNECTION_CHECK_MAX_TURNS,
+  PiHarnessDriver,
+  piHarnessAgentName,
+  type PiHarnessDependencies,
+} from './driver'
 
 /**
  * The connection test for the built-in assistant.
@@ -81,8 +86,12 @@ export async function runBuiltinAssistantConnectionCheck(
     // A probe must not be told to go and read a school; there is not one.
     bootstrapText: connectionCheckPromptText,
     // One turn is the whole test. A model that starts calling tools has
-    // already answered the only question being asked.
-    maxTurns: 1,
+    // already answered the only question being asked. This bound is owned
+    // by the probe and is not the analysis-run default.
+    maxTurns: CONNECTION_CHECK_MAX_TURNS,
+    // A connection check is allowed to just answer. Requiring a proposal
+    // would turn a working probe into a failed one.
+    requireExplicitOutcome: false,
   })
 
   const workbenchToolCalls: string[] = []

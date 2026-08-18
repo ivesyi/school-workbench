@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest'
 import { agentBootstrapText } from '../bootstrap'
 import type { HarnessCapabilityGrant } from '../harness/contracts'
 import {
+  CONNECTION_CHECK_MAX_TURNS,
+  DEFAULT_MAX_TURNS,
   PiHarnessDriver,
   piHarnessAgentName,
   type PiHarnessChannel,
@@ -85,6 +87,68 @@ function dependencies(
   }
 }
 
+/** Schema-valid enough for the harness to dispatch the tool. */
+const validDiagnosisProposeInput = Object.freeze({
+  type: 'state',
+  title: '改进实践开始可见',
+  candidate: {
+    protocolVersion: 1,
+    claimRefs: ['c1'],
+    criterionMappings: [
+      {
+        packKey: 'data-wise',
+        version: '3',
+        criterionId: 'DW.C2.PRACTICE_VISIBILITY',
+        reason: '公共墙上的课堂记录正对应实践可见性这条准则。',
+      },
+    ],
+    stageTargetRefs: ['target-1'],
+    supportingFactRefs: ['f1'],
+    counterFactRefs: [],
+    counterEvidenceSearch: {
+      completed: true,
+      summary: '查了同一份记录里是否有相反迹象，没有发现。',
+      searchedEvidenceRefs: ['e1'],
+      searchedFactRefs: ['f1'],
+    },
+    interpretations: [
+      {
+        kind: 'interpretation',
+        id: 'i1',
+        summary: '贴到公共空间意味着实践开始可被同伴检视。',
+        factRefs: ['f1'],
+      },
+    ],
+    provisionalJudgment: '改进实践已经开始可见，但还只发生在一个教研组。',
+    mechanism: null,
+    alternativeHypotheses: ['也可能只是这一次公开课的临时安排。'],
+    unresolvedQuestions: [],
+    recommendedActions: [],
+    nextObservations: ['下月再看一次公共墙是否仍在更新。'],
+    impactEvidencePlan: [],
+    evidenceQuality: {
+      directness: 'high',
+      triangulation: 'single_source',
+      limitations: ['只有一份观察记录。'],
+    },
+    confidence: 'medium',
+    status: 'proposed',
+  },
+})
+
+const validStageProposeInput = Object.freeze({
+  title: '起始阶段',
+  summary: '建立共同推动改进的组织基础',
+  focus: '结构与机制',
+  targets: {
+    leadership: { title: '领导', description: '领导层把改进排进日常议程。' },
+    key_tasks: { title: '任务', description: '明确本阶段要推动的关键任务。' },
+    structure: { title: '结构', description: '让教研改进有固定的组织位置。' },
+    culture: { title: '文化', description: '把公开讨论实践当成常态。' },
+    capability: { title: '能力', description: '教师能看见并讨论彼此的课。' },
+  },
+})
+
 describe('built-in assistant driver', () => {
   it('drives one turn, calls a workbench tool, and reports the outcome', async () => {
     const calls: Array<{ tool: string; input: unknown }> = []
@@ -99,7 +163,13 @@ describe('built-in assistant driver', () => {
 
     const progress: string[] = []
     const statuses: string[] = []
-    const driver = new PiHarnessDriver(dependencies({ createChannel: scripted.channel, call }))
+    const driver = new PiHarnessDriver(
+      dependencies({
+        createChannel: scripted.channel,
+        call,
+        requireExplicitOutcome: false,
+      }),
+    )
     const result = await driver.run(
       { grant, consultantMessage: '看看这所学校' },
       {
@@ -166,6 +236,7 @@ describe('built-in assistant driver', () => {
         createChannel: scripted.channel,
         resolveChannel: async () => configured,
         call: async () => ({}),
+        requireExplicitOutcome: false,
       }),
     )
 
@@ -221,6 +292,7 @@ describe('built-in assistant driver', () => {
           }
         },
         call,
+        requireExplicitOutcome: false,
       }),
     )
 
@@ -241,7 +313,11 @@ describe('built-in assistant driver', () => {
   it('records an in-process session identity without inventing protocol facts', async () => {
     const scripted = scriptedChannel([fauxAssistantMessage([fauxText('好的。')])])
     const driver = new PiHarnessDriver(
-      dependencies({ createChannel: scripted.channel, call: async () => ({}) }),
+      dependencies({
+        createChannel: scripted.channel,
+        call: async () => ({}),
+        requireExplicitOutcome: false,
+      }),
     )
 
     const result = await driver.run({ grant, consultantMessage: '你好' })
@@ -277,8 +353,93 @@ describe('built-in assistant driver', () => {
     )
 
     expect(result.workbenchToolCalls).toHaveLength(3)
-    expect(result.status).toBe('completed')
+    expect(result.status).toBe('failed')
+    expect(result.failure?.code).toBe('NO_EXPLICIT_OUTCOME')
     expect(diagnostics.some((message) => message.includes('turn bound'))).toBe(true)
+  })
+
+  it('keeps the analysis turn bound far above the connection-check bound', () => {
+    expect(CONNECTION_CHECK_MAX_TURNS).toBe(1)
+    expect(DEFAULT_MAX_TURNS).toBeGreaterThanOrEqual(120)
+  })
+
+  it('lets an analysis run take more than ten tool turns and still submit a proposal', async () => {
+    const reads = Array.from({ length: 12 }, () =>
+      fauxAssistantMessage([fauxToolCall('school_context', {})], { stopReason: 'toolUse' }),
+    )
+    const scripted = scriptedChannel([
+      ...reads,
+      fauxAssistantMessage([fauxToolCall('diagnosis_propose', validDiagnosisProposeInput)], {
+        stopReason: 'toolUse',
+      }),
+      fauxAssistantMessage([fauxText('判断已经提交。')], { stopReason: 'stop' }),
+    ])
+    const driver = new PiHarnessDriver(
+      dependencies({ createChannel: scripted.channel, call: async () => ({}) }),
+    )
+
+    const result = await driver.run({ grant, consultantMessage: '分析这所学校' })
+
+    expect(result.status).toBe('completed')
+    expect(result.failure).toBeNull()
+    expect(result.workbenchToolCalls.filter((name) => name === 'school_context')).toHaveLength(12)
+    expect(result.workbenchToolCalls).toContain('diagnosis_propose')
+  })
+
+  it('fails a run that chats without submitting a proposal or abstaining', async () => {
+    const scripted = scriptedChannel([
+      fauxAssistantMessage([fauxText('看了一圈，先到这儿。')], { stopReason: 'stop' }),
+    ])
+    const driver = new PiHarnessDriver(
+      dependencies({ createChannel: scripted.channel, call: async () => ({}) }),
+    )
+
+    const result = await driver.run({ grant, consultantMessage: '分析这所学校' })
+
+    expect(result.status).toBe('failed')
+    expect(result.status).not.toBe('completed')
+    expect(result.failure?.code).toBe('NO_EXPLICIT_OUTCOME')
+  })
+
+  it('treats a successful stage proposal as an explicit outcome', async () => {
+    const scripted = scriptedChannel([
+      fauxAssistantMessage([fauxToolCall('stage_propose', validStageProposeInput)], {
+        stopReason: 'toolUse',
+      }),
+      fauxAssistantMessage([fauxText('阶段已经提议。')], { stopReason: 'stop' }),
+    ])
+    const driver = new PiHarnessDriver(
+      dependencies({ createChannel: scripted.channel, call: async () => ({}) }),
+    )
+
+    const result = await driver.run({ grant, consultantMessage: '这所学校还没有阶段' })
+
+    expect(result.status).toBe('completed')
+    expect(result.failure).toBeNull()
+    expect(result.workbenchToolCalls).toEqual(['stage_propose'])
+  })
+
+  it('does not treat a refused proposal as an explicit outcome', async () => {
+    const scripted = scriptedChannel([
+      fauxAssistantMessage([fauxToolCall('diagnosis_propose', validDiagnosisProposeInput)], {
+        stopReason: 'toolUse',
+      }),
+      fauxAssistantMessage([fauxText('提交被拒，先停在这儿。')], { stopReason: 'stop' }),
+    ])
+    const driver = new PiHarnessDriver(
+      dependencies({
+        createChannel: scripted.channel,
+        call: async () => {
+          throw new WorkbenchToolCallError('ASSESSMENT_REFUSED', 'Candidate refused')
+        },
+      }),
+    )
+
+    const result = await driver.run({ grant, consultantMessage: '提交判断' })
+
+    expect(result.status).toBe('failed')
+    expect(result.failure?.code).toBe('NO_EXPLICIT_OUTCOME')
+    expect(result.workbenchToolCalls).toEqual(['diagnosis_propose'])
   })
 
   it('reports a model service failure as a failed run rather than a silent empty answer', async () => {

@@ -389,7 +389,9 @@ describe('the built-in assistant against the real workbench', () => {
       { schoolId: SCHOOL, message: '随便看看' },
     )
 
-    expect(view.outcome).toBe('no_new_judgment')
+    expect(view.status).toBe('failed')
+    expect(view.outcome).toBe('failed')
+    expect(view.failureCode).toBe('NO_EXPLICIT_OUTCOME')
 
     const session = database.client
       .prepare(

@@ -39,15 +39,38 @@ import { createWorkbenchAgentTools, type WorkbenchToolCaller } from './workbench
  */
 
 /**
- * How many model turns one run may take.
+ * How many model turns a real analysis run may take.
  *
- * A turn is one model request plus the tools it asked for. Ten reads, a couple
- * of registrations and a proposal is a full working run; well past that the
- * assistant is going in circles while the consultant waits. The bound ends the
- * run with whatever it has. The wall-clock bound in the composition root is a
- * backstop behind this, not the first line of defence.
+ * A turn is one model request plus the tools it asked for. Observed full
+ * analyses on the other assistant take on the order of ninety tool calls
+ * (many of them criterion lookups and corrections), so the bound has to sit
+ * above that rather than above a tidy "ten reads and a proposal". Hitting
+ * the bound without an explicit outcome is a failed run, not a silent
+ * completion. The wall-clock bound in the composition root is a backstop
+ * behind this, not the first line of defence.
+ *
+ * The connection check uses `CONNECTION_CHECK_MAX_TURNS` on its own driver
+ * instance. These two numbers must not share a default.
  */
-export const DEFAULT_MAX_TURNS = 32
+export const DEFAULT_MAX_TURNS = 120
+
+/**
+ * How many model turns a connection check may take.
+ *
+ * One turn is the whole test: the probe only asks whether a model answers
+ * at all. A check that kept calling tools would be a run, not a check.
+ */
+export const CONNECTION_CHECK_MAX_TURNS = 1
+
+/** Tools that count as an explicit analysis outcome when they succeed. */
+export const EXPLICIT_OUTCOME_TOOL_NAMES = Object.freeze([
+  'diagnosis_propose',
+  'stage_propose',
+] as const satisfies readonly WorkbenchToolName[])
+
+export function isExplicitOutcomeTool(name: string): name is WorkbenchToolName {
+  return (EXPLICIT_OUTCOME_TOOL_NAMES as readonly string[]).includes(name)
+}
 
 /** Name recorded in `agent_sessions.agent_name`. Not consultant-facing. */
 export const piHarnessAgentName = 'workbench-builtin-harness'
@@ -74,7 +97,21 @@ export type PiHarnessDependencies = Readonly<{
   createChannel?: (config: ModelChannelConfig) => PiHarnessChannel
   /** Test seam. Production calls the real loopback read plane. */
   call?: WorkbenchToolCaller
+  /**
+   * Analysis-run turn bound. Production leaves this unset so it uses
+   * `DEFAULT_MAX_TURNS`. The connection check passes
+   * `CONNECTION_CHECK_MAX_TURNS` on its own instance.
+   */
   maxTurns?: number
+  /**
+   * Whether finishing without a successful `diagnosis_propose` or
+   * `stage_propose` is a failed run.
+   *
+   * Analysis runs leave this unset (it defaults to true). The connection
+   * check is the one caller that turns it off: a probe is allowed to just
+   * answer, and must not be punished for not submitting a judgement.
+   */
+  requireExplicitOutcome?: boolean
   /**
    * The standing instructions the model is given, defaulting to the SPEC 26
    * Agent Bootstrap.
@@ -159,6 +196,7 @@ export class PiHarnessDriver implements HarnessDriver {
     const toolCalls: WorkbenchToolName[] = []
     let text = ''
     let failure: HarnessRunFailure | null = null
+    let producedExplicitOutcome = false
     // Nothing is verified until the tool contract has actually been checked
     // against the frozen SPEC 18 list, so the pessimistic value starts here.
     let compatibility: RuntimeCompatibility = 'unsupported'
@@ -224,6 +262,19 @@ export class PiHarnessDriver implements HarnessDriver {
           },
         },
         (event: AgentEvent) => {
+          // A successful propose or stage proposal is the only thing that
+          // counts as an analysis having finished its job. A refused call is
+          // not that — the model still has to correct it or abstain.
+          if (event.type === 'tool_execution_end') {
+            if (
+              !event.isError &&
+              isWorkbenchToolName(event.toolName) &&
+              isExplicitOutcomeTool(event.toolName)
+            ) {
+              producedExplicitOutcome = true
+            }
+            return
+          }
           // The progress line follows what the assistant actually did. Only
           // workbench tools reach it, so nothing a runtime does on its own can
           // be described to a consultant (PRD 16).
@@ -239,8 +290,19 @@ export class PiHarnessDriver implements HarnessDriver {
       const assistants = messages.filter(isAssistantMessage)
       text = assistantText(assistants)
       const outcome = outcomeForStopReason(assistants.at(-1))
-      failure = outcome.failure
-      lifecycle.settle(outcome.status)
+      const requireExplicitOutcome = this.dependencies.requireExplicitOutcome ?? true
+      if (outcome.status === 'completed' && requireExplicitOutcome && !producedExplicitOutcome) {
+        failure = Object.freeze({
+          code: 'NO_EXPLICIT_OUTCOME',
+          message:
+            'The built-in assistant finished without submitting a diagnosis proposal, an explicit abstention, or a stage proposal.',
+        })
+        observers.onDiagnostic?.('built-in assistant finished without an explicit outcome')
+        lifecycle.settle('failed')
+      } else {
+        failure = outcome.failure
+        lifecycle.settle(outcome.status)
+      }
     } catch (error) {
       const code = error instanceof AgentHostError ? error.code : 'HARNESS_ASSEMBLY_FAILED'
       const message = error instanceof Error ? error.message : String(error)
