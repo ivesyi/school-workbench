@@ -176,6 +176,7 @@ function api(
       checkConnection: vi.fn(),
       saveModelChannel: vi.fn(),
       clearModelChannel: vi.fn(),
+      testFeishuRead: vi.fn(),
     },
     agent: {
       run: vi.fn().mockResolvedValue(agentRun()),
@@ -404,6 +405,33 @@ describe('the workbench when the assistant can run', () => {
     ]) {
       expect(shown, leak).not.toContain(leak)
     }
+  })
+
+  it('keeps the sentence when a Feishu document could not be read', async () => {
+    const workbench = api('ready', {
+      run: vi.fn().mockResolvedValue(
+        agentRun({
+          runId: 'not-started',
+          status: 'failed',
+          outcome: 'failed',
+          proposal: null,
+          usedWorkbenchTools: false,
+          failureCode: 'FEISHU_UNBOUND',
+          failureMessage: '链接里的文档没能取回来：飞书还没绑定。',
+        }),
+      ),
+    })
+    renderPage(workbench)
+    await screen.findByText(/AI 助手会先看一遍/)
+    await say('请看 https://sample.feishu.cn/docx/Abc123Token')
+
+    await screen.findByText(/链接里的文档没能取回来：飞书还没绑定/)
+    expect(screen.getByText(/可以把文档内容直接粘贴进来再试/)).toBeInTheDocument()
+    expect(
+      screen.getByDisplayValue('请看 https://sample.feishu.cn/docx/Abc123Token'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '认同' })).not.toBeInTheDocument()
   })
 
   it('points at the connection test in settings after a failure', async () => {

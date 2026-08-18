@@ -9,11 +9,15 @@ import {
   versionStanding,
   type VerifiedRuntimeKey,
 } from '@school-workbench/agent-host'
-import type { LocalToolStatusView, RuntimeVersionView } from '@school-workbench/shared'
+import type {
+  FeishuBindingView,
+  LocalToolStatusView,
+  RuntimeVersionView,
+} from '@school-workbench/shared'
 
 type PathExists = (path: string) => boolean
 
-function resolveSystemLarkCliPath(
+export function resolveSystemLarkCliPath(
   environment: NodeJS.ProcessEnv,
   exists: PathExists,
 ): string | null {
@@ -57,10 +61,86 @@ export function localToolStatuses(
       label: '飞书命令行工具',
       availability: larkCliAvailable ? 'available' : 'unavailable',
       detail: larkCliAvailable
-        ? '已检测到。飞书材料接入尚未启用，后续可继续完成授权设置。'
-        : '未检测到。启用飞书材料接入前需要先安装飞书命令行工具。',
+        ? '已检测到。绑定情况和读取测试见下方「飞书」。'
+        : '未检测到。要让 AI 助手读飞书文档，需要先在这台电脑上装好飞书。',
     },
   ])
+}
+
+/**
+ * The exact command a consultant runs in a terminal to bind Feishu.
+ *
+ * The workbench never launches this itself: it is an interactive login, and
+ * the product only shows the line.
+ */
+export const FEISHU_BIND_COMMAND = 'lark-cli auth login --domain docs'
+
+function extractJsonObject(text: string): unknown {
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start < 0 || end <= start) return null
+  try {
+    return JSON.parse(text.slice(start, end + 1)) as unknown
+  } catch {
+    return null
+  }
+}
+
+function accountNameFromStatus(parsed: unknown): string | null {
+  if (typeof parsed !== 'object' || parsed === null) return null
+  const identities = (parsed as { identities?: { user?: { userName?: unknown } } }).identities
+  const name = identities?.user?.userName
+  return typeof name === 'string' && name.trim().length > 0 ? name.trim() : null
+}
+
+function userIdentityBound(parsed: unknown): boolean {
+  if (typeof parsed !== 'object' || parsed === null) return false
+  const user = (parsed as { identities?: { user?: { available?: unknown; status?: unknown } } })
+    .identities?.user
+  if (!user) return false
+  return user.available === true || user.status === 'ready'
+}
+
+/**
+ * Whether Feishu on this computer can read a document as the signed-in person.
+ *
+ * Installation is answered from the path. Binding is answered by asking the
+ * tool for its own auth status — a local read, no document, no login.
+ */
+export async function probeFeishuBinding(
+  environment: NodeJS.ProcessEnv = process.env,
+  exists: PathExists = existsSync,
+  run: RunCommand = runCommand,
+): Promise<FeishuBindingView> {
+  const path = resolveSystemLarkCliPath(environment, exists)
+  if (!path) {
+    return Object.freeze({
+      state: 'uninstalled',
+      accountName: null,
+      bindCommand: null,
+      detail: '这台电脑上还没装好飞书。装好后再打开设置，就能继续绑定。',
+    })
+  }
+
+  const output = await run(path, ['auth', 'status', '--json'])
+  const parsed = extractJsonObject(output)
+  if (userIdentityBound(parsed)) {
+    const accountName = accountNameFromStatus(parsed)
+    return Object.freeze({
+      state: 'bound',
+      accountName,
+      bindCommand: null,
+      detail: accountName ? `已绑定：${accountName}` : '已绑定飞书账号。',
+    })
+  }
+
+  return Object.freeze({
+    state: 'unbound',
+    accountName: null,
+    bindCommand: FEISHU_BIND_COMMAND,
+    detail:
+      '飞书已经装好，但还没绑定账号。请在终端运行下面这行，用你的飞书账号完成绑定，然后点重新检查。',
+  })
 }
 
 /** How long the workbench waits for a tool to print its own version. */

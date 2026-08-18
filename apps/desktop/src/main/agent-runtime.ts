@@ -29,6 +29,12 @@ import {
   type WorkbenchWriteCapabilityService,
 } from '@school-workbench/workbench-read-plane'
 import { randomUUID } from 'node:crypto'
+import {
+  FEISHU_FAILURE_CODES,
+  humanFeishuFailure,
+  prepareConsultantMessage,
+  type FeishuDocumentResult,
+} from './feishu-document'
 
 /**
  * The runtimes this workbench drives, one row each in `runtime_profiles`.
@@ -151,6 +157,11 @@ export type AgentRuntimeDependencies = Readonly<{
   judgments: JudgmentService
   /** Reports the high-level step the consultant is allowed to see (PRD 16). */
   onProgress?: (phase: AgentProgressPhase) => void
+  /**
+   * Test seam. Production reads Feishu documents through the local Feishu
+   * tool; a test supplies a scripted fetch so no real document is opened.
+   */
+  fetchFeishuDocument?: (url: string) => Promise<FeishuDocumentResult>
 }>
 
 export type AssistantReadinessResult = Readonly<{ ready: boolean; detail: string | null }>
@@ -233,15 +244,43 @@ export function assistantReadiness(
  * is decided here; `packages/agent-host` only sees protocol-level inputs
  * (SPEC 7).
  */
+export function unstartedFeishuFailure(reason: keyof typeof FEISHU_FAILURE_CODES): AgentRunView {
+  return Object.freeze({
+    runId: 'not-started',
+    status: 'failed' as const,
+    outcome: 'failed' as const,
+    proposal: null,
+    abstention: null,
+    usedWorkbenchTools: false,
+    unrecognisedUpdateKinds: [],
+    runtimeCompatibility: 'compatible' as const,
+    failureCode: FEISHU_FAILURE_CODES[reason],
+    failureMessage: humanFeishuFailure(reason),
+  })
+}
+
 export async function runAgentOnce(
   dependencies: AgentRuntimeDependencies,
   input: RunAgentInput,
 ): Promise<AgentRunView> {
+  const prepared = await prepareConsultantMessage(input.message, {
+    ...(dependencies.environment ? { environment: dependencies.environment } : {}),
+    ...(dependencies.fetchFeishuDocument ? { fetch: dependencies.fetchFeishuDocument } : {}),
+    log: (line) => {
+      process.stderr.write(`${line}\n`)
+      dependencies.onDiagnostic?.(line)
+    },
+  })
+  if (!prepared.ok) {
+    return unstartedFeishuFailure(prepared.reason)
+  }
+  const resolvedInput: RunAgentInput = { ...input, message: prepared.message }
+
   const runtimeProfileId = await dependencies.repository.ensureRuntimeProfile(
     runtimeProfiles[dependencies.assistant],
   )
   const run = await dependencies.repository.createRun({
-    schoolId: input.schoolId,
+    schoolId: resolvedInput.schoolId,
     runId: randomUUID(),
   })
 
@@ -280,14 +319,28 @@ export async function runAgentOnce(
     try {
       outcome =
         dependencies.assistant === 'builtin'
-          ? await runBuiltinAssistant(dependencies, input, run.id, grant.token, deadline.signal, {
-              onStatus,
-              onWorkbenchToolCall,
-            })
-          : await runCodexAssistant(dependencies, input, run.id, grant.token, deadline.signal, {
-              onStatus,
-              onWorkbenchToolCall,
-            })
+          ? await runBuiltinAssistant(
+              dependencies,
+              resolvedInput,
+              run.id,
+              grant.token,
+              deadline.signal,
+              {
+                onStatus,
+                onWorkbenchToolCall,
+              },
+            )
+          : await runCodexAssistant(
+              dependencies,
+              resolvedInput,
+              run.id,
+              grant.token,
+              deadline.signal,
+              {
+                onStatus,
+                onWorkbenchToolCall,
+              },
+            )
     } finally {
       clearTimeout(runTimer)
     }
@@ -344,7 +397,7 @@ export async function runAgentOnce(
   // assessment contract, or an explicit abstention. Nothing else is produced in
   // their place.
   const submitted = await dependencies.judgments
-    .findAgentRunOutcome(input.schoolId, run.id)
+    .findAgentRunOutcome(resolvedInput.schoolId, run.id)
     .catch(() => ({ kind: 'none' }) as const)
 
   return Object.freeze({

@@ -53,6 +53,7 @@ describe('SchoolListPage', () => {
         checkConnection: vi.fn(),
         saveModelChannel: vi.fn(),
         clearModelChannel: vi.fn(),
+        testFeishuRead: vi.fn(),
       },
       agent: {
         run: vi.fn(),
@@ -111,6 +112,7 @@ describe('SchoolListPage archive action', () => {
         checkConnection: vi.fn(),
         saveModelChannel: vi.fn(),
         clearModelChannel: vi.fn(),
+        testFeishuRead: vi.fn(),
       },
       agent: { run: vi.fn(), onProgress: vi.fn().mockReturnValue(() => undefined) },
     }
@@ -160,6 +162,7 @@ describe('SchoolListPage recovery guidance', () => {
         checkConnection: vi.fn(),
         saveModelChannel: vi.fn(),
         clearModelChannel: vi.fn(),
+        testFeishuRead: vi.fn(),
       },
       agent: { run: vi.fn(), onProgress: vi.fn().mockReturnValue(() => undefined) },
     }

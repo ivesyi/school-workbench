@@ -99,6 +99,12 @@ describe('the guide the consultant reads first', () => {
     }
   })
 
+  it('tells the consultant how to let the assistant read a Feishu document', () => {
+    expect(guide).toContain('让 AI 助手能看飞书文档')
+    expect(guide).toContain('读取测试')
+    expect(guide).toContain('可以把文档内容直接粘贴进来再试')
+  })
+
   it('says a version notice is a notice, not a block', () => {
     expect(guide).toContain('此版本未经产品验证')
     expect(guide).toContain('不会**因此不让你用')

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { pinnedBuiltinHarnessVersion } from '@school-workbench/agent-host'
-import { localToolStatuses, readCodexAcpVersion, runtimeVersions } from './local-tool-status'
+import {
+  FEISHU_BIND_COMMAND,
+  localToolStatuses,
+  probeFeishuBinding,
+  readCodexAcpVersion,
+  runtimeVersions,
+} from './local-tool-status'
 
 describe('local tool status checks', () => {
   it('reports Codex and Feishu CLI separately when both are installed', () => {
@@ -17,7 +23,7 @@ describe('local tool status checks', () => {
         key: 'lark_cli',
         label: '飞书命令行工具',
         availability: 'available',
-        detail: '已检测到。飞书材料接入尚未启用，后续可继续完成授权设置。',
+        detail: '已检测到。绑定情况和读取测试见下方「飞书」。',
       },
     ])
   })
@@ -34,9 +40,74 @@ describe('local tool status checks', () => {
         key: 'lark_cli',
         label: '飞书命令行工具',
         availability: 'unavailable',
-        detail: '未检测到。启用飞书材料接入前需要先安装飞书命令行工具。',
+        detail: '未检测到。要让 AI 助手读飞书文档，需要先在这台电脑上装好飞书。',
       },
     ])
+  })
+})
+
+describe('Feishu binding three-state', () => {
+  it('is uninstalled when the tool is not on disk', async () => {
+    const asked: string[][] = []
+    const view = await probeFeishuBinding({ PATH: '/tools' }, () => false, async (command, args) => {
+      asked.push([command, ...args])
+      return ''
+    })
+
+    expect(view.state).toBe('uninstalled')
+    expect(view.accountName).toBeNull()
+    expect(view.bindCommand).toBeNull()
+    expect(view.detail).toContain('还没装好飞书')
+    expect(asked).toEqual([])
+  })
+
+  it('is unbound when the tool is installed but the person is not signed in', async () => {
+    const asked: string[][] = []
+    const view = await probeFeishuBinding(
+      { PATH: '/tools' },
+      (path) => path === '/tools/lark-cli',
+      async (command, args) => {
+        asked.push([command, ...args])
+        return JSON.stringify({
+          identities: {
+            user: {
+              status: 'missing',
+              available: false,
+              userName: '易虎',
+            },
+          },
+        })
+      },
+    )
+
+    expect(asked).toEqual([['/tools/lark-cli', 'auth', 'status', '--json']])
+    expect(view.state).toBe('unbound')
+    expect(view.accountName).toBeNull()
+    expect(view.bindCommand).toBe(FEISHU_BIND_COMMAND)
+    expect(view.detail).toContain('还没绑定')
+    expect(view.detail).not.toContain('token')
+  })
+
+  it('is bound and shows the account name when the user identity is ready', async () => {
+    const view = await probeFeishuBinding(
+      { PATH: '/tools' },
+      (path) => path === '/tools/lark-cli',
+      async () =>
+        JSON.stringify({
+          identities: {
+            user: {
+              status: 'ready',
+              available: true,
+              userName: '易虎',
+            },
+          },
+        }),
+    )
+
+    expect(view.state).toBe('bound')
+    expect(view.accountName).toBe('易虎')
+    expect(view.bindCommand).toBeNull()
+    expect(view.detail).toBe('已绑定：易虎')
   })
 })
 

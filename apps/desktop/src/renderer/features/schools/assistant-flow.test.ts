@@ -25,6 +25,12 @@ function settings(
       configured: false,
       detail: '还没填。',
     },
+    feishu: {
+      state: 'uninstalled',
+      accountName: null,
+      bindCommand: null,
+      detail: '这台电脑上还没装好飞书。',
+    },
     options: [{ key: 'codex', label: 'Codex', availability, detail }],
   }
 }
@@ -89,6 +95,10 @@ describe('what the consultant sees while an assistant works', () => {
       assistantFailureNote('WORKBENCH_MCP_TOOLS_INVISIBLE'),
       assistantFailureNote('RUNTIME_UNSUPPORTED'),
       assistantFailureNote('AGENT_RUN_FAILED'),
+      assistantFailureNote('FEISHU_UNBOUND'),
+      assistantFailureNote('FEISHU_PERMISSION'),
+      assistantFailureNote('FEISHU_INVALID_LINK'),
+      assistantFailureNote('FEISHU_TIMEOUT'),
       assistantFailureNote(null),
       unavailableReason(settings('unavailable')) ?? '',
     ].join('\n')
@@ -131,6 +141,12 @@ describe('what the consultant sees while an assistant works', () => {
     expect(abstained).toContain('目前依据不足，暂不形成判断')
     expect(abstained).not.toContain('记下来了')
     expect(assistantNote(run({ outcome: 'no_new_judgment' }))).not.toContain('依据不足')
+  })
+
+  it('tells the consultant when a Feishu document could not be read', () => {
+    expect(assistantFailureNote('FEISHU_UNBOUND')).toContain('飞书还没绑定')
+    expect(assistantFailureNote('FEISHU_TIMEOUT')).toContain('等太久没有读回来')
+    expect(assistantFailureNote('FEISHU_UNBOUND')).toContain('可以把文档内容直接粘贴进来再试')
   })
 })
 

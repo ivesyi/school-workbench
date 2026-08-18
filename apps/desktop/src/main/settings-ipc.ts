@@ -2,12 +2,17 @@ import {
   assistantConnectionCheckViewSchema,
   assistantSettingsViewSchema,
   chooseAssistantInputSchema,
+  feishuBindingViewSchema,
+  feishuReadTestInputSchema,
+  feishuReadTestViewSchema,
   modelChannelSaveResultSchema,
   saveModelChannelInputSchema,
   settingsIpcChannels,
   type AssistantChoice,
   type AssistantConnectionCheckView,
   type AssistantSettingsView,
+  type FeishuBindingView,
+  type FeishuReadTestView,
   type LocalToolStatusView,
   type ModelChannelSaveResult,
   type RuntimeVersionView,
@@ -62,6 +67,7 @@ export type SettingsIpcHandlers = {
   checkConnection(): Promise<AssistantConnectionCheckView>
   saveModelChannel(input: unknown): Promise<ModelChannelSaveResult>
   clearModelChannel(): Promise<AssistantSettingsView>
+  testFeishuRead(input: unknown): Promise<FeishuReadTestView>
 }
 
 export type SettingsDependencies = Readonly<{
@@ -73,6 +79,8 @@ export type SettingsDependencies = Readonly<{
   /** Installed versions next to the ones this product was verified against. */
   runtimeVersions(): Promise<readonly RuntimeVersionView[]>
   checkConnection(assistant: AssistantChoice): Promise<AssistantConnectionCheckView>
+  feishuBinding(): Promise<FeishuBindingView>
+  testFeishuRead(url: string): Promise<FeishuReadTestView>
   modelChannel: ModelChannelStore
 }>
 
@@ -82,15 +90,17 @@ async function toView(
   selected: AssistantChoice,
   dependencies: SettingsDependencies,
 ): Promise<AssistantSettingsView> {
-  const [versions, modelChannel] = await Promise.all([
+  const [versions, modelChannel, feishu] = await Promise.all([
     dependencies.runtimeVersions(),
     dependencies.modelChannel.readView(),
+    dependencies.feishuBinding(),
   ])
   return assistantSettingsViewSchema.parse({
     selected,
     localTools: [...dependencies.localToolStatuses()],
     runtimeVersions: [...versions],
     modelChannel,
+    feishu: feishuBindingViewSchema.parse(feishu),
     // Every assistant is listed, ready or not. An assistant that cannot run
     // today still says *why* — hiding it would leave a consultant with no way
     // to find out what to do about it, and no way to pick it once fixed.
@@ -149,6 +159,10 @@ export function createSettingsIpcHandlers(dependencies: SettingsDependencies): S
       await dependencies.modelChannel.clear()
       return toView(await currentChoice(dependencies), dependencies)
     },
+    async testFeishuRead(input) {
+      const parsed = feishuReadTestInputSchema.parse(input)
+      return feishuReadTestViewSchema.parse(await dependencies.testFeishuRead(parsed.url))
+    },
   }
 }
 
@@ -162,4 +176,7 @@ export function registerSettingsIpc(ipcMain: IpcMain, handlers: SettingsIpcHandl
     handlers.saveModelChannel(input),
   )
   ipcMain.handle(settingsIpcChannels.clearModelChannel, () => handlers.clearModelChannel())
+  ipcMain.handle(settingsIpcChannels.testFeishuRead, (_event, input: unknown) =>
+    handlers.testFeishuRead(input),
+  )
 }

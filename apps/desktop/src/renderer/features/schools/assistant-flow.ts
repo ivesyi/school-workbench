@@ -106,6 +106,14 @@ export function assistantFailureNote(failureCode: string | null): string {
       return 'AI 助手没有拿到学校资料接口，因此这次没有开始分析。你写的内容还在，可以稍后重试。'
     case 'WORKBENCH_MCP_STARTUP_FAILED':
       return 'AI 助手这次没有成功开始分析。你写的内容还在，可以稍后再点击重试。'
+    case 'FEISHU_UNBOUND':
+      return '链接里的文档没能取回来：飞书还没绑定。你写的内容还在，可以把文档内容直接粘贴进来再试。'
+    case 'FEISHU_PERMISSION':
+      return '链接里的文档没能取回来：没有读这份文档的权限。你写的内容还在，可以把文档内容直接粘贴进来再试。'
+    case 'FEISHU_INVALID_LINK':
+      return '链接里的文档没能取回来：这个链接不像是一份飞书文档。你写的内容还在，可以把文档内容直接粘贴进来再试。'
+    case 'FEISHU_TIMEOUT':
+      return '链接里的文档没能取回来：等太久没有读回来。你写的内容还在，可以把文档内容直接粘贴进来再试。'
     default:
       return 'AI 助手这次没能完成。你写的内容还在，可以过一会儿再重试。'
   }

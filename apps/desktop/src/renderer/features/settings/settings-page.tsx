@@ -3,6 +3,12 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
   Separator,
 } from '@school-workbench/experience'
@@ -10,11 +16,34 @@ import type {
   AssistantChoice,
   AssistantConnectionCheckView,
   AssistantSettingsView,
+  FeishuReadTestView,
 } from '@school-workbench/shared'
 import { CheckCircle2, ChevronRight, CircleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useWorkbenchApi } from '../../lib/workbench-api'
+
+function feishuStateLabel(state: AssistantSettingsView['feishu']['state']): string {
+  switch (state) {
+    case 'uninstalled':
+      return '还没装好飞书'
+    case 'unbound':
+      return '飞书还没绑定'
+    case 'bound':
+      return '飞书已绑定'
+  }
+}
+
+function feishuStateBadge(state: AssistantSettingsView['feishu']['state']): string {
+  switch (state) {
+    case 'uninstalled':
+      return '未安装'
+    case 'unbound':
+      return '未绑定'
+    case 'bound':
+      return '已绑定'
+  }
+}
 
 export function SettingsPage(): React.JSX.Element {
   const api = useWorkbenchApi()
@@ -31,6 +60,11 @@ export function SettingsPage(): React.JSX.Element {
   const [channelApiKey, setChannelApiKey] = useState('')
   const [savingChannel, setSavingChannel] = useState(false)
   const [channelMessage, setChannelMessage] = useState<string | null>(null)
+  const [readTestOpen, setReadTestOpen] = useState(false)
+  const [readTestUrl, setReadTestUrl] = useState('')
+  const [readTesting, setReadTesting] = useState(false)
+  const [readTestResult, setReadTestResult] = useState<FeishuReadTestView | null>(null)
+  const [readTestError, setReadTestError] = useState<string | null>(null)
 
   useEffect(() => {
     let current = true
@@ -110,6 +144,30 @@ export function SettingsPage(): React.JSX.Element {
       setChannelMessage('这次没能保存，请检查填写内容后再试一次。')
     } finally {
       setSavingChannel(false)
+    }
+  }
+
+  async function refreshAssistant(): Promise<void> {
+    try {
+      const next = await api.settings.getAssistant()
+      setAssistant(next)
+    } catch {
+      setError('暂时读不到飞书的绑定情况，请再试一次。')
+    }
+  }
+
+  async function runFeishuReadTest(): Promise<void> {
+    const url = readTestUrl.trim()
+    if (!url || readTesting) return
+    setReadTesting(true)
+    setReadTestError(null)
+    setReadTestResult(null)
+    try {
+      setReadTestResult(await api.settings.testFeishuRead({ url }))
+    } catch {
+      setReadTestError('这次没能完成读取测试，请稍后再试一次。')
+    } finally {
+      setReadTesting(false)
     }
   }
 
@@ -312,10 +370,123 @@ export function SettingsPage(): React.JSX.Element {
 
       <section className="mt-6 overflow-hidden rounded-xl border border-border bg-surface">
         <div className="px-6 py-5">
-          <h2 className="font-medium">本机工具状态</h2>
+          <h2 className="font-medium">飞书</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            这里只检查工具是否已安装，不会读取你的登录信息或飞书内容。
+            把飞书文档链接贴进学校里的情况时，工作台会先把文档读回来再交给 AI 助手。
           </p>
+          {assistant === null ? (
+            <p className="mt-4 text-sm text-muted-foreground">正在检查…</p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              <div className="flex items-start justify-between gap-4 rounded-lg border border-border px-4 py-3">
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">
+                    {feishuStateLabel(assistant.feishu?.state ?? 'uninstalled')}
+                  </span>
+                  <span className="mt-1 block text-sm text-muted-foreground">
+                    {assistant.feishu?.detail ??
+                      '这台电脑上还没装好飞书。装好后再打开设置，就能继续绑定。'}
+                  </span>
+                  {assistant.feishu?.bindCommand ? (
+                    <code className="mt-2 block overflow-x-auto rounded-md bg-muted px-3 py-2 text-xs text-foreground">
+                      {assistant.feishu.bindCommand}
+                    </code>
+                  ) : null}
+                </span>
+                <span
+                  className={
+                    assistant.feishu?.state === 'bound'
+                      ? 'inline-flex shrink-0 items-center gap-2 text-sm text-primary'
+                      : 'inline-flex shrink-0 items-center gap-2 text-sm text-muted-foreground'
+                  }
+                >
+                  {assistant.feishu?.state === 'bound' ? (
+                    <CheckCircle2 className="size-4" />
+                  ) : (
+                    <CircleAlert className="size-4" />
+                  )}
+                  {feishuStateBadge(assistant.feishu?.state ?? 'uninstalled')}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" variant="secondary" onClick={() => void refreshAssistant()}>
+                  重新检查
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setReadTestOpen(true)
+                    setReadTestResult(null)
+                    setReadTestError(null)
+                  }}
+                >
+                  读取测试
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <Dialog
+        open={readTestOpen}
+        onOpenChange={(open) => {
+          setReadTestOpen(open)
+          if (!open) {
+            setReadTesting(false)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>读取测试</DialogTitle>
+            <DialogDescription>
+              贴一个飞书文档链接，工作台会试着读一次标题。不会改文档，也不会交给 AI 助手。
+            </DialogDescription>
+          </DialogHeader>
+          <label className="block">
+            <span className="block text-sm font-medium">飞书文档链接</span>
+            <Input
+              className="mt-1"
+              value={readTestUrl}
+              placeholder="https://…"
+              aria-label="飞书文档链接"
+              onChange={(event) => setReadTestUrl(event.target.value)}
+            />
+          </label>
+          {readTestResult ? (
+            <Alert variant={readTestResult.state === 'ok' ? 'quiet' : 'destructive'}>
+              <AlertTitle>{readTestResult.headline}</AlertTitle>
+              <AlertDescription>
+                <span className="block">{readTestResult.detail}</span>
+                <span className="mt-2 block text-xs">
+                  这次测试用了 {readTestResult.durationSeconds} 秒。
+                </span>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {readTestError ? (
+            <p className="text-sm text-destructive" role="alert">
+              {readTestError}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              disabled={readTesting || readTestUrl.trim().length === 0}
+              onClick={() => void runFeishuReadTest()}
+            >
+              {readTesting ? '正在读取…' : '开始读取'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <section className="mt-6 overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="px-6 py-5">
+          <h2 className="font-medium">本机工具状态</h2>
+          <p className="mt-1 text-sm text-muted-foreground">这里只检查工具是否已安装。</p>
           {assistant === null ? (
             <p className="mt-4 text-sm text-muted-foreground">正在检查…</p>
           ) : (

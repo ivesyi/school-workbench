@@ -148,6 +148,7 @@ function baseApi(): WorkbenchApi {
       checkConnection: vi.fn(),
       saveModelChannel: vi.fn(),
       clearModelChannel: vi.fn(),
+      testFeishuRead: vi.fn(),
     },
     agent: {
       run: vi.fn().mockResolvedValue(assistantRun),

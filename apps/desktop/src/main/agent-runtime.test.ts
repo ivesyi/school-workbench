@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { assistantReadiness, describeOutcome, nextProgressPhase } from './agent-runtime'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  assistantReadiness,
+  describeOutcome,
+  nextProgressPhase,
+  runAgentOnce,
+  unstartedFeishuFailure,
+} from './agent-runtime'
 
 describe('high-level progress (PRD 16)', () => {
   it('follows what the assistant actually did, in order', () => {
@@ -65,5 +71,53 @@ describe('whether an assistant can start on this computer', () => {
     // The real repository layout: this is the same resolution the run itself
     // uses, so a "ready" here means a run gets at least as far as starting.
     expect(assistantReadiness('apps/desktop/out/main').ready).toBe(true)
+  })
+})
+
+describe('Feishu documents in an analysis run', () => {
+  it('does not start a run when a linked document cannot be read', async () => {
+    const ensureRuntimeProfile = vi.fn(async () => {
+      throw new Error('run must not start')
+    })
+    const createRun = vi.fn(async () => {
+      throw new Error('run must not start')
+    })
+
+    const result = await runAgentOnce(
+      {
+        assistant: 'codex',
+        repository: { ensureRuntimeProfile, createRun },
+        fetchFeishuDocument: async () => ({ ok: false, reason: 'unbound' }),
+      } as never,
+      {
+        schoolId: 'school-1',
+        message: '请看 https://sample.feishu.cn/docx/Abc123Token',
+      },
+    )
+
+    expect(result).toEqual(unstartedFeishuFailure('unbound'))
+    expect(ensureRuntimeProfile).not.toHaveBeenCalled()
+    expect(createRun).not.toHaveBeenCalled()
+  })
+
+  it('does not fetch anything when the situation has no Feishu link', async () => {
+    const fetchFeishuDocument = vi.fn()
+    const ensureRuntimeProfile = vi.fn(async () => {
+      throw new Error('stop after preflight')
+    })
+
+    await expect(
+      runAgentOnce(
+        {
+          assistant: 'codex',
+          repository: { ensureRuntimeProfile },
+          fetchFeishuDocument,
+        } as never,
+        { schoolId: 'school-1', message: '今天中层会议还是校长在拆任务。' },
+      ),
+    ).rejects.toThrow('stop after preflight')
+
+    expect(fetchFeishuDocument).not.toHaveBeenCalled()
+    expect(ensureRuntimeProfile).toHaveBeenCalledTimes(1)
   })
 })

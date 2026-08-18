@@ -52,6 +52,54 @@ export const localToolStatusViewSchema = z.object({
   detail: z.string().min(1),
 })
 
+/**
+ * Whether Feishu on this computer can actually read a document.
+ *
+ * Three states a consultant can act on: the tool is missing, it is here but
+ * nobody has signed in, or a named account is ready. The workbench never runs
+ * the sign-in itself.
+ */
+export const feishuBindingStateSchema = z.enum(['uninstalled', 'unbound', 'bound'])
+
+export const feishuBindingViewSchema = z.object({
+  state: feishuBindingStateSchema,
+  /** Present only when a signed-in account name could be read. */
+  accountName: z.string().min(1).nullable(),
+  /** The exact terminal command to run when the account is not bound. */
+  bindCommand: z.string().min(1).nullable(),
+  detail: z.string().min(1),
+})
+
+export const feishuReadFailureReasonSchema = z.enum([
+  'unbound',
+  'permission',
+  'invalid_link',
+  'timeout',
+])
+
+export const feishuReadTestInputSchema = z
+  .object({
+    url: z.string().trim().min(1).max(2000),
+  })
+  .strict()
+
+/**
+ * One throwaway read of a Feishu document the consultant pasted.
+ *
+ * Same shape as the assistant connection test: shown, never acted on, never
+ * retried, and written in the consultant's words.
+ */
+export const feishuReadTestViewSchema = z.object({
+  state: z.enum(['ok', 'failed']),
+  headline: z.string().min(1),
+  detail: z.string().min(1),
+  /** The document title when the read worked. */
+  title: z.string().min(1).nullable(),
+  durationSeconds: z.number().int().nonnegative(),
+  checkedAt: z.string().min(1),
+  reason: feishuReadFailureReasonSchema.nullable(),
+})
+
 export const runtimeVersionKeySchema = z.enum(['codex_cli', 'codex_acp', 'builtin_harness'])
 
 /**
@@ -121,6 +169,7 @@ export const assistantSettingsViewSchema = z.object({
   localTools: z.array(localToolStatusViewSchema).length(2),
   runtimeVersions: z.array(runtimeVersionViewSchema).length(3),
   modelChannel: modelChannelViewSchema,
+  feishu: feishuBindingViewSchema,
 })
 
 /**
@@ -157,6 +206,7 @@ export const settingsIpcChannels = {
   checkConnection: 'settings:check-connection',
   saveModelChannel: 'settings:save-model-channel',
   clearModelChannel: 'settings:clear-model-channel',
+  testFeishuRead: 'settings:test-feishu-read',
 } as const
 
 /**
@@ -188,6 +238,11 @@ export type AssistantChoice = z.infer<typeof assistantChoiceSchema>
 export type AssistantOptionView = z.infer<typeof assistantOptionViewSchema>
 export type AssistantSettingsView = z.infer<typeof assistantSettingsViewSchema>
 export type LocalToolStatusView = z.infer<typeof localToolStatusViewSchema>
+export type FeishuBindingState = z.infer<typeof feishuBindingStateSchema>
+export type FeishuBindingView = z.infer<typeof feishuBindingViewSchema>
+export type FeishuReadFailureReason = z.infer<typeof feishuReadFailureReasonSchema>
+export type FeishuReadTestInput = z.infer<typeof feishuReadTestInputSchema>
+export type FeishuReadTestView = z.infer<typeof feishuReadTestViewSchema>
 export type RuntimeVersionKey = z.infer<typeof runtimeVersionKeySchema>
 export type RuntimeVersionStanding = z.infer<typeof runtimeVersionStandingSchema>
 export type RuntimeVersionView = z.infer<typeof runtimeVersionViewSchema>

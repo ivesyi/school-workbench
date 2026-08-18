@@ -20,7 +20,8 @@ import { createAgentIpcHandlers, registerAgentIpc, type AgentRunner } from './ag
 import { assistantReadiness, builtinAssistantReadiness, runAgentOnce } from './agent-runtime'
 import { createModelChannelStore, type ModelChannelStore } from './model-channel-store'
 import { checkAssistantConnection, NOT_STARTED_VIEW } from './connection-check-runtime'
-import { localToolStatuses, runtimeVersions } from './local-tool-status'
+import { testFeishuRead } from './feishu-document'
+import { localToolStatuses, probeFeishuBinding, runtimeVersions } from './local-tool-status'
 import {
   agentIpcChannels,
   type AgentProgressEvent,
@@ -242,6 +243,8 @@ app.whenReady().then(() => {
               durationSeconds: 0,
               checkedAt: new Date().toISOString(),
             },
+      feishuBinding: () => probeFeishuBinding(),
+      testFeishuRead: (url) => testFeishuRead(url),
     }),
   )
 

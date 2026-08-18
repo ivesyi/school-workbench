@@ -8,6 +8,8 @@ import {
   assistantConnectionCheckViewSchema,
   assistantSettingsViewSchema,
   chooseAssistantInputSchema,
+  feishuReadTestInputSchema,
+  feishuReadTestViewSchema,
   modelChannelSaveResultSchema,
   runAgentInputSchema,
   saveModelChannelInputSchema,
@@ -169,6 +171,13 @@ const api: WorkbenchApi = {
     async clearModelChannel() {
       const result: unknown = await ipcRenderer.invoke(settingsIpcChannels.clearModelChannel)
       return assistantSettingsViewSchema.parse(result)
+    },
+    async testFeishuRead(input) {
+      const result: unknown = await ipcRenderer.invoke(
+        settingsIpcChannels.testFeishuRead,
+        feishuReadTestInputSchema.parse(input),
+      )
+      return feishuReadTestViewSchema.parse(result)
     },
   },
   agent: {

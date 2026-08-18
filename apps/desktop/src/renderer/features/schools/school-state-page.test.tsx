@@ -161,6 +161,7 @@ function baseApi(stateView: StateWorkspaceView = draft): WorkbenchApi {
       checkConnection: vi.fn(),
       saveModelChannel: vi.fn(),
       clearModelChannel: vi.fn(),
+      testFeishuRead: vi.fn(),
     },
     agent: {
       run: vi.fn(),

@@ -1,4 +1,9 @@
-import type { AssistantConnectionCheckView, AssistantSettingsView } from '@school-workbench/shared'
+import type {
+  AssistantConnectionCheckView,
+  AssistantSettingsView,
+  FeishuBindingView,
+  FeishuReadTestView,
+} from '@school-workbench/shared'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ASSISTANT_PREFERENCE_KEY,
@@ -38,6 +43,8 @@ function store(initial: Record<string, string> = {}) {
       void assistant
       return connectionCheckOk
     }),
+    feishuBinding: vi.fn(async () => feishuUninstalled),
+    testFeishuRead: vi.fn(async () => feishuReadOk),
     modelChannel: {
       readView: async () => emptyChannel,
       readConfig: async () => null,
@@ -45,6 +52,23 @@ function store(initial: Record<string, string> = {}) {
       clear: vi.fn(async () => undefined),
     },
   }
+}
+
+const feishuUninstalled: FeishuBindingView = {
+  state: 'uninstalled',
+  accountName: null,
+  bindCommand: null,
+  detail: '这台电脑上还没装好飞书。装好后再打开设置，就能继续绑定。',
+}
+
+const feishuReadOk: FeishuReadTestView = {
+  state: 'ok',
+  headline: '能读到：《课堂观察纪要》',
+  detail: '这份文档现在可以读。把链接贴进学校里的情况，AI 助手就能看到正文。',
+  title: '课堂观察纪要',
+  durationSeconds: 2,
+  checkedAt: '2026-08-19T04:00:00.000Z',
+  reason: null,
 }
 
 const localTools: AssistantSettingsView['localTools'] = [
@@ -97,6 +121,7 @@ describe('choosing a default assistant', () => {
     expect(view.options.map((option) => option.key)).toEqual(['codex', 'builtin'])
     expect(view.options.map((option) => option.label)).toEqual(['Codex', '工作台自带助手'])
     expect(view.localTools).toEqual(localTools)
+    expect(view.feishu).toEqual(feishuUninstalled)
   })
 
   it('names the second assistant by where it runs, never by the library behind it', async () => {
@@ -316,5 +341,27 @@ describe('the model connection the built-in assistant uses', () => {
     const handlers = createSettingsIpcHandlers({ ...backing, readiness: () => ready })
     await handlers.clearModelChannel()
     expect(backing.modelChannel.clear).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('the Feishu read test', () => {
+  it('only runs when it is asked to, and hands back what happened', async () => {
+    const backing = store()
+    const handlers = createSettingsIpcHandlers({ ...backing, readiness: () => ready })
+
+    await handlers.getAssistant()
+    expect(backing.testFeishuRead).not.toHaveBeenCalled()
+
+    expect(
+      await handlers.testFeishuRead({ url: 'https://sample.feishu.cn/docx/Abc123Token' }),
+    ).toEqual(feishuReadOk)
+    expect(backing.testFeishuRead).toHaveBeenCalledTimes(1)
+    expect(backing.testFeishuRead).toHaveBeenCalledWith('https://sample.feishu.cn/docx/Abc123Token')
+  })
+
+  it('refuses a blank link', async () => {
+    const handlers = createSettingsIpcHandlers({ ...store(), readiness: () => ready })
+    await expect(handlers.testFeishuRead({ url: '' })).rejects.toThrow()
+    await expect(handlers.testFeishuRead({})).rejects.toThrow()
   })
 })

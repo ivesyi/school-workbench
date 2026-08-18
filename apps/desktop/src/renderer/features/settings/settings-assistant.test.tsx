@@ -63,6 +63,12 @@ function view(
       configured: false,
       detail: '还没填。填好模型地址、模型名称和密钥之后，工作台自带助手就能用了。',
     },
+    feishu: {
+      state: 'uninstalled',
+      accountName: null,
+      bindCommand: null,
+      detail: '这台电脑上还没装好飞书。装好后再打开设置，就能继续绑定。',
+    },
     options: [
       { key: 'codex', label: 'Codex', availability, detail },
       {
@@ -105,6 +111,7 @@ function api(settings: Partial<WorkbenchApi['settings']> = {}): WorkbenchApi {
       checkConnection: vi.fn().mockResolvedValue(passedCheck),
       saveModelChannel: vi.fn(),
       clearModelChannel: vi.fn(),
+      testFeishuRead: vi.fn(),
       ...settings,
     },
     agent: { run: vi.fn(), onProgress: vi.fn().mockReturnValue(() => undefined) },
@@ -147,7 +154,7 @@ describe('choosing a default AI assistant in settings', () => {
     expect(screen.getByText('飞书命令行工具')).toBeInTheDocument()
     expect(screen.getByText('已检测到')).toBeInTheDocument()
     expect(screen.getByText('未检测到')).toBeInTheDocument()
-    expect(screen.getByText(/不会读取你的登录信息或飞书内容/)).toBeInTheDocument()
+    expect(screen.getByText(/这里只检查工具是否已安装/)).toBeInTheDocument()
   })
 
   it('says in plain words when the assistant cannot be used here', async () => {

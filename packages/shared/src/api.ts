@@ -10,6 +10,8 @@ import type {
   AssistantConnectionCheckView,
   AssistantSettingsView,
   ChooseAssistantInput,
+  FeishuReadTestInput,
+  FeishuReadTestView,
   ModelChannelSaveResult,
   SaveModelChannelInput,
 } from './preferences'
@@ -58,6 +60,11 @@ export type WorkbenchApi = {
     saveModelChannel(input: SaveModelChannelInput): Promise<ModelChannelSaveResult>
     /** Forgets the model connection, key included. */
     clearModelChannel(): Promise<AssistantSettingsView>
+    /**
+     * Really reads one Feishu document the consultant pasted, title only.
+     * Started by a person, never on launch.
+     */
+    testFeishuRead(input: FeishuReadTestInput): Promise<FeishuReadTestView>
   }
   agent: {
     run(input: RunAgentInput): Promise<AgentRunView>

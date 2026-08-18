@@ -139,11 +139,18 @@ function apiWith(methodology: WorkbenchApi['methodology']): WorkbenchApi {
           detail: '还没填。',
         },
         options: [{ key: 'codex', label: 'Codex', availability: 'ready', detail: null }],
+        feishu: {
+          state: 'uninstalled',
+          accountName: null,
+          bindCommand: null,
+          detail: '这台电脑上还没装好飞书。',
+        },
       }),
       chooseAssistant: vi.fn(),
       checkConnection: vi.fn(),
       saveModelChannel: vi.fn(),
       clearModelChannel: vi.fn(),
+      testFeishuRead: vi.fn(),
     },
     agent: {
       run: vi.fn(),
