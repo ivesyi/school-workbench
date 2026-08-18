@@ -3,20 +3,18 @@ import { describe, expect, it } from 'vitest'
 import {
   assistantFailureNote,
   assistantNote,
+  canStartAnalysis,
   progressLabel,
-  shouldAskAssistant,
+  unavailableReason,
 } from './assistant-flow'
 
 function settings(
-  selected: AssistantSettingsView['selected'],
   availability: 'ready' | 'unavailable' = 'ready',
+  detail: string | null = null,
 ): AssistantSettingsView {
   return {
-    selected,
-    options: [
-      { key: 'codex', label: 'Codex', availability, detail: null },
-      { key: 'none', label: '暂不使用 AI 助手', availability: 'ready', detail: null },
-    ],
+    selected: 'codex',
+    options: [{ key: 'codex', label: 'Codex', availability, detail }],
   }
 }
 
@@ -26,6 +24,7 @@ function run(overrides: Partial<AgentRunView>): AgentRunView {
     status: 'completed',
     outcome: 'no_new_judgment',
     proposal: null,
+    abstention: null,
     usedWorkbenchTools: true,
     unrecognisedUpdateKinds: [],
     runtimeCompatibility: 'verified',
@@ -80,6 +79,7 @@ describe('what the consultant sees while an assistant works', () => {
       assistantFailureNote('RUNTIME_UNSUPPORTED'),
       assistantFailureNote('AGENT_RUN_FAILED'),
       assistantFailureNote(null),
+      unavailableReason(settings('unavailable')) ?? '',
     ].join('\n')
 
     for (const word of FORBIDDEN_WORDS) {
@@ -87,13 +87,21 @@ describe('what the consultant sees while an assistant works', () => {
     }
   })
 
-  it('always tells the consultant the sentence was kept', () => {
-    // The assistant not producing a judgement must never mean the consultant's
-    // words were thrown away.
-    for (const outcome of ['needs_more_evidence', 'no_new_judgment', 'failed'] as const) {
-      expect(
-        assistantNote(run({ outcome, status: outcome === 'failed' ? 'failed' : 'completed' })),
-      ).toContain('记下来了')
+  it('offers a retry when a run failed, and never claims to have written anything down', () => {
+    for (const code of [
+      'RUNTIME_NOT_FOUND',
+      'RUNTIME_UNSUPPORTED',
+      'WORKBENCH_MCP_STARTUP_FAILED',
+      'WORKBENCH_MCP_TOOLS_INVISIBLE',
+      'AGENT_RUN_FAILED',
+      null,
+    ]) {
+      const note = assistantFailureNote(code)
+      expect(note, String(code)).toContain('重试')
+      expect(note, String(code)).toContain('你写的内容还在')
+      // Nothing was recorded on the assistant's behalf, so nothing may say it was.
+      expect(note, String(code)).not.toContain('记下来了')
+      expect(note, String(code)).not.toContain('判断')
     }
   })
 
@@ -101,23 +109,32 @@ describe('what the consultant sees while an assistant works', () => {
     expect(assistantNote(run({ outcome: 'proposal_ready' }))).toBe('')
   })
 
-  it('distinguishes an abstention from having nothing to say', () => {
-    expect(assistantNote(run({ outcome: 'needs_more_evidence' }))).toContain('依据还不足')
-    expect(assistantNote(run({ outcome: 'no_new_judgment' }))).not.toContain('依据还不足')
+  it('reports an abstention as an abstention, not as a judgement or a failure', () => {
+    const abstained = assistantNote(run({ outcome: 'needs_more_evidence' }))
+    expect(abstained).toContain('目前依据不足，暂不形成判断')
+    expect(abstained).not.toContain('记下来了')
+    expect(assistantNote(run({ outcome: 'no_new_judgment' }))).not.toContain('依据不足')
   })
 })
 
-describe('deciding whether to ask an assistant', () => {
-  it('asks only when one was chosen and can actually start', () => {
-    expect(shouldAskAssistant(settings('codex'))).toBe(true)
-    expect(shouldAskAssistant(settings('codex', 'unavailable'))).toBe(false)
-    expect(shouldAskAssistant(settings('none'))).toBe(false)
-    expect(shouldAskAssistant(null)).toBe(false)
+describe('whether new analysis can start at all', () => {
+  it('needs an assistant that can actually start on this computer', () => {
+    expect(canStartAnalysis(settings())).toBe(true)
+    expect(canStartAnalysis(settings('unavailable'))).toBe(false)
+    expect(canStartAnalysis(null)).toBe(false)
   })
 
-  it('never asks before the settings have been read', () => {
-    // Otherwise the very first sentence after launch could go somewhere the
-    // consultant never chose.
-    expect(shouldAskAssistant(null)).toBe(false)
+  it('stays quiet until the settings have been read', () => {
+    // Otherwise a perfectly working machine is accused of missing something for
+    // the fraction of a second before the answer arrives.
+    expect(unavailableReason(null)).toBeNull()
+    expect(unavailableReason(settings())).toBeNull()
+  })
+
+  it('explains in plain words why analysis is unavailable', () => {
+    expect(unavailableReason(settings('unavailable', '这台电脑上还没有装好 Codex。'))).toBe(
+      '这台电脑上还没有装好 Codex。',
+    )
+    expect(unavailableReason(settings('unavailable'))).toContain('不能开始新的分析')
   })
 })

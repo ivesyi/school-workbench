@@ -22,7 +22,6 @@ import { openWorkbenchDatabase, type WorkbenchDatabase } from './database'
 import { SqliteGroundedDiagnosisRepository } from './sqlite-grounded-diagnosis-repository'
 import { SqliteJudgmentRepository } from './sqlite-judgment-repository'
 import { SqliteMethodologyRepository } from './sqlite-methodology-repository'
-import { SqliteSchoolRepository } from './sqlite-school-repository'
 import {
   claimFacts,
   claims,
@@ -633,10 +632,7 @@ describe('validated diagnosis persistence seam', () => {
     expect(saved.stageTargetIds).toEqual([])
 
     const judgmentRepository = new SqliteJudgmentRepository(database.db)
-    const judgmentService = new JudgmentService(
-      new SqliteSchoolRepository(database.db),
-      judgmentRepository,
-    )
+    const judgmentService = new JudgmentService(judgmentRepository)
     await expect(
       judgmentService.review({
         schoolId: fixture.input.school.schoolId,

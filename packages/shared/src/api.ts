@@ -1,11 +1,5 @@
 import type { AgentProgressEvent, AgentRunView, RunAgentInput } from './agent'
-import type {
-  AcceptedJudgmentView,
-  JudgmentReviewView,
-  ReviewDiagnosisInput,
-  ReviewOutcomeView,
-  SubmitSituationInput,
-} from './judgments'
+import type { AcceptedJudgmentView, ReviewDiagnosisInput, ReviewOutcomeView } from './judgments'
 import type { PackReviewWorkbenchView, SignOffPackInput } from './methodology'
 import type { AssistantSettingsView, ChooseAssistantInput } from './preferences'
 import type { CreateSchoolInput, SchoolView } from './schools'
@@ -19,7 +13,6 @@ export type WorkbenchApi = {
     get(id: string): Promise<SchoolView | null>
   }
   judgments: {
-    submitSituation(input: SubmitSituationInput): Promise<JudgmentReviewView>
     review(input: ReviewDiagnosisInput): Promise<ReviewOutcomeView>
     listAccepted(schoolId: string): Promise<AcceptedJudgmentView[]>
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createProposalChain, createReviewOutcome, type DiagnosisProposal } from './judgment'
+import { createReviewOutcome, type DiagnosisProposal } from './judgment'
 
 function dependencies() {
   let index = 0
@@ -9,53 +9,40 @@ function dependencies() {
   }
 }
 
-describe('judgment epistemic chain', () => {
-  it('keeps evidence, fact, claim and proposal as distinct records', () => {
-    const chain = createProposalChain(
-      'school-1',
-      '中层会议里仍由校长完成任务拆解。',
-      {
-        title: '中层任务拆解仍依赖校长',
-        observationText: '中层会议里仍由校长完成任务拆解。',
-        factType: 'organization',
-        claimText: '中层当前可能仍依赖校长完成任务拆解。',
-        interpretations: ['这是一条待验证的组织实践解释。'],
-        provisionalJudgment: '中层独立任务转译能力尚未稳定表现出来。',
-        evidenceQuality: { directness: 'medium', triangulated: false },
-        confidence: 'low',
-      },
-      dependencies(),
-    )
+function proposedProposal(overrides: Partial<DiagnosisProposal> = {}): DiagnosisProposal {
+  return {
+    id: 'proposal-1',
+    schoolId: 'school-1',
+    agentRunId: 'run-1',
+    type: 'state',
+    title: '中层任务拆解仍依赖校长',
+    scopeJson: JSON.stringify({ kind: 'school', schoolId: 'school-1' }),
+    interpretations: ['这是一条待验证的组织实践解释。'],
+    provisionalJudgment: '原判断',
+    mechanism: null,
+    alternativeHypotheses: [],
+    unresolvedQuestions: [],
+    recommendedActions: [],
+    nextObservations: [],
+    impactEvidencePlan: [],
+    evidenceQuality: { directness: 'medium', triangulated: false },
+    confidence: 'low',
+    status: 'proposed',
+    createdAt: '2026-08-17T00:00:00.000Z',
+    ...overrides,
+  }
+}
 
-    expect(chain.evidence[0]?.inlineText).toContain('校长')
-    expect(chain.facts[0]?.text).toContain('会议')
-    expect(chain.claims[0]?.statement).toContain('可能')
-    expect(chain.proposal.provisionalJudgment).toContain('尚未稳定')
-    expect(chain.claimFacts[0]?.stance).toBe('supporting')
-  })
-
+describe('judgment review invariants', () => {
   it('only creates an accepted judgment after a human accepts or modifies', () => {
-    const chain = createProposalChain(
-      'school-1',
-      '新的情况',
-      {
-        title: '新的情况',
-        observationText: '新的情况',
-        claimText: '暂定判断',
-        interpretations: [],
-        provisionalJudgment: '原判断',
-        evidenceQuality: { directness: 'medium', triangulated: false },
-        confidence: 'low',
-      },
-      dependencies(),
-    )
+    const proposal = proposedProposal()
 
-    const rejected = createReviewOutcome(chain.proposal, { decision: 'rejected' }, dependencies())
+    const rejected = createReviewOutcome(proposal, { decision: 'rejected' }, dependencies())
     expect(rejected.review.decision).toBe('rejected')
     expect(rejected.acceptedJudgment).toBeNull()
 
     const needsMoreEvidence = createReviewOutcome(
-      chain.proposal,
+      proposal,
       { decision: 'needs_more_evidence' },
       dependencies(),
     )
@@ -63,34 +50,44 @@ describe('judgment epistemic chain', () => {
     expect(needsMoreEvidence.acceptedJudgment).toBeNull()
 
     const modified = createReviewOutcome(
-      chain.proposal,
+      proposal,
       { decision: 'modified', finalText: '顾问修改后的判断' },
       dependencies(),
     )
     expect(modified.acceptedJudgment?.statement).toBe('顾问修改后的判断')
   })
 
+  it('keeps the assistant judgment, the consultant feedback and the final text', () => {
+    const outcome = createReviewOutcome(
+      proposedProposal({ provisionalJudgment: 'AI 原本的判断' }),
+      {
+        decision: 'modified',
+        feedback: '不是中层不会拆，是校长一直没有真正放权。',
+        finalText: '中层已表现出基础拆解能力，但校长仍持续承担关键决策。',
+      },
+      dependencies(),
+    )
+
+    expect(outcome.review.feedback).toBe('不是中层不会拆，是校长一直没有真正放权。')
+    expect(outcome.review.finalText).toBe('中层已表现出基础拆解能力，但校长仍持续承担关键决策。')
+    expect(outcome.review.reviewedAt).toBe('2026-08-17T00:00:00.000Z')
+    // The proposal itself is immutable: the original judgement survives the edit.
+    expect(outcome.acceptedJudgment?.statement).toBe(
+      '中层已表现出基础拆解能力，但校长仍持续承担关键决策。',
+    )
+  })
+
   it('never accepts or modifies an insufficient-evidence proposal', () => {
-    const proposal: DiagnosisProposal = {
+    const proposal = proposedProposal({
       id: 'proposal-insufficient',
-      schoolId: 'school-1',
-      agentRunId: null,
-      type: 'state',
       title: '还需要更多依据',
-      scopeJson: JSON.stringify({ kind: 'school', schoolId: 'school-1' }),
       interpretations: [],
       provisionalJudgment: null,
-      mechanism: null,
-      alternativeHypotheses: [],
       unresolvedQuestions: ['还缺什么可观察事实？'],
-      recommendedActions: [],
       nextObservations: ['补充一次可定位观察。'],
-      impactEvidencePlan: [],
       evidenceQuality: { directness: 'low', triangulated: false },
-      confidence: 'low',
       status: 'insufficient_evidence',
-      createdAt: '2026-08-17T00:00:00.000Z',
-    }
+    })
 
     expect(() => createReviewOutcome(proposal, { decision: 'accepted' }, dependencies())).toThrow(
       /证据不足/,

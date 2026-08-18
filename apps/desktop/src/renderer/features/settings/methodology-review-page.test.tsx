@@ -121,17 +121,14 @@ const withdrawn: PackReviewWorkbenchView = {
 function apiWith(methodology: WorkbenchApi['methodology']): WorkbenchApi {
   return {
     schools: { list: vi.fn(), create: vi.fn(), get: vi.fn() },
-    judgments: { submitSituation: vi.fn(), review: vi.fn(), listAccepted: vi.fn() },
+    judgments: { review: vi.fn(), listAccepted: vi.fn() },
     stages: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
     states: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
     methodology,
     settings: {
       getAssistant: vi.fn().mockResolvedValue({
-        selected: 'none',
-        options: [
-          { key: 'codex', label: 'Codex', availability: 'ready', detail: null },
-          { key: 'none', label: '暂不使用 AI 助手', availability: 'ready', detail: null },
-        ],
+        selected: 'codex',
+        options: [{ key: 'codex', label: 'Codex', availability: 'ready', detail: null }],
       }),
       chooseAssistant: vi.fn(),
     },

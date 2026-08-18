@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import type { WorkbenchApi } from '@school-workbench/shared'
+import type { AgentRunView, JudgmentReviewView, WorkbenchApi } from '@school-workbench/shared'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -16,34 +16,80 @@ const school = {
   createdAt: '2026-08-17T00:00:00.000Z',
 }
 
-const reviewView = {
-  evidence: [{ id: 'e-1', title: '顾问输入', sourceType: 'pasted_text' }],
+const reviewView: JudgmentReviewView = {
+  evidence: [
+    {
+      id: 'e-1',
+      title: '《8月中层会议纪要》',
+      sourceType: 'feishu_doc',
+      sourceLabel: '飞书文档',
+      uri: null,
+      excerpt: '三项关键任务都由校长拆解。',
+    },
+  ],
   facts: [
     {
       id: 'f-1',
       text: '中层会议里仍由校长完成任务拆解。',
-      directness: 'medium' as const,
+      directness: 'medium',
+      evidenceId: 'e-1',
     },
   ],
   counterFacts: [],
-  source: 'workbench' as const,
+  source: 'assistant',
   claims: [{ id: 'c-1', text: '中层当前可能仍依赖校长完成任务拆解。' }],
+  grounding: {
+    schoolName: '南山实验学校',
+    stageTitle: '中层承接机制建立',
+    stageTargets: [
+      {
+        id: 't-1',
+        dimensionKey: 'key_tasks',
+        label: '关键任务',
+        text: '中层开始独立完成任务转译。',
+      },
+    ],
+    criteria: [
+      {
+        id: 'criterion-1',
+        stableKey: 'SBD.C4.SYSTEM_ALIGNMENT',
+        title: '系统一致性',
+        description: '关键任务与阶段目标是否一致。',
+        packTitle: 'Schooling by Design',
+        packVersion: '1',
+      },
+    ],
+  },
   proposal: {
     id: 'd-1',
     title: '一个新的情况',
-    interpretations: ['这条情况来自顾问直接输入，当前只形成暂定解释。'],
+    interpretations: ['这条情况当前只形成暂定解释。'],
     provisionalJudgment: '中层会议里仍由校长完成任务拆解。',
+    mechanism: null,
     alternativeHypotheses: ['这可能只是一次局部现象，还不能代表稳定状态。'],
     unresolvedQuestions: ['还有没有独立材料支持或反驳这条判断？'],
     proposedActions: [],
     recommendedObservations: ['寻找至少一条独立材料进行交叉验证。'],
     impactMeasures: [],
-    evidenceQuality: { directness: 'medium' as const, triangulated: false },
-    confidence: 'low' as const,
+    evidenceQuality: { directness: 'medium', triangulated: false },
+    confidence: 'low',
     evidenceCount: 1,
-    status: 'proposed' as const,
+    status: 'proposed',
     createdAt: '2026-08-17T00:00:00.000Z',
   },
+}
+
+const assistantRun: AgentRunView = {
+  runId: 'run-1',
+  status: 'completed',
+  outcome: 'proposal_ready',
+  proposal: reviewView,
+  abstention: null,
+  usedWorkbenchTools: true,
+  unrecognisedUpdateKinds: [],
+  runtimeCompatibility: 'verified',
+  failureCode: null,
+  failureMessage: null,
 }
 
 const suggestedStage = {
@@ -74,7 +120,6 @@ function baseApi(): WorkbenchApi {
     },
     judgments: {
       listAccepted: vi.fn().mockResolvedValue([]),
-      submitSituation: vi.fn().mockResolvedValue(reviewView),
       review: vi.fn(),
     },
     stages: {
@@ -93,16 +138,13 @@ function baseApi(): WorkbenchApi {
     },
     settings: {
       getAssistant: vi.fn().mockResolvedValue({
-        selected: 'none',
-        options: [
-          { key: 'codex', label: 'Codex', availability: 'ready', detail: null },
-          { key: 'none', label: '暂不使用 AI 助手', availability: 'ready', detail: null },
-        ],
+        selected: 'codex',
+        options: [{ key: 'codex', label: 'Codex', availability: 'ready', detail: null }],
       }),
       chooseAssistant: vi.fn(),
     },
     agent: {
-      run: vi.fn(),
+      run: vi.fn().mockResolvedValue(assistantRun),
       onProgress: vi.fn().mockReturnValue(() => undefined),
     },
   }

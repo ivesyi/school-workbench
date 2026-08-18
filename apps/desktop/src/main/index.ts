@@ -91,7 +91,7 @@ app.whenReady().then(() => {
   const stageRepository = new SqliteStageRepository(database.db)
   const stateRepository = new SqliteStateRepository(database.db)
   const schoolService = new SchoolService(schoolRepository, stageRepository)
-  const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
+  const judgmentService = new JudgmentService(judgmentRepository)
   const stageService = new StageService(schoolRepository, judgmentRepository, stageRepository)
   const stateService = new StateService(
     schoolRepository,

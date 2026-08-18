@@ -1,6 +1,6 @@
 import { Alert, AlertDescription, AlertTitle, Separator } from '@school-workbench/experience'
 import type { AssistantChoice, AssistantSettingsView } from '@school-workbench/shared'
-import { CheckCircle2, ChevronRight, CircleDashed } from 'lucide-react'
+import { CheckCircle2, ChevronRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useWorkbenchApi } from '../../lib/workbench-api'
@@ -60,7 +60,7 @@ export function SettingsPage(): React.JSX.Element {
         <div className="px-6 py-5">
           <h2 className="font-medium">默认 AI 助手</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            选好以后，日常工作里不会再问你用哪一个。
+            日常工作里不会再问你用哪一个。新的分析由它来做，工作台自己不下判断。
           </p>
 
           {assistant === null ? (
@@ -90,14 +90,9 @@ export function SettingsPage(): React.JSX.Element {
                           {option.detail}
                         </span>
                       ) : null}
-                      {option.key === 'codex' && !unavailable ? (
+                      {!unavailable ? (
                         <span className="mt-1 block text-sm text-muted-foreground">
-                          选中后，你在工作台说的每一条情况都会先交给它看一遍。
-                        </span>
-                      ) : null}
-                      {option.key === 'none' ? (
-                        <span className="mt-1 block text-sm text-muted-foreground">
-                          工作台照常记录你说的情况，只是不再等 AI。
+                          你在工作台说的每一条情况都会先交给它看一遍。
                         </span>
                       ) : null}
                     </span>
@@ -107,10 +102,9 @@ export function SettingsPage(): React.JSX.Element {
             </div>
           )}
 
-          {assistant && assistant.selected === 'none' ? (
-            <p className="mt-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
-              <CircleDashed className="size-4" />
-              目前没有使用 AI 助手
+          {assistant && assistant.options.every((option) => option.availability !== 'ready') ? (
+            <p className="mt-3 text-sm text-muted-foreground">
+              在它准备好之前，已经记录下来的学校、判断和状态都还能照常查看，只是不能开始新的分析。
             </p>
           ) : null}
 

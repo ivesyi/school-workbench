@@ -13,7 +13,6 @@ import {
   confirmStateInputSchema,
   createSchoolInputSchema,
   judgmentIpcChannels,
-  judgmentReviewViewSchema,
   methodologyIpcChannels,
   packReviewWorkbenchViewSchema,
   reviewDiagnosisInputSchema,
@@ -27,7 +26,6 @@ import {
   stageWorkspaceViewSchema,
   stateIpcChannels,
   stateWorkspaceViewSchema,
-  submitSituationInputSchema,
   type WorkbenchApi,
 } from '@school-workbench/shared'
 import { contextBridge, ipcRenderer } from 'electron'
@@ -53,13 +51,6 @@ const api: WorkbenchApi = {
     },
   },
   judgments: {
-    async submitSituation(input) {
-      const result: unknown = await ipcRenderer.invoke(
-        judgmentIpcChannels.submitSituation,
-        submitSituationInputSchema.parse(input),
-      )
-      return judgmentReviewViewSchema.parse(result)
-    },
     async review(input) {
       const result: unknown = await ipcRenderer.invoke(
         judgmentIpcChannels.review,

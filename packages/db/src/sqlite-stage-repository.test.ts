@@ -1,13 +1,14 @@
-import { JudgmentService, SchoolService, StageService } from '@school-workbench/application'
+import { SchoolService, StageService } from '@school-workbench/application'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { openWorkbenchDatabase } from './database'
+import { openWorkbenchDatabase, type WorkbenchDatabase } from './database'
 import { stageTargets, stages } from './schema'
 import { SqliteJudgmentRepository } from './sqlite-judgment-repository'
 import { SqliteSchoolRepository } from './sqlite-school-repository'
 import { SqliteStageRepository } from './sqlite-stage-repository'
+import { insertAcceptedJudgmentFixture } from './test-support'
 
 const temporaryDirectories: string[] = []
 
@@ -28,29 +29,33 @@ function countRows(
   return row.count
 }
 
-async function addAcceptedJudgment(
-  judgmentService: JudgmentService,
-  schoolId: string,
-  text: string,
-) {
-  const proposal = await judgmentService.submitSituation({ schoolId, text })
-  const outcome = await judgmentService.review({
+/**
+ * The stage slice runs *before* a school has a confirmed stage, so its starting
+ * position — a school that already has an accepted judgement — cannot be built
+ * through the assessment contract, which requires one. It is written straight
+ * to the tables by an explicit fixture instead; nothing in the product may do
+ * the same.
+ */
+let fixtureSequence = 0
+
+function addAcceptedJudgment(database: WorkbenchDatabase, schoolId: string, text: string) {
+  fixtureSequence += 1
+  return insertAcceptedJudgmentFixture(database, {
     schoolId,
-    diagnosisId: proposal.proposal.id,
-    decision: 'accepted',
+    statement: text,
+    suffix: String(fixtureSequence),
+    createdAt: `2026-08-18T00:00:0${fixtureSequence % 10}.000Z`,
   })
-  if (!outcome.acceptedJudgment) throw new Error('expected accepted judgment')
-  return outcome.acceptedJudgment
 }
 
 async function createAcceptedJudgment(
+  database: WorkbenchDatabase,
   schoolService: SchoolService,
-  judgmentService: JudgmentService,
   name = '南山实验学校',
   text = '中层会议里仍由校长完成任务拆解。',
 ) {
   const school = await schoolService.create({ name })
-  const judgment = await addAcceptedJudgment(judgmentService, school.id, text)
+  const judgment = addAcceptedJudgment(database, school.id, text)
   return { school, judgment }
 }
 
@@ -66,8 +71,7 @@ describe('stage recommendation persistence', () => {
     const judgmentRepository = new SqliteJudgmentRepository(firstDatabase.db)
     const stageRepository = new SqliteStageRepository(firstDatabase.db)
     const schoolService = new SchoolService(schoolRepository)
-    const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
-    const { school } = await createAcceptedJudgment(schoolService, judgmentService)
+    const { school } = await createAcceptedJudgment(firstDatabase, schoolService)
 
     const stageService = new StageService(schoolRepository, judgmentRepository, stageRepository)
     const suggested = await stageService.getWorkspace(school.id)
@@ -118,15 +122,14 @@ describe('stage recommendation persistence', () => {
     const judgmentRepository = new SqliteJudgmentRepository(database.db)
     const stageRepository = new SqliteStageRepository(database.db)
     const schoolService = new SchoolService(schoolRepository)
-    const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
-    const first = await createAcceptedJudgment(schoolService, judgmentService)
+    const first = await createAcceptedJudgment(database, schoolService)
     const service = new StageService(schoolRepository, judgmentRepository, stageRepository)
 
     const suggested = await service.getWorkspace(first.school.id)
     if (suggested.state !== 'suggested') throw new Error('expected suggestion')
 
-    const secondJudgment = await addAcceptedJudgment(
-      judgmentService,
+    const secondJudgment = addAcceptedJudgment(
+      database,
       first.school.id,
       '教师已经开始稳定教研复盘。',
     )
@@ -168,8 +171,7 @@ describe('stage recommendation persistence', () => {
     const judgmentRepository = new SqliteJudgmentRepository(database.db)
     const stageRepository = new SqliteStageRepository(database.db)
     const schoolService = new SchoolService(schoolRepository)
-    const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
-    const { school } = await createAcceptedJudgment(schoolService, judgmentService)
+    const { school } = await createAcceptedJudgment(database, schoolService)
     const service = new StageService(schoolRepository, judgmentRepository, stageRepository)
     const suggested = await service.getWorkspace(school.id)
     if (suggested.state !== 'suggested') throw new Error('expected suggestion')
@@ -230,8 +232,7 @@ describe('stage recommendation persistence', () => {
     const judgmentRepository = new SqliteJudgmentRepository(database.db)
     const stageRepository = new SqliteStageRepository(database.db)
     const schoolService = new SchoolService(schoolRepository)
-    const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
-    const { school } = await createAcceptedJudgment(schoolService, judgmentService)
+    const { school } = await createAcceptedJudgment(database, schoolService)
     const service = new StageService(schoolRepository, judgmentRepository, stageRepository)
     const first = await service.getWorkspace(school.id)
     if (first.state !== 'suggested') throw new Error('expected suggestion')

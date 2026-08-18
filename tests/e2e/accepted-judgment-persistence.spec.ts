@@ -1,42 +1,42 @@
-import { _electron as electron, expect, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { createSchool, launchWorkbench } from './support/app'
+import { firstSchoolId, openWorkbenchSqlite, seedAcceptedJudgment } from './support/workbench-db'
 
+/**
+ * A judgement the consultant confirmed is part of the school's formal record,
+ * so it has to be there after a restart. The judgement itself is produced by an
+ * assistant against the assessment contract; this school starts with one
+ * already accepted, because that is the state being checked.
+ */
 test('an accepted judgment remains after the desktop app restarts', async () => {
   const userDataDirectory = await mkdtemp(resolve(tmpdir(), 'school-workbench-judgment-e2e-'))
-  const appDirectory = resolve('apps/desktop')
+  const statement = '今天的中层会议里，任务拆解还是主要由校长完成。'
 
   try {
-    const firstApp = await electron.launch({
-      args: [appDirectory],
-      env: { ...process.env, SWB_E2E_USER_DATA_DIR: userDataDirectory },
-    })
-    const firstWindow = await firstApp.firstWindow()
+    const first = await launchWorkbench(userDataDirectory)
+    await createSchool(first.window, '南山实验学校')
+    await expect(first.window.getByText('还没有正式判断。')).toBeVisible()
+    await first.app.close()
 
-    await firstWindow.getByRole('button', { name: '新建学校' }).click()
-    await firstWindow.getByLabel('学校名称').fill('南山实验学校')
-    await firstWindow.getByRole('button', { name: '创建' }).click()
+    const database = openWorkbenchSqlite(userDataDirectory)
+    try {
+      seedAcceptedJudgment(database, {
+        schoolId: firstSchoolId(database),
+        statement,
+        suffix: 'first',
+      })
+    } finally {
+      database.close()
+    }
 
-    const situation = '今天的中层会议里，任务拆解还是主要由校长完成。'
-    await firstWindow.getByPlaceholder(/例如：今天的中层会议里/).fill(situation)
-    await firstWindow.getByRole('button', { name: '提交情况' }).click()
-    await expect(firstWindow.getByText('我发现一个新的情况，想让你确认')).toBeVisible()
-    await firstWindow.getByRole('button', { name: '认同', exact: true }).click()
-    await expect(firstWindow.getByText('已经记录这条判断。')).toBeVisible()
-    await expect(firstWindow.getByText(situation)).toBeVisible()
-    await firstApp.close()
-
-    const secondApp = await electron.launch({
-      args: [appDirectory],
-      env: { ...process.env, SWB_E2E_USER_DATA_DIR: userDataDirectory },
-    })
-    const secondWindow = await secondApp.firstWindow()
-
-    await secondWindow.getByRole('link', { name: /南山实验学校/ }).click()
-    await expect(secondWindow.getByText(situation)).toBeVisible()
-    await expect(secondWindow.getByText('已由你确认')).toBeVisible()
-    await secondApp.close()
+    const second = await launchWorkbench(userDataDirectory)
+    await second.window.getByRole('link', { name: /南山实验学校/ }).click()
+    await expect(second.window.getByText(statement)).toBeVisible()
+    await expect(second.window.getByText('已由你确认')).toBeVisible()
+    await second.app.close()
   } finally {
     await rm(userDataDirectory, { recursive: true, force: true })
   }

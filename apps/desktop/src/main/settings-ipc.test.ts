@@ -24,18 +24,18 @@ const notReady: AssistantReadiness = {
 }
 
 describe('choosing a default assistant', () => {
-  it('starts switched off so a first launch never waits or spends', () => {
-    expect(DEFAULT_ASSISTANT).toBe('none')
+  it('defaults to the one assistant that exists, because analysis needs one', () => {
+    expect(DEFAULT_ASSISTANT).toBe('codex')
   })
 
-  it('offers exactly the assistants that exist, plus opting out', async () => {
+  it('offers exactly the assistants that exist, and no way to decline', async () => {
     const handlers = createSettingsIpcHandlers({ ...store(), readiness: () => ready })
     const view = await handlers.getAssistant()
 
-    expect(view.selected).toBe('none')
-    expect(view.options.map((option) => option.key)).toEqual(['codex', 'none'])
+    expect(view.selected).toBe('codex')
     // DeepSeek Harness is a later slice; nothing offers what does not exist.
-    expect(view.options.map((option) => option.label)).toEqual(['Codex', '暂不使用 AI 助手'])
+    expect(view.options.map((option) => option.key)).toEqual(['codex'])
+    expect(view.options.map((option) => option.label)).toEqual(['Codex'])
   })
 
   it('remembers the choice', async () => {
@@ -46,23 +46,26 @@ describe('choosing a default assistant', () => {
     expect(saved.selected).toBe('codex')
     expect(backing.values.get(ASSISTANT_PREFERENCE_KEY)).toBe('codex')
     expect((await handlers.getAssistant()).selected).toBe('codex')
-
-    await handlers.chooseAssistant({ assistant: 'none' })
-    expect((await handlers.getAssistant()).selected).toBe('none')
   })
 
   it('refuses a choice it does not know about', async () => {
     const handlers = createSettingsIpcHandlers({ ...store(), readiness: () => ready })
     await expect(handlers.chooseAssistant({ assistant: 'gpt' })).rejects.toThrow()
     await expect(handlers.chooseAssistant({})).rejects.toThrow()
+    // The retired "no assistant" option is not a choice any more, either.
+    await expect(handlers.chooseAssistant({ assistant: 'none' })).rejects.toThrow()
   })
 
-  it('falls back to the default when the stored value makes no sense', async () => {
-    const handlers = createSettingsIpcHandlers({
-      ...store({ [ASSISTANT_PREFERENCE_KEY]: 'something-else' }),
-      readiness: () => ready,
-    })
-    expect((await handlers.getAssistant()).selected).toBe(DEFAULT_ASSISTANT)
+  it('upgrades a stored choice that no longer exists instead of failing to start', async () => {
+    for (const stored of ['none', 'something-else']) {
+      const handlers = createSettingsIpcHandlers({
+        ...store({ [ASSISTANT_PREFERENCE_KEY]: stored }),
+        readiness: () => ready,
+      })
+      const view = await handlers.getAssistant()
+      expect(view.selected).toBe(DEFAULT_ASSISTANT)
+      expect(view.options).toHaveLength(1)
+    }
   })
 
   it('says in plain words when an assistant cannot be used', async () => {
@@ -77,9 +80,10 @@ describe('choosing a default assistant', () => {
     }
   })
 
-  it('still lets the consultant opt out when nothing is available', async () => {
+  it('still reports the chosen assistant when it cannot start on this computer', async () => {
     const handlers = createSettingsIpcHandlers({ ...store(), readiness: () => notReady })
     const view = await handlers.getAssistant()
-    expect(view.options.find((option) => option.key === 'none')?.availability).toBe('ready')
+    expect(view.selected).toBe('codex')
+    expect(view.options.every((option) => option.availability === 'unavailable')).toBe(true)
   })
 })

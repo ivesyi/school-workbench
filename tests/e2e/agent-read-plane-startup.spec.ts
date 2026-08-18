@@ -2,6 +2,7 @@ import { _electron as electron, expect, test, type ElectronApplication } from '@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { firstSchoolId, openWorkbenchSqlite, seedAcceptedJudgment } from './support/workbench-db'
 
 function collectStderr(app: ElectronApplication): () => string {
   let buffer = ''
@@ -209,21 +210,43 @@ test('a school with a confirmed stage can reach the write plane contract check',
     const window = await app.firstWindow()
     await waitForLine(readStderr, 'workbench read plane ready')
 
-    // Take the school as far as the deterministic flow allows, so it has the
-    // active Stage and confirmed targets a grounded diagnosis needs.
+    // The school needs the active Stage and confirmed targets a grounded
+    // diagnosis rests on. The judgement that stage is derived from is seeded:
+    // producing one needs an assistant, and this is the test that has none.
     await window.getByRole('button', { name: '新建学校' }).click()
     await window.getByLabel('学校名称').fill('南山实验学校')
     await window.getByRole('button', { name: '创建' }).click()
-    await window
-      .getByPlaceholder(/例如：今天的中层会议里/)
-      .fill('今天的中层会议里，任务拆解还是主要由校长完成。')
-    await window.getByRole('button', { name: '提交情况' }).click()
-    await window.getByRole('button', { name: '认同', exact: true }).click()
-    await expect(window.getByText(/我理解这个学校目前大致处于/)).toBeVisible()
-    await window.getByRole('button', { name: '基本对' }).click()
-    await expect(window.getByText('当前阶段')).toBeVisible()
+    await expect(window.getByRole('heading', { name: '南山实验学校' })).toBeVisible()
+    await app.close()
 
-    const outcome = await window.evaluate(async () => {
+    const seedDatabase = openWorkbenchSqlite(userDataDirectory)
+    try {
+      seedAcceptedJudgment(seedDatabase, {
+        schoolId: firstSchoolId(seedDatabase),
+        statement: '今天的中层会议里，任务拆解还是主要由校长完成。',
+        suffix: 'first',
+      })
+    } finally {
+      seedDatabase.close()
+    }
+
+    const resumed = await electron.launch({
+      args: [appDirectory],
+      env: {
+        ...process.env,
+        SWB_E2E_USER_DATA_DIR: userDataDirectory,
+        SWB_CODEX_ACP_ENTRY: inertRuntime,
+      },
+    })
+    const resumedStderr = collectStderr(resumed)
+    const window2 = await resumed.firstWindow()
+    await waitForLine(resumedStderr, 'workbench read plane ready')
+    await window2.getByRole('link', { name: /南山实验学校/ }).click()
+    await expect(window2.getByText(/我理解这个学校目前大致处于/)).toBeVisible()
+    await window2.getByRole('button', { name: '基本对' }).click()
+    await expect(window2.getByText('当前阶段')).toBeVisible()
+
+    const outcome = await window2.evaluate(async () => {
       const api = (
         window as unknown as {
           workbench: {
@@ -252,7 +275,7 @@ test('a school with a confirmed stage can reach the write plane contract check',
     expect(outcome.failureCode).toBe('AGENT_RUN_FAILED')
     expect(outcome.status).toBe('failed')
 
-    await app.close()
+    await resumed.close()
   } finally {
     await rm(userDataDirectory, { recursive: true, force: true })
   }

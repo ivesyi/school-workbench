@@ -7,6 +7,7 @@ const runView: AgentRunView = {
   status: 'completed',
   outcome: 'proposal_ready',
   proposal: null,
+  abstention: null,
   usedWorkbenchTools: true,
   unrecognisedUpdateKinds: [],
   runtimeCompatibility: 'verified',

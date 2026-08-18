@@ -19,7 +19,30 @@ import { ArrowLeft, CheckCircle2, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useWorkbenchApi } from '../../lib/workbench-api'
-import { assistantNote, progressLabel, shouldAskAssistant } from './assistant-flow'
+import { assistantNote, canStartAnalysis, progressLabel, unavailableReason } from './assistant-flow'
+
+type Abstention = Readonly<{
+  unresolvedQuestions: readonly string[]
+  nextObservations: readonly string[]
+}>
+
+function DetailList({
+  title,
+  items,
+}: {
+  title: string
+  items: readonly string[]
+}): React.JSX.Element | null {
+  if (items.length === 0) return null
+  return (
+    <div>
+      <p className="font-medium text-foreground">{title}</p>
+      {items.map((item) => (
+        <p key={item}>{item}</p>
+      ))}
+    </div>
+  )
+}
 
 export function SchoolWorkspacePage(): React.JSX.Element {
   const { schoolId = '' } = useParams()
@@ -33,6 +56,7 @@ export function SchoolWorkspacePage(): React.JSX.Element {
   const [accepted, setAccepted] = useState<AcceptedJudgmentView[]>([])
   const [editing, setEditing] = useState(false)
   const [editedJudgment, setEditedJudgment] = useState('')
+  const [reviewFeedback, setReviewFeedback] = useState('')
   const [stageWorkspace, setStageWorkspace] = useState<StageWorkspaceView>({ state: 'none' })
   const [stageFeedbackOpen, setStageFeedbackOpen] = useState(false)
   const [stageFeedback, setStageFeedback] = useState('')
@@ -43,6 +67,8 @@ export function SchoolWorkspacePage(): React.JSX.Element {
   const [assistant, setAssistant] = useState<AssistantSettingsView | null>(null)
   const [phase, setPhase] = useState<AgentProgressPhase | null>(null)
   const [note, setNote] = useState<string | null>(null)
+  const [retryable, setRetryable] = useState(false)
+  const [abstention, setAbstention] = useState<Abstention | null>(null)
 
   useEffect(() => {
     let current = true
@@ -92,6 +118,9 @@ export function SchoolWorkspacePage(): React.JSX.Element {
     }
   }, [api, schoolId])
 
+  const analysisAvailable = canStartAnalysis(assistant)
+  const blockedReason = unavailableReason(assistant)
+
   async function refreshStage(): Promise<void> {
     try {
       setStageError(null)
@@ -102,49 +131,40 @@ export function SchoolWorkspacePage(): React.JSX.Element {
   }
 
   /**
-   * One sentence in, one judgement to confirm out.
+   * One sentence in; whatever the assistant honestly concluded out.
    *
-   * When the consultant has chosen an assistant, it gets the sentence first and
-   * may come back with a grounded judgement. When it comes back with nothing —
-   * or does not come back at all — the workbench still records what was said,
-   * so a sentence is never lost and the page is never stuck waiting on
-   * something that failed.
+   * There is no second path here. If the assistant does not produce a judgement
+   * — because it failed, or because it decided the evidence is not enough — the
+   * workbench says so and keeps what was typed so it can be tried again. It
+   * never writes a judgement of its own to fill the gap.
    */
   async function submitSituation(): Promise<void> {
     const text = message.trim()
-    if (!text) return
+    if (!text || !analysisAvailable) return
     setSubmitting(true)
     setError(null)
     setResultMessage(null)
     setNote(null)
+    setRetryable(false)
+    setAbstention(null)
+    setPhase('understanding')
 
     try {
-      if (shouldAskAssistant(assistant)) {
-        setPhase('understanding')
-        try {
-          const run = await api.agent.run({ schoolId, message: text })
-          if (run.proposal) {
-            setProposal(run.proposal)
-            setEditedJudgment(run.proposal.proposal.provisionalJudgment)
-            setEditing(false)
-            setMessage('')
-            return
-          }
-          setNote(assistantNote(run))
-        } catch {
-          setNote('AI 助手这次没能完成。我先把你说的这条记下来了，可以过一会儿再试。')
-        } finally {
-          setPhase(null)
-        }
+      const run = await api.agent.run({ schoolId, message: text })
+      if (run.proposal) {
+        setProposal(run.proposal)
+        setEditedJudgment(run.proposal.proposal.provisionalJudgment)
+        setReviewFeedback('')
+        setEditing(false)
+        setMessage('')
+        return
       }
-
-      const result = await api.judgments.submitSituation({ schoolId, text })
-      setProposal(result)
-      setEditedJudgment(result.proposal.provisionalJudgment)
-      setEditing(false)
-      setMessage('')
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '暂时没能整理这条情况')
+      setNote(assistantNote(run))
+      setAbstention(run.abstention)
+      setRetryable(run.outcome !== 'needs_more_evidence')
+    } catch {
+      setNote('AI 助手这次没能完成。你写的内容还在，可以过一会儿再重试。')
+      setRetryable(true)
     } finally {
       setPhase(null)
       setSubmitting(false)
@@ -156,10 +176,12 @@ export function SchoolWorkspacePage(): React.JSX.Element {
     setReviewing(true)
     setError(null)
     try {
+      const feedback = reviewFeedback.trim()
       const input: ReviewDiagnosisInput = {
         schoolId,
         diagnosisId: proposal.proposal.id,
         decision,
+        ...(feedback ? { feedback } : {}),
         ...(decision === 'modified' ? { finalText: editedJudgment } : {}),
       }
       const outcome = await api.judgments.review(input)
@@ -179,6 +201,7 @@ export function SchoolWorkspacePage(): React.JSX.Element {
 
       setProposal(null)
       setEditing(false)
+      setReviewFeedback('')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '确认判断时遇到问题')
     } finally {
@@ -271,29 +294,39 @@ export function SchoolWorkspacePage(): React.JSX.Element {
       <section className="mt-10 rounded-xl border border-border bg-surface p-7">
         <h2 className="text-lg font-semibold">今天有什么新的情况？</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          直接说发生了什么。系统会先整理成一条待确认判断，只有你确认后才进入正式记录。
+          直接说发生了什么。AI
+          助手会看过这所学校已有的材料后整理成一条待确认判断，只有你确认后才进入正式记录。
         </p>
         <Textarea
           className="mt-5"
           value={message}
+          maxLength={20000}
+          disabled={!analysisAvailable}
           onChange={(event) => setMessage(event.target.value)}
           placeholder="例如：今天的中层会议里，任务拆解还是主要由校长完成……"
         />
         <div className="mt-4 flex items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            {shouldAskAssistant(assistant)
+            {analysisAvailable
               ? 'AI 助手会先看一遍这所学校的情况，可能需要一会儿。'
-              : '你可以在设置里让 AI 助手参与进来。'}
+              : '已经记录下来的学校、判断和状态都还能照常查看。'}
           </p>
           <Button
             type="button"
-            disabled={submitting || message.trim().length === 0}
+            disabled={!analysisAvailable || submitting || message.trim().length === 0}
             onClick={() => void submitSituation()}
           >
-            {submitting ? '正在整理…' : '提交情况'}
+            {submitting ? '正在整理…' : retryable ? '重试' : '提交情况'}
           </Button>
         </div>
       </section>
+
+      {!analysisAvailable && blockedReason ? (
+        <Alert variant="quiet" className="mt-5">
+          <AlertTitle>现在还不能开始新的分析</AlertTitle>
+          <AlertDescription>{blockedReason}</AlertDescription>
+        </Alert>
+      ) : null}
 
       {phase ? (
         <section
@@ -308,7 +341,29 @@ export function SchoolWorkspacePage(): React.JSX.Element {
       {note ? (
         <Alert variant="quiet" className="mt-5">
           <AlertTitle>AI 助手</AlertTitle>
-          <AlertDescription>{note}</AlertDescription>
+          <AlertDescription>
+            <span className="block">{note}</span>
+            {abstention && abstention.nextObservations.length > 0 ? (
+              <span className="mt-3 block">
+                <span className="block font-medium text-foreground">下一步值得补充什么</span>
+                {abstention.nextObservations.map((item) => (
+                  <span key={item} className="block">
+                    {item}
+                  </span>
+                ))}
+              </span>
+            ) : null}
+            {abstention && abstention.unresolvedQuestions.length > 0 ? (
+              <span className="mt-3 block">
+                <span className="block font-medium text-foreground">目前还不能确定什么</span>
+                {abstention.unresolvedQuestions.map((item) => (
+                  <span key={item} className="block">
+                    {item}
+                  </span>
+                ))}
+              </span>
+            ) : null}
+          </AlertDescription>
         </Alert>
       ) : null}
 
@@ -338,75 +393,120 @@ export function SchoolWorkspacePage(): React.JSX.Element {
         <section className="mt-6 rounded-xl border border-border bg-surface p-7">
           <p className="text-sm font-medium text-primary">我发现一个新的情况，想让你确认</p>
           <h2 className="mt-2 text-xl font-semibold">{proposal.proposal.provisionalJudgment}</h2>
-          <p className="mt-4 text-sm text-muted-foreground">
+          {proposal.grounding.stageTargets.length > 0 ? (
+            <p className="mt-4 text-sm text-muted-foreground">
+              这个阶段原本希望：{proposal.grounding.stageTargets[0]?.text}
+            </p>
+          ) : null}
+          <p className="mt-2 text-sm text-muted-foreground">
             依据 {proposal.proposal.evidenceCount} 条
             {proposal.counterFacts.length > 0
               ? ` · 有 ${proposal.counterFacts.length} 条相反迹象`
-              : ' · 当前还需要更多观察'}
+              : ' · 没有找到与它不一致的记录'}
           </p>
-          {proposal.source === 'assistant' ? (
-            <p className="mt-2 text-xs text-muted-foreground">
-              这条是 AI 助手看过这所学校的情况后整理的，仍然要你确认才算数。
-            </p>
-          ) : null}
+          <p className="mt-2 text-xs text-muted-foreground">
+            这条是 AI 助手看过这所学校的情况后整理的，仍然要你确认才算数。
+          </p>
 
           <details className="mt-5 rounded-lg border border-border px-4 py-3 text-sm">
             <summary className="cursor-pointer font-medium">为什么这样判断？</summary>
             <div className="mt-4 space-y-4 leading-6 text-muted-foreground">
               <div>
-                <p className="font-medium text-foreground">看到的事实</p>
+                <p className="font-medium text-foreground">我看到的事实</p>
                 {proposal.facts.map((fact) => (
                   <p key={fact.id}>{fact.text}</p>
                 ))}
               </div>
+              <DetailList title="这些事实可能说明什么" items={proposal.proposal.interpretations} />
               <div>
-                <p className="font-medium text-foreground">暂时的解释</p>
-                {proposal.proposal.interpretations.map((item) => (
-                  <p key={item}>{item}</p>
+                <p className="font-medium text-foreground">支持这个判断的依据</p>
+                {proposal.evidence.map((item) => (
+                  <p key={item.id}>
+                    {item.title}（{item.sourceLabel}）{item.excerpt ? `：${item.excerpt}` : ''}
+                    {item.uri ? (
+                      <a className="ml-2 underline" href={item.uri}>
+                        查看原文
+                      </a>
+                    ) : null}
+                  </p>
                 ))}
               </div>
-              {proposal.counterFacts.length > 0 ? (
+              <div>
+                <p className="font-medium text-foreground">与这个判断不一致的依据</p>
+                {proposal.counterFacts.length > 0 ? (
+                  proposal.counterFacts.map((fact) => <p key={fact.id}>{fact.text}</p>)
+                ) : (
+                  <p>已经找过与这条判断相反的记录，这一轮没有找到。</p>
+                )}
+              </div>
+              <DetailList
+                title="还有哪些可能的解释"
+                items={proposal.proposal.alternativeHypotheses}
+              />
+              <DetailList
+                title="目前还不能确定什么"
+                items={proposal.proposal.unresolvedQuestions}
+              />
+              {proposal.proposal.mechanism ? (
                 <div>
-                  <p className="font-medium text-foreground">与这个判断不一致的依据</p>
-                  {proposal.counterFacts.map((fact) => (
-                    <p key={fact.id}>{fact.text}</p>
-                  ))}
+                  <p className="font-medium text-foreground">我认为背后的机制</p>
+                  <p>{proposal.proposal.mechanism}</p>
                 </div>
               ) : null}
-              {proposal.proposal.alternativeHypotheses.length > 0 ? (
-                <div>
-                  <p className="font-medium text-foreground">也可能是</p>
-                  {proposal.proposal.alternativeHypotheses.map((item) => (
-                    <p key={item}>{item}</p>
-                  ))}
-                </div>
-              ) : null}
-              {proposal.proposal.unresolvedQuestions.length > 0 ? (
-                <div>
-                  <p className="font-medium text-foreground">还不知道</p>
-                  {proposal.proposal.unresolvedQuestions.map((item) => (
-                    <p key={item}>{item}</p>
-                  ))}
-                </div>
-              ) : null}
-              {proposal.proposal.recommendedObservations.length > 0 ? (
-                <div>
-                  <p className="font-medium text-foreground">下一步值得看</p>
-                  {proposal.proposal.recommendedObservations.map((item) => (
-                    <p key={item}>{item}</p>
-                  ))}
-                </div>
-              ) : null}
+              <DetailList
+                title="下一轮值得重点观察什么"
+                items={proposal.proposal.recommendedObservations}
+              />
+              <DetailList title="建议采取的行动" items={proposal.proposal.proposedActions} />
+              <DetailList
+                title="怎么验证这些行动是否起作用"
+                items={proposal.proposal.impactMeasures}
+              />
+              <div>
+                <p className="font-medium text-foreground">这条判断的出处</p>
+                <p>学校：{proposal.grounding.schoolName}</p>
+                <p>阶段：{proposal.grounding.stageTitle}</p>
+                {proposal.grounding.stageTargets.map((target) => (
+                  <p key={target.id}>
+                    本阶段目标 · {target.label}：{target.text}
+                  </p>
+                ))}
+                {proposal.grounding.criteria.map((criterion) => (
+                  <p key={criterion.id}>
+                    判断标准 · {criterion.title}（{criterion.packTitle} 第 {criterion.packVersion}{' '}
+                    版）：{criterion.description}
+                  </p>
+                ))}
+              </div>
             </div>
           </details>
 
           {editing ? (
-            <div className="mt-5">
-              <p className="mb-2 text-sm font-medium">改成你的判断</p>
-              <Textarea
-                value={editedJudgment}
-                onChange={(event) => setEditedJudgment(event.target.value)}
-              />
+            <div className="mt-5 space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium" htmlFor="review-feedback">
+                  你觉得哪里不准确？
+                </label>
+                <Textarea
+                  id="review-feedback"
+                  value={reviewFeedback}
+                  onChange={(event) => setReviewFeedback(event.target.value)}
+                  placeholder="例如：不是中层不会拆，是校长一直没有真正放权。"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium" htmlFor="review-final-text">
+                  改成你的判断
+                </label>
+                <Textarea
+                  id="review-final-text"
+                  value={editedJudgment}
+                  onChange={(event) => setEditedJudgment(event.target.value)}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                原来的这条判断、你写的意见和最终文字都会一起留下来。
+              </p>
             </div>
           ) : null}
 

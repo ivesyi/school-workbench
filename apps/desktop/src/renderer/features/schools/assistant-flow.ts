@@ -22,32 +22,45 @@ export function progressLabel(phase: AgentProgressPhase): string {
 }
 
 /**
- * Whether this sentence should go to an assistant first.
+ * Whether new analysis can be started at all right now.
  *
- * Two things have to be true: the consultant chose one, and it can actually
- * start on this computer. Asking every time would be exactly the selector
- * PRD 14 rules out.
+ * Analysis is the assistant's work, and the workbench has nothing that could do
+ * it instead. So when the assistant cannot start on this computer, the answer
+ * is not "do it another way" — it is "not yet". Everything already recorded
+ * stays readable either way.
  */
-export function shouldAskAssistant(settings: AssistantSettingsView | null): boolean {
-  if (!settings || settings.selected === 'none') return false
+export function canStartAnalysis(settings: AssistantSettingsView | null): boolean {
+  if (!settings) return false
   return settings.options.some(
     (option) => option.key === settings.selected && option.availability === 'ready',
   )
 }
 
 /**
- * What to tell the consultant when the assistant finished without a judgement.
+ * Why new analysis is unavailable, in the consultant's words.
  *
- * Every branch ends the same way in practice: the workbench records what was
- * said anyway, so nothing is lost. These sentences explain the difference
- * without naming a single piece of machinery.
+ * Returns null while the answer is still unknown, so the page can stay quiet
+ * rather than accusing a perfectly working machine of missing something.
+ */
+export function unavailableReason(settings: AssistantSettingsView | null): string | null {
+  if (!settings) return null
+  if (canStartAnalysis(settings)) return null
+  const chosen = settings.options.find((option) => option.key === settings.selected)
+  return chosen?.detail ?? 'AI 助手在这台电脑上还没准备好，暂时不能开始新的分析。'
+}
+
+/**
+ * What the consultant is told when a run ends without a judgement to confirm.
+ *
+ * Each of these is a different professional situation, and none of them is
+ * covered up by the workbench inventing something to show instead.
  */
 export function assistantNote(run: AgentRunView): string {
   switch (run.outcome) {
     case 'needs_more_evidence':
-      return 'AI 助手看过这所学校的情况，觉得现在的依据还不足以下判断。我先把你说的这条记下来了。'
+      return '目前依据不足，暂不形成判断。AI 助手看过这所学校已有的材料，认为还不足以支撑一条正式判断。'
     case 'no_new_judgment':
-      return 'AI 助手看过这所学校的情况，这次没有形成需要你确认的新判断。我先把你说的这条记下来了。'
+      return 'AI 助手看过这所学校的情况，这次没有形成需要你确认的新判断。'
     case 'failed':
       return assistantFailureNote(run.failureCode)
     case 'proposal_ready':
@@ -60,18 +73,20 @@ export function assistantNote(run: AgentRunView): string {
  *
  * The underlying message is written for whoever maintains the workbench and can
  * contain paths and identifiers, so it never reaches the screen; only these do.
+ * Every one of them ends in the same place: try again. Nothing is written down
+ * on the assistant's behalf.
  */
 export function assistantFailureNote(failureCode: string | null): string {
   switch (failureCode) {
     case 'RUNTIME_NOT_FOUND':
     case 'WORKBENCH_MCP_NOT_FOUND':
-      return 'AI 助手在这台电脑上还没准备好。我先把你说的这条记下来了，你可以照常继续。'
+      return 'AI 助手在这台电脑上还没准备好，这次没能开始。你写的内容还在，装好之后可以直接重试。'
     case 'RUNTIME_UNSUPPORTED':
-      return 'AI 助手的版本和工作台对不上。我先把你说的这条记下来了，你可以照常继续。'
+      return 'AI 助手的版本和工作台对不上，这次没能开始。你写的内容还在，更新之后可以直接重试。'
     case 'WORKBENCH_MCP_TOOLS_INVISIBLE':
     case 'WORKBENCH_MCP_STARTUP_FAILED':
-      return 'AI 助手这次没能连上这所学校的资料。我先把你说的这条记下来了，可以过一会儿再试。'
+      return 'AI 助手这次没能连上这所学校的资料。你写的内容还在，可以过一会儿再重试。'
     default:
-      return 'AI 助手这次没能完成。我先把你说的这条记下来了，可以过一会儿再试。'
+      return 'AI 助手这次没能完成。你写的内容还在，可以过一会儿再重试。'
   }
 }

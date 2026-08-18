@@ -23,7 +23,13 @@ export const runtimeCompatibilitySchema = z.enum(['verified', 'compatible', 'uns
 export const runAgentInputSchema = z
   .object({
     schoolId: z.string().trim().min(1).max(128),
-    message: z.string().trim().min(1).max(4_000),
+    /**
+     * What the consultant typed. The cap matches what the workbench used to
+     * accept for a situation report, so pasting a chunk of material still
+     * works; the interface stops typing at the same number rather than letting
+     * a long paste turn into an unexplained failure.
+     */
+    message: z.string().trim().min(1).max(20_000),
   })
   .strict()
 
@@ -50,6 +56,21 @@ export const agentRunViewSchema = z
     outcome: agentRunOutcomeSchema,
     /** The judgement to review, when the assistant submitted one. */
     proposal: judgmentReviewViewSchema.nullable(),
+    /**
+     * What the assistant said it would still need, when it declined to judge.
+     *
+     * An abstention is a professional answer, not a failure: SPEC forbids
+     * turning it into a judgement, and the workbench has no second path that
+     * could produce one instead. So the only useful thing to show is what the
+     * assistant is still missing.
+     */
+    abstention: z
+      .object({
+        unresolvedQuestions: z.array(z.string().min(1)),
+        nextObservations: z.array(z.string().min(1)),
+      })
+      .strict()
+      .nullable(),
     /** True when the agent actually reached the workbench MCP read tools. */
     usedWorkbenchTools: z.boolean(),
     /** `session/update` kinds this build did not understand. Ignored, reported. */

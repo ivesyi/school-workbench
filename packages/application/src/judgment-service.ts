@@ -1,92 +1,18 @@
 import {
-  createProposalChain,
   createReviewOutcome,
-  type AssessmentDraft,
   type JudgmentRepository,
   type PendingProposalReview,
-  type ProposalChain,
-  type SchoolRepository,
 } from '@school-workbench/domain'
 import {
   reviewDiagnosisInputSchema,
   schoolIdSchema,
-  submitSituationInputSchema,
   type AcceptedJudgmentView,
+  type EvidenceReferenceView,
+  type JudgmentGroundingView,
   type JudgmentReviewView,
   type ReviewDiagnosisInput,
   type ReviewOutcomeView,
-  type SubmitSituationInput,
 } from '@school-workbench/shared'
-
-export interface AssessmentEngine {
-  analyze(text: string): Promise<AssessmentDraft>
-}
-
-export class BaselineAssessmentEngine implements AssessmentEngine {
-  async analyze(text: string): Promise<AssessmentDraft> {
-    const normalized = text.trim()
-    return {
-      title: '一个新的情况',
-      observationText: `顾问报告：“${normalized}”`,
-      factType: 'context',
-      claimText: `当前有迹象表明：${normalized}`,
-      interpretations: ['目前只有顾问的一条直接报告，尚不能把报告内容本身当作已验证事实。'],
-      provisionalJudgment: normalized,
-      alternativeHypotheses: ['这可能只是一次局部现象，还不能代表稳定状态。'],
-      unresolvedQuestions: ['还有没有独立材料支持或反驳这条判断？'],
-      proposedActions: [],
-      recommendedObservations: ['寻找至少一条独立材料进行交叉验证。'],
-      impactMeasures: [],
-      evidenceQuality: {
-        directness: 'medium',
-        triangulated: false,
-        notes: '单一顾问输入，尚未完成交叉验证。',
-      },
-      confidence: 'low',
-    }
-  }
-}
-
-function toReviewView(chain: ProposalChain): JudgmentReviewView {
-  if (chain.proposal.status !== 'proposed' || !chain.proposal.provisionalJudgment) {
-    throw new Error('工作台待确认判断必须包含暂定判断文本')
-  }
-
-  return {
-    evidence: chain.evidence.map((item) => ({
-      id: item.id,
-      title: item.title,
-      sourceType: item.sourceType,
-    })),
-    facts: chain.facts.map((item) => ({
-      id: item.id,
-      text: item.text,
-      directness: item.directness,
-    })),
-    counterFacts: [],
-    source: 'workbench',
-    claims: chain.claims.map((item) => ({
-      id: item.id,
-      text: item.statement,
-    })),
-    proposal: {
-      id: chain.proposal.id,
-      title: chain.proposal.title,
-      interpretations: chain.proposal.interpretations,
-      provisionalJudgment: chain.proposal.provisionalJudgment,
-      alternativeHypotheses: chain.proposal.alternativeHypotheses,
-      unresolvedQuestions: chain.proposal.unresolvedQuestions,
-      proposedActions: chain.proposal.recommendedActions,
-      recommendedObservations: chain.proposal.nextObservations,
-      impactMeasures: chain.proposal.impactEvidencePlan,
-      evidenceQuality: chain.proposal.evidenceQuality,
-      confidence: chain.proposal.confidence,
-      evidenceCount: chain.evidence.length,
-      status: 'proposed',
-      createdAt: chain.proposal.createdAt,
-    },
-  }
-}
 
 export type AgentRunJudgmentOutcome =
   | Readonly<{ kind: 'proposal'; view: JudgmentReviewView }>
@@ -98,9 +24,62 @@ export type AgentRunJudgmentOutcome =
   | Readonly<{ kind: 'none' }>
 
 /**
- * Renders a judgement an assistant submitted earlier into the same shape the
- * workbench's own judgements use, so both reach the consultant through one
- * review surface rather than two.
+ * PRD 21: internally this is Evidence, to the consultant it is 依据, and where
+ * it came from is said in words rather than in a column value.
+ */
+const SOURCE_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  feishu_doc: '飞书文档',
+  feishu_minutes: '飞书妙记',
+  audio: '录音',
+  local_file: '本地文件',
+  observation: '现场观察',
+  pasted_text: '直接提供的材料',
+  other: '其他材料',
+})
+
+function sourceLabel(sourceType: string): string {
+  return SOURCE_LABELS[sourceType] ?? '其他材料'
+}
+
+function toEvidenceView(item: PendingProposalReview['evidence'][number]): EvidenceReferenceView {
+  return {
+    id: item.id,
+    title: item.title,
+    sourceType: item.sourceType,
+    sourceLabel: sourceLabel(item.sourceType),
+    uri: item.uri,
+    excerpt: item.inlineText,
+  }
+}
+
+function toGrounding(review: PendingProposalReview): JudgmentGroundingView {
+  return {
+    schoolName: review.schoolName,
+    stageTitle: review.stageTitle,
+    stageTargets: review.stageTargets.map((target) => ({
+      id: target.id,
+      dimensionKey:
+        target.dimensionKey as JudgmentGroundingView['stageTargets'][number]['dimensionKey'],
+      label: target.title,
+      text: target.description,
+    })),
+    criteria: review.criteria.map((criterion) => ({
+      id: criterion.id,
+      stableKey: criterion.stableKey,
+      title: criterion.title,
+      description: criterion.description,
+      packTitle: criterion.packTitle,
+      packVersion: criterion.packVersion,
+    })),
+  }
+}
+
+/**
+ * Renders a judgement an assistant submitted into the review surface.
+ *
+ * This is the only shape a pending judgement ever takes, because the assistant
+ * is the only thing that can produce one: the workbench has no engine of its
+ * own and no second persistence path.
  */
 function toAssistantReviewView(review: PendingProposalReview): JudgmentReviewView | null {
   const { proposal } = review
@@ -109,28 +88,28 @@ function toAssistantReviewView(review: PendingProposalReview): JudgmentReviewVie
   if (proposal.status !== 'proposed' || !proposal.provisionalJudgment) return null
 
   return {
-    evidence: review.evidence.map((item) => ({
-      id: item.id,
-      title: item.title,
-      sourceType: item.sourceType,
-    })),
+    evidence: review.evidence.map(toEvidenceView),
     facts: review.supportingFacts.map((item) => ({
       id: item.id,
       text: item.text,
       directness: item.directness,
+      evidenceId: item.evidenceId,
     })),
     counterFacts: review.counterFacts.map((item) => ({
       id: item.id,
       text: item.text,
       directness: item.directness,
+      evidenceId: item.evidenceId,
     })),
     source: 'assistant',
     claims: review.claims.map((item) => ({ id: item.id, text: item.statement })),
+    grounding: toGrounding(review),
     proposal: {
       id: proposal.id,
       title: proposal.title,
       interpretations: proposal.interpretations,
       provisionalJudgment: proposal.provisionalJudgment,
+      mechanism: proposal.mechanism,
       alternativeHypotheses: proposal.alternativeHypotheses,
       unresolvedQuestions: proposal.unresolvedQuestions,
       proposedActions: proposal.recommendedActions,
@@ -145,23 +124,15 @@ function toAssistantReviewView(review: PendingProposalReview): JudgmentReviewVie
   }
 }
 
+/**
+ * Everything the consultant does with a judgement after an assistant proposed
+ * one: read it, accept it, rewrite it, or throw it away.
+ *
+ * Notably absent: any way to *make* one. Creating a DiagnosisProposal belongs
+ * to `GroundedDiagnosisService` alone, behind the strict assessment contract.
+ */
 export class JudgmentService {
-  constructor(
-    private readonly schoolRepository: SchoolRepository,
-    private readonly judgmentRepository: JudgmentRepository,
-    private readonly assessmentEngine: AssessmentEngine = new BaselineAssessmentEngine(),
-  ) {}
-
-  async submitSituation(input: SubmitSituationInput): Promise<JudgmentReviewView> {
-    const parsed = submitSituationInputSchema.parse(input)
-    const school = await this.schoolRepository.findById(parsed.schoolId)
-    if (!school || school.archivedAt) throw new Error('没有找到这所学校')
-
-    const draft = await this.assessmentEngine.analyze(parsed.text)
-    const chain = createProposalChain(parsed.schoolId, parsed.text, draft)
-    await this.judgmentRepository.saveProposalChain(chain)
-    return toReviewView(chain)
-  }
+  constructor(private readonly judgmentRepository: JudgmentRepository) {}
 
   async review(input: ReviewDiagnosisInput): Promise<ReviewOutcomeView> {
     const parsed = reviewDiagnosisInputSchema.parse(input)
@@ -196,7 +167,7 @@ export class JudgmentService {
    * The three answers are genuinely different things: a judgement to decide on,
    * an explicit "the evidence is not enough yet", and nothing at all. Collapsing
    * the middle one into "nothing" would hide the most professionally useful
-   * thing an assistant can say.
+   * thing an assistant can say — and nothing else may be produced in its place.
    */
   async findAgentRunOutcome(
     schoolId: string,

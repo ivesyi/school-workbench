@@ -3,11 +3,16 @@ import { z } from 'zod'
 /**
  * The assistants the consultant can pick between.
  *
- * `none` is a real choice, not an error state: a consultant who does not want
- * to wait for an assistant, or who has not set one up, keeps a workbench that
- * still records situations and judgements.
+ * An assistant is not an enhancement the workbench can do without: professional
+ * reasoning is the assistant's job, and the workbench has no second way to
+ * produce it. So there is no "off" choice here. When no assistant can run, the
+ * workbench still shows every school, judgement and state it already holds — it
+ * simply cannot start new analysis.
+ *
+ * Only Codex is integrated today, so this reads as a list of one. It stays an
+ * enum because PRD 15 is written for the day there is more than one.
  */
-export const assistantChoiceSchema = z.enum(['codex', 'none'])
+export const assistantChoiceSchema = z.enum(['codex'])
 
 export const assistantAvailabilitySchema = z.enum(['ready', 'unavailable'])
 

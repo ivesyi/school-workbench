@@ -2,7 +2,6 @@ import type {
   AcceptedJudgment,
   DiagnosisProposal,
   JudgmentRepository,
-  ProposalChain,
   ReviewOutcome,
   School,
   SchoolRepository,
@@ -101,7 +100,6 @@ function judgmentRepository(
 ): JudgmentRepository {
   const current = typeof judgments === 'function' ? judgments : () => judgments
   return {
-    saveProposalChain: vi.fn<(chain: ProposalChain) => Promise<void>>(),
     findProposal: vi.fn<(id: string) => Promise<DiagnosisProposal | null>>(),
     saveReviewOutcome: vi.fn<(outcome: ReviewOutcome) => Promise<void>>(),
     listAcceptedJudgments: vi.fn().mockImplementation(async () => [...current()]),

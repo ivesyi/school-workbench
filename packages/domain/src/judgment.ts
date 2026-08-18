@@ -89,15 +89,6 @@ export type DiagnosisClaim = {
   claimId: string
 }
 
-export type ProposalChain = {
-  evidence: Evidence[]
-  facts: ObservationFact[]
-  claims: Claim[]
-  claimFacts: ClaimFact[]
-  proposal: DiagnosisProposal
-  diagnosisClaims: DiagnosisClaim[]
-}
-
 export type HumanReview = {
   id: string
   proposalId: string
@@ -134,23 +125,6 @@ export class DiagnosisReviewInvariantError extends Error {
   }
 }
 
-export type AssessmentDraft = {
-  title: string
-  observationText: string
-  factType?: ObservationFact['factType']
-  claimText: string
-  interpretations: string[]
-  provisionalJudgment: string
-  mechanism?: string
-  alternativeHypotheses?: string[]
-  unresolvedQuestions?: string[]
-  proposedActions?: string[]
-  recommendedObservations?: string[]
-  impactMeasures?: string[]
-  evidenceQuality: EvidenceQuality
-  confidence: 'low' | 'medium' | 'high'
-}
-
 export type JudgmentFactoryDependencies = {
   createId(): string
   now(): Date
@@ -159,93 +133,6 @@ export type JudgmentFactoryDependencies = {
 const defaultDependencies: JudgmentFactoryDependencies = {
   createId: ulid,
   now: () => new Date(),
-}
-
-export function createProposalChain(
-  schoolId: string,
-  sourceText: string,
-  draft: AssessmentDraft,
-  dependencies: JudgmentFactoryDependencies = defaultDependencies,
-): ProposalChain {
-  const createdAt = dependencies.now().toISOString()
-  const evidenceId = dependencies.createId()
-  const factId = dependencies.createId()
-  const claimId = dependencies.createId()
-  const proposalId = dependencies.createId()
-  const schoolScope = JSON.stringify({ kind: 'school', schoolId })
-
-  const evidence: Evidence = {
-    id: evidenceId,
-    schoolId,
-    sourceType: 'pasted_text',
-    uri: null,
-    inlineText: sourceText,
-    title: '顾问输入',
-    locatorJson: JSON.stringify({ kind: 'inline_text' }),
-    contentHash: null,
-    capturedAt: createdAt,
-    registeredBy: 'human',
-    agentRunId: null,
-    createdAt,
-  }
-
-  const fact: ObservationFact = {
-    id: factId,
-    schoolId,
-    evidenceId,
-    factType: draft.factType ?? 'context',
-    text: draft.observationText,
-    locatorJson: JSON.stringify({ kind: 'inline_text' }),
-    directness: draft.evidenceQuality.directness,
-    extractedBy: 'agent',
-    agentRunId: null,
-    createdAt,
-  }
-
-  const claim: Claim = {
-    id: claimId,
-    schoolId,
-    subjectRefJson: schoolScope,
-    predicateKey: 'swb:claim.current_situation',
-    objectRefJson: null,
-    statement: draft.claimText,
-    validFrom: createdAt,
-    validTo: null,
-    scopeJson: schoolScope,
-    createdBy: 'agent',
-    agentRunId: null,
-    createdAt,
-  }
-
-  const proposal: DiagnosisProposal = {
-    id: proposalId,
-    schoolId,
-    agentRunId: null,
-    type: 'state',
-    title: draft.title,
-    scopeJson: schoolScope,
-    interpretations: draft.interpretations,
-    provisionalJudgment: draft.provisionalJudgment,
-    mechanism: draft.mechanism ?? null,
-    alternativeHypotheses: draft.alternativeHypotheses ?? [],
-    unresolvedQuestions: draft.unresolvedQuestions ?? [],
-    recommendedActions: draft.proposedActions ?? [],
-    nextObservations: draft.recommendedObservations ?? [],
-    impactEvidencePlan: draft.impactMeasures ?? [],
-    evidenceQuality: draft.evidenceQuality,
-    confidence: draft.confidence,
-    status: 'proposed',
-    createdAt,
-  }
-
-  return {
-    evidence: [evidence],
-    facts: [fact],
-    claims: [claim],
-    claimFacts: [{ claimId, factId, stance: 'supporting', sequence: 0 }],
-    proposal,
-    diagnosisClaims: [{ proposalId, claimId }],
-  }
 }
 
 export function assertReviewDecisionAllowed(
@@ -329,14 +216,50 @@ export function createReviewOutcome(
  */
 export type PendingProposalReview = {
   proposal: DiagnosisProposal
+  /** Named so the review surface can state which school this is about. */
+  schoolName: string
+  /** The confirmed stage the judgement was measured against. */
+  stageTitle: string
   evidence: Evidence[]
   supportingFacts: ObservationFact[]
   counterFacts: ObservationFact[]
   claims: Claim[]
+  criteria: PendingProposalCriterion[]
+  stageTargets: PendingProposalStageTarget[]
 }
 
+/**
+ * The versioned methodology criterion a proposal was measured against.
+ *
+ * Carried through to the consultant because PRD 5.7 makes a judgement auditable
+ * only if the standard behind it can be named, and the standard is versioned.
+ */
+export type PendingProposalCriterion = {
+  id: string
+  stableKey: string
+  title: string
+  description: string
+  packTitle: string
+  packKey: string
+  packVersion: string
+}
+
+export type PendingProposalStageTarget = {
+  id: string
+  dimensionKey: string
+  title: string
+  description: string
+}
+
+/**
+ * Reading and reviewing judgements.
+ *
+ * There is deliberately no way to *create* a proposal here. A DiagnosisProposal
+ * can only be produced by `GroundedDiagnosisService`, which refuses anything
+ * that has not passed the strict assessment contract, so no second persistence
+ * route exists for the workbench to fall back on.
+ */
 export interface JudgmentRepository {
-  saveProposalChain(chain: ProposalChain): Promise<void>
   findProposal(id: string): Promise<DiagnosisProposal | null>
   saveReviewOutcome(outcome: ReviewOutcome): Promise<void>
   listAcceptedJudgments(schoolId: string): Promise<AcceptedJudgment[]>

@@ -6,12 +6,15 @@ import {
   type Evidence,
   type JudgmentRepository,
   type ObservationFact,
+  type PendingProposalCriterion,
   type PendingProposalReview,
-  type ProposalChain,
+  type PendingProposalStageTarget,
   type ReviewOutcome,
 } from '@school-workbench/domain'
-import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
+import { diagnosisCriteria, diagnosisStageTargets } from './diagnosis-schema'
+import { methodologyCriteria, methodologyPacks } from './methodology-schema'
 import {
   acceptedJudgments,
   claimFacts,
@@ -22,6 +25,9 @@ import {
   humanReviews,
   judgmentClaims,
   observationFacts,
+  schools,
+  stageTargets,
+  stages,
 } from './schema'
 
 function parseStringArray(value: string): string[] {
@@ -88,65 +94,8 @@ function toAcceptedJudgment(
   }
 }
 
-function assertProposalChain(chain: ProposalChain): void {
-  const schoolId = chain.proposal.schoolId
-  const wrongSchool = [
-    ...chain.evidence.map((item) => item.schoolId),
-    ...chain.facts.map((item) => item.schoolId),
-    ...chain.claims.map((item) => item.schoolId),
-  ].find((value) => value !== schoolId)
-  if (wrongSchool) throw new Error('不能跨学校保存判断链')
-
-  if (chain.proposal.status !== 'proposed' || !chain.proposal.provisionalJudgment?.trim()) {
-    throw new Error('既有工作台判断链只能保存带暂定判断的 proposed Proposal')
-  }
-  if (chain.evidence.some((item) => !item.uri && !item.inlineText)) {
-    throw new Error('依据必须包含可定位来源或原始内容')
-  }
-  if (chain.claimFacts.every((item) => item.stance !== 'supporting')) {
-    throw new Error('判断至少需要一条支持事实')
-  }
-}
-
 export class SqliteJudgmentRepository implements JudgmentRepository {
   constructor(private readonly database: BetterSQLite3Database) {}
-
-  async saveProposalChain(chain: ProposalChain): Promise<void> {
-    assertProposalChain(chain)
-    this.database.transaction((tx) => {
-      for (const item of chain.evidence) tx.insert(evidence).values(item).run()
-      for (const item of chain.facts) tx.insert(observationFacts).values(item).run()
-      for (const item of chain.claims) tx.insert(claims).values(item).run()
-      for (const item of chain.claimFacts) tx.insert(claimFacts).values(item).run()
-
-      tx.insert(diagnosisProposals)
-        .values({
-          id: chain.proposal.id,
-          schoolId: chain.proposal.schoolId,
-          agentRunId: chain.proposal.agentRunId,
-          type: chain.proposal.type,
-          title: chain.proposal.title,
-          scopeJson: chain.proposal.scopeJson,
-          interpretationsJson: JSON.stringify(chain.proposal.interpretations),
-          provisionalJudgment: chain.proposal.provisionalJudgment,
-          mechanism: chain.proposal.mechanism,
-          alternativeHypothesesJson: JSON.stringify(chain.proposal.alternativeHypotheses),
-          unresolvedQuestionsJson: JSON.stringify(chain.proposal.unresolvedQuestions),
-          recommendedActionsJson: JSON.stringify(chain.proposal.recommendedActions),
-          nextObservationsJson: JSON.stringify(chain.proposal.nextObservations),
-          impactEvidencePlanJson: JSON.stringify(chain.proposal.impactEvidencePlan),
-          evidenceQualityJson: JSON.stringify(chain.proposal.evidenceQuality),
-          confidence: chain.proposal.confidence,
-          status: chain.proposal.status,
-          createdAt: chain.proposal.createdAt,
-        })
-        .run()
-
-      for (const item of chain.diagnosisClaims) {
-        tx.insert(diagnosisClaims).values(item).run()
-      }
-    })
-  }
 
   /**
    * Rebuilds a pending proposal and the chain under it.
@@ -222,12 +171,87 @@ export class SqliteJudgmentRepository implements JudgmentRepository {
             .where(inArray(evidence.id, evidenceIds))
             .all() as Evidence[])
 
+    const targetRows: PendingProposalStageTarget[] = this.database
+      .select({
+        id: stageTargets.id,
+        dimensionKey: stageTargets.dimensionKey,
+        title: stageTargets.title,
+        description: stageTargets.description,
+        sequence: stageTargets.sequence,
+      })
+      .from(diagnosisStageTargets)
+      .innerJoin(stageTargets, eq(diagnosisStageTargets.stageTargetId, stageTargets.id))
+      .where(eq(diagnosisStageTargets.proposalId, proposalId))
+      .orderBy(asc(stageTargets.sequence))
+      .all()
+      .map((row) => ({
+        id: row.id,
+        dimensionKey: row.dimensionKey,
+        title: row.title,
+        description: row.description,
+      }))
+
+    const criteriaRows: PendingProposalCriterion[] = this.database
+      .select({
+        id: methodologyCriteria.id,
+        stableKey: methodologyCriteria.stableKey,
+        title: methodologyCriteria.title,
+        description: methodologyCriteria.description,
+        sequence: methodologyCriteria.sequence,
+        packTitle: methodologyPacks.title,
+        packKey: methodologyPacks.key,
+        packVersion: methodologyPacks.version,
+      })
+      .from(diagnosisCriteria)
+      .innerJoin(methodologyCriteria, eq(diagnosisCriteria.criterionId, methodologyCriteria.id))
+      .innerJoin(methodologyPacks, eq(methodologyCriteria.packId, methodologyPacks.id))
+      .where(eq(diagnosisCriteria.proposalId, proposalId))
+      .orderBy(asc(methodologyPacks.key), asc(methodologyCriteria.sequence))
+      .all()
+      .map((row) => ({
+        id: row.id,
+        stableKey: row.stableKey,
+        title: row.title,
+        description: row.description,
+        packTitle: row.packTitle,
+        packKey: row.packKey,
+        packVersion: row.packVersion,
+      }))
+
+    const school = this.database
+      .select({ name: schools.name })
+      .from(schools)
+      .where(eq(schools.id, proposal.schoolId))
+      .get()
+
+    // The stage a judgement was measured against is the one its confirmed
+    // targets belong to. The assessment contract guarantees a `proposed`
+    // proposal has at least one, so the fallback only covers abstentions.
+    const stageRow =
+      targetRows.length === 0
+        ? undefined
+        : this.database
+            .select({ title: stages.title })
+            .from(stageTargets)
+            .innerJoin(stages, eq(stageTargets.stageId, stages.id))
+            .where(
+              inArray(
+                stageTargets.id,
+                targetRows.map((target) => target.id),
+              ),
+            )
+            .get()
+
     return {
       proposal,
+      schoolName: school?.name ?? '这所学校',
+      stageTitle: stageRow?.title ?? '尚未确认的阶段',
       evidence: evidenceRows,
       supportingFacts: pickFacts('supporting'),
       counterFacts: pickFacts('counter'),
       claims: claimRows,
+      criteria: criteriaRows,
+      stageTargets: targetRows,
     }
   }
 

@@ -1,6 +1,5 @@
 import {
   BaselineStateAssessmentEngine,
-  JudgmentService,
   SchoolService,
   StageService,
   StateService,
@@ -10,7 +9,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { openWorkbenchDatabase } from './database'
+import { openWorkbenchDatabase, type WorkbenchDatabase } from './database'
 import {
   assessmentJudgments,
   dimensionAssessments,
@@ -21,6 +20,7 @@ import { SqliteJudgmentRepository } from './sqlite-judgment-repository'
 import { SqliteSchoolRepository } from './sqlite-school-repository'
 import { SqliteStageRepository } from './sqlite-stage-repository'
 import { SqliteStateRepository } from './sqlite-state-repository'
+import { insertAcceptedJudgmentFixture } from './test-support'
 
 const temporaryDirectories: string[] = []
 
@@ -42,19 +42,22 @@ function countRows(
   return row.count
 }
 
-async function addAcceptedJudgment(
-  judgmentService: JudgmentService,
-  schoolId: string,
-  text: string,
-) {
-  const proposal = await judgmentService.submitSituation({ schoolId, text })
-  const outcome = await judgmentService.review({
+/**
+ * The school-state slice starts from judgements that are already accepted. That
+ * starting position cannot be built through the assessment contract here — the
+ * contract needs a confirmed stage, and confirming one is part of what this
+ * test sets up — so it is written straight to the tables by a fixture.
+ */
+let fixtureSequence = 0
+
+function addAcceptedJudgment(database: WorkbenchDatabase, schoolId: string, text: string) {
+  fixtureSequence += 1
+  return insertAcceptedJudgmentFixture(database, {
     schoolId,
-    diagnosisId: proposal.proposal.id,
-    decision: 'accepted',
+    statement: text,
+    suffix: String(fixtureSequence),
+    createdAt: `2026-08-18T00:00:0${fixtureSequence % 10}.000Z`,
   })
-  if (!outcome.acceptedJudgment) throw new Error('expected accepted judgment')
-  return outcome.acceptedJudgment
 }
 
 async function prepareSchoolWithActiveStage(database: ReturnType<typeof openWorkbenchDatabase>) {
@@ -62,18 +65,13 @@ async function prepareSchoolWithActiveStage(database: ReturnType<typeof openWork
   const judgmentRepository = new SqliteJudgmentRepository(database.db)
   const stageRepository = new SqliteStageRepository(database.db)
   const schoolService = new SchoolService(schoolRepository, stageRepository)
-  const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
   const stageService = new StageService(schoolRepository, judgmentRepository, stageRepository)
   const school = await schoolService.create({ name: '南山实验学校' })
-  const first = await addAcceptedJudgment(
-    judgmentService,
-    school.id,
-    '中层仍然依赖校长完成关键任务拆解。',
-  )
+  const first = addAcceptedJudgment(database, school.id, '中层仍然依赖校长完成关键任务拆解。')
   const suggestion = await stageService.getWorkspace(school.id)
   if (suggestion.state !== 'suggested') throw new Error('expected stage suggestion')
-  const second = await addAcceptedJudgment(
-    judgmentService,
+  const second = addAcceptedJudgment(
+    database,
     school.id,
     '教师已经开始稳定教研复盘，能够根据课堂情况调整。',
   )
@@ -86,7 +84,6 @@ async function prepareSchoolWithActiveStage(database: ReturnType<typeof openWork
     judgmentRepository,
     stageRepository,
     schoolService,
-    judgmentService,
   }
 }
 
@@ -198,8 +195,8 @@ describe('school state persistence', () => {
       summary: item.assessment.summary,
     }))
 
-    const third = await addAcceptedJudgment(
-      prepared.judgmentService,
+    const third = addAcceptedJudgment(
+      database,
       prepared.school.id,
       '中层已经能够独立完成关键任务拆解，校长开始授权中层承担真实责任。',
     )
@@ -288,8 +285,8 @@ describe('school state persistence', () => {
     const prepared = await prepareSchoolWithActiveStage(database)
     const stateRepository = new SqliteStateRepository(database.db)
     const { baseline } = await confirmBaseline(prepared, stateRepository)
-    await addAcceptedJudgment(
-      prepared.judgmentService,
+    addAcceptedJudgment(
+      database,
       prepared.school.id,
       '中层已经能够独立完成关键任务拆解，校长开始授权。',
     )
@@ -322,14 +319,14 @@ describe('school state persistence', () => {
     const prepared = await prepareSchoolWithActiveStage(database)
     const stateRepository = new SqliteStateRepository(database.db)
     const { baseline } = await confirmBaseline(prepared, stateRepository)
-    const ownNewJudgment = await addAcceptedJudgment(
-      prepared.judgmentService,
+    const ownNewJudgment = addAcceptedJudgment(
+      database,
       prepared.school.id,
       '中层已经能够独立完成关键任务拆解，校长开始授权。',
     )
     const otherSchool = await prepared.schoolService.create({ name: '滨江学校' })
-    const otherJudgment = await addAcceptedJudgment(
-      prepared.judgmentService,
+    const otherJudgment = addAcceptedJudgment(
+      database,
       otherSchool.id,
       '滨江学校的教师已经稳定开展复盘。',
     )

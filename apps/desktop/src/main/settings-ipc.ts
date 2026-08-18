@@ -10,14 +10,15 @@ import type { IpcMain } from 'electron'
 /**
  * The assistant the workbench uses when nobody has said otherwise.
  *
- * Off until chosen. PRD 15 puts this choice in settings, and it is a real
- * choice rather than a technical detail the product could make on the
- * consultant's behalf: an assistant takes a minute of waiting and costs money
- * per question. Shipping it switched on would mean the very first sentence
- * someone types silently does both. Once chosen, PRD 14 holds and nothing asks
- * again.
+ * Codex, because an assistant is not optional: professional reasoning is its
+ * job and the workbench has no path of its own that could stand in. PRD 15 puts
+ * the choice in settings for the day there is more than one runtime; with one,
+ * the honest default is that one, and PRD 14 then holds so nothing asks again.
+ *
+ * A previously stored `none` — from the build where declining was offered —
+ * lands here too rather than leaving the workbench without an assistant.
  */
-export const DEFAULT_ASSISTANT: AssistantChoice = 'none'
+export const DEFAULT_ASSISTANT: AssistantChoice = 'codex'
 
 export const ASSISTANT_PREFERENCE_KEY = 'default_assistant'
 
@@ -48,21 +49,16 @@ function toView(selected: AssistantChoice, readiness: AssistantReadiness): Assis
         availability: readiness.ready ? 'ready' : 'unavailable',
         detail: readiness.ready ? null : readiness.detail,
       },
-      {
-        key: 'none',
-        label: '暂不使用 AI 助手',
-        availability: 'ready',
-        detail: null,
-      },
     ],
   })
 }
 
 async function currentChoice(dependencies: SettingsDependencies): Promise<AssistantChoice> {
   const stored = await dependencies.read(ASSISTANT_PREFERENCE_KEY)
-  // An unreadable or unknown stored value falls back to the default rather than
-  // leaving the workbench without an answer.
-  return stored === 'codex' || stored === 'none' ? stored : DEFAULT_ASSISTANT
+  // An unreadable, unknown, or retired stored value — `none` from the build
+  // that offered declining — falls back to the default rather than leaving the
+  // workbench without an assistant it can name.
+  return stored === 'codex' ? stored : DEFAULT_ASSISTANT
 }
 
 export function createSettingsIpcHandlers(dependencies: SettingsDependencies): SettingsIpcHandlers {

@@ -52,6 +52,46 @@ describe('assessment validator', () => {
     )
   })
 
+  it('refuses a proposed candidate that names no judgement of its own', () => {
+    const goldenCase = caseById('sbd-system-alignment-proposed')
+    const candidate = {
+      ...(goldenCase.candidate as Record<string, unknown>),
+      provisionalJudgment: null,
+    }
+
+    const result = validateAssessmentCandidate(
+      goldenCase.input,
+      candidate,
+      registryForProfile('active'),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.errors.map((error) => error.code)).toContain(
+      'ASSESSMENT_PROVISIONAL_JUDGMENT_REQUIRED',
+    )
+  })
+
+  it('refuses a stage target that is not confirmed on the current active Stage', () => {
+    const goldenCase = caseById('sbd-system-alignment-proposed')
+    const candidate = {
+      ...(goldenCase.candidate as Record<string, unknown>),
+      stageTargetRefs: ['a-target-from-some-other-stage'],
+    }
+
+    const result = validateAssessmentCandidate(
+      goldenCase.input,
+      candidate,
+      registryForProfile('active'),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.errors.map((error) => error.code)).toContain(
+      'ASSESSMENT_STAGE_TARGET_NOT_CURRENT',
+    )
+  })
+
   it('requires a completed counter search declaration to carry auditable refs', () => {
     const goldenCase = caseById('sbd-system-alignment-proposed')
     const candidate = {

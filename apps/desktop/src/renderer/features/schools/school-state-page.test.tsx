@@ -132,7 +132,6 @@ function baseApi(stateView: StateWorkspaceView = draft): WorkbenchApi {
       get: vi.fn().mockResolvedValue(school),
     },
     judgments: {
-      submitSituation: vi.fn(),
       review: vi.fn(),
       listAccepted: vi.fn().mockResolvedValue([]),
     },
@@ -152,11 +151,8 @@ function baseApi(stateView: StateWorkspaceView = draft): WorkbenchApi {
     },
     settings: {
       getAssistant: vi.fn().mockResolvedValue({
-        selected: 'none',
-        options: [
-          { key: 'codex', label: 'Codex', availability: 'ready', detail: null },
-          { key: 'none', label: '暂不使用 AI 助手', availability: 'ready', detail: null },
-        ],
+        selected: 'codex',
+        options: [{ key: 'codex', label: 'Codex', availability: 'ready', detail: null }],
       }),
       chooseAssistant: vi.fn(),
     },

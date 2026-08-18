@@ -238,6 +238,7 @@ export async function runAgentOnce(
       status: 'failed' as const,
       outcome: 'failed' as const,
       proposal: null,
+      abstention: null,
       usedWorkbenchTools: false,
       unrecognisedUpdateKinds: [],
       runtimeCompatibility: 'unsupported' as const,
@@ -270,8 +271,10 @@ export async function runAgentOnce(
 
   // What the assistant said is deliberately dropped here. It arrives mixed with
   // the runtime's own notices ("Skill descriptions were shortened…"), and PRD 16
-  // keeps that class of text away from the consultant. What survives is the
-  // judgement it submitted through the proper channel, which is reviewable.
+  // keeps that class of text away from the consultant. What survives is what it
+  // submitted through the proper channel: a judgement that passed the strict
+  // assessment contract, or an explicit abstention. Nothing else is produced in
+  // their place.
   const submitted = await dependencies.judgments
     .findAgentRunOutcome(input.schoolId, run.id)
     .catch(() => ({ kind: 'none' }) as const)
@@ -281,6 +284,13 @@ export async function runAgentOnce(
     status: outcome.status,
     outcome: describeOutcome(outcome.status, submitted.kind),
     proposal: submitted.kind === 'proposal' ? submitted.view : null,
+    abstention:
+      submitted.kind === 'insufficient_evidence'
+        ? {
+            unresolvedQuestions: [...submitted.unresolvedQuestions],
+            nextObservations: [...submitted.nextObservations],
+          }
+        : null,
     usedWorkbenchTools: outcome.usedWorkbenchTools,
     unrecognisedUpdateKinds: [...outcome.unrecognisedUpdateTags],
     runtimeCompatibility: outcome.compatibility.compatibility,

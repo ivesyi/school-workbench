@@ -1,28 +1,33 @@
-import { JudgmentService, SchoolService, StageService } from '@school-workbench/application'
+import { SchoolService, StageService } from '@school-workbench/application'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { openWorkbenchDatabase } from './database'
+import { openWorkbenchDatabase, type WorkbenchDatabase } from './database'
 import { SqliteJudgmentRepository } from './sqlite-judgment-repository'
 import { SqliteSchoolRepository } from './sqlite-school-repository'
 import { SqliteStageRepository } from './sqlite-stage-repository'
+import { insertAcceptedJudgmentFixture } from './test-support'
 
+/**
+ * A school that already carries an accepted judgement, written straight to the
+ * tables. The assessment contract cannot build this starting position: it needs
+ * a confirmed stage, and the stage is what this slice is about.
+ */
 async function acceptedJudgment(
+  database: WorkbenchDatabase,
   schools: SchoolService,
-  judgments: JudgmentService,
   name: string,
   text: string,
+  suffix: string,
 ) {
   const school = await schools.create({ name })
-  const proposal = await judgments.submitSituation({ schoolId: school.id, text })
-  const outcome = await judgments.review({
+  const judgment = insertAcceptedJudgmentFixture(database, {
     schoolId: school.id,
-    diagnosisId: proposal.proposal.id,
-    decision: 'accepted',
+    statement: text,
+    suffix,
   })
-  if (!outcome.acceptedJudgment) throw new Error('expected accepted judgment')
-  return { school, judgment: outcome.acceptedJudgment }
+  return { school, judgment }
 }
 
 describe('stage judgment scope', () => {
@@ -37,19 +42,19 @@ describe('stage judgment scope', () => {
       const judgmentRepository = new SqliteJudgmentRepository(database.db)
       const stageRepository = new SqliteStageRepository(database.db)
       const schoolService = new SchoolService(schoolRepository)
-      const judgmentService = new JudgmentService(schoolRepository, judgmentRepository)
-
       const first = await acceptedJudgment(
+        database,
         schoolService,
-        judgmentService,
         '甲校',
         '中层仍依赖校长推进。',
+        'first',
       )
       const second = await acceptedJudgment(
+        database,
         schoolService,
-        judgmentService,
         '乙校',
         '教师开始稳定教研复盘。',
+        'second',
       )
 
       const stageService = new StageService(schoolRepository, judgmentRepository, stageRepository)
