@@ -11,7 +11,7 @@ import {
   type PendingProposalStageTarget,
   type ReviewOutcome,
 } from '@school-workbench/domain'
-import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { diagnosisCriteria, diagnosisStageTargets } from './diagnosis-schema'
 import { methodologyCriteria, methodologyPacks } from './methodology-schema'
@@ -253,6 +253,33 @@ export class SqliteJudgmentRepository implements JudgmentRepository {
       criteria: criteriaRows,
       stageTargets: targetRows,
     }
+  }
+
+  /**
+   * Proposed rows this school still has no review for. Newest first. This only
+   * reads; the write path that created those rows is unchanged.
+   */
+  async listPendingProposalReviews(schoolId: string): Promise<PendingProposalReview[]> {
+    const rows = this.database
+      .select({ id: diagnosisProposals.id })
+      .from(diagnosisProposals)
+      .leftJoin(humanReviews, eq(humanReviews.proposalId, diagnosisProposals.id))
+      .where(
+        and(
+          eq(diagnosisProposals.schoolId, schoolId),
+          eq(diagnosisProposals.status, 'proposed'),
+          isNull(humanReviews.id),
+        ),
+      )
+      .orderBy(desc(diagnosisProposals.createdAt), desc(diagnosisProposals.id))
+      .all()
+
+    const reviews: PendingProposalReview[] = []
+    for (const row of rows) {
+      const review = await this.findPendingProposalReview(row.id)
+      if (review) reviews.push(review)
+    }
+    return reviews
   }
 
   async findLatestProposalIdByAgentRun(agentRunId: string): Promise<string | null> {

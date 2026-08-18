@@ -135,6 +135,7 @@ function baseApi(stateView: StateWorkspaceView = draft): WorkbenchApi {
     judgments: {
       review: vi.fn(),
       listAccepted: vi.fn().mockResolvedValue([]),
+      listPending: vi.fn().mockResolvedValue([]),
     },
     stages: {
       getWorkspace: vi.fn(),

@@ -1,5 +1,10 @@
 import type { AgentProgressEvent, AgentRunView, RunAgentInput } from './agent'
-import type { AcceptedJudgmentView, ReviewDiagnosisInput, ReviewOutcomeView } from './judgments'
+import type {
+  AcceptedJudgmentView,
+  JudgmentReviewView,
+  ReviewDiagnosisInput,
+  ReviewOutcomeView,
+} from './judgments'
 import type { PackReviewWorkbenchView, SignOffPackInput } from './methodology'
 import type {
   AssistantConnectionCheckView,
@@ -21,6 +26,7 @@ export type WorkbenchApi = {
   }
   judgments: {
     review(input: ReviewDiagnosisInput): Promise<ReviewOutcomeView>
+    listPending(schoolId: string): Promise<JudgmentReviewView[]>
     listAccepted(schoolId: string): Promise<AcceptedJudgmentView[]>
   }
   stages: {

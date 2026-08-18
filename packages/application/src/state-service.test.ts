@@ -114,6 +114,10 @@ class MemoryJudgmentRepository implements JudgmentRepository {
   async findLatestProposalIdByAgentRun(): Promise<string | null> {
     return null
   }
+
+  async listPendingProposalReviews(): Promise<PendingProposalReview[]> {
+    return []
+  }
 }
 
 class MemoryStageRepository implements StageRepository {

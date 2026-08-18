@@ -121,6 +121,7 @@ function baseApi(): WorkbenchApi {
     },
     judgments: {
       listAccepted: vi.fn().mockResolvedValue([]),
+      listPending: vi.fn().mockResolvedValue([]),
       review: vi.fn(),
     },
     stages: {
@@ -265,5 +266,82 @@ describe('SchoolWorkspacePage', () => {
     await userEvent.click(screen.getByRole('button', { name: '基本对' }))
     expect(await screen.findByText('当前阶段')).toBeInTheDocument()
     expect(screen.getByText('让改进进入教师实践')).toBeInTheDocument()
+  })
+
+  it('renders a pending judgement that was already in the school when the page opens', async () => {
+    const api = baseApi()
+    vi.mocked(api.judgments.listPending).mockResolvedValue([reviewView])
+
+    renderWorkspace(api)
+
+    expect(await screen.findByText('我发现一个新的情况，想让你确认')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: reviewView.proposal.provisionalJudgment }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^认同$/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '我想改一下' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '不认同' })).toBeEnabled()
+    expect(api.agent.run).not.toHaveBeenCalled()
+  })
+
+  it('removes a mount-loaded pending card after the consultant accepts it', async () => {
+    const acceptedJudgment = {
+      id: 'j-1',
+      proposalId: 'd-1',
+      text: reviewView.proposal.provisionalJudgment,
+      createdAt: '2026-08-17T00:01:00.000Z',
+    }
+    const api = baseApi()
+    vi.mocked(api.judgments.listPending).mockResolvedValue([reviewView])
+    vi.mocked(api.judgments.review).mockResolvedValue({ decision: 'accepted', acceptedJudgment })
+
+    renderWorkspace(api)
+    expect(await screen.findByText('我发现一个新的情况，想让你确认')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /^认同$/ }))
+
+    await waitFor(() =>
+      expect(api.judgments.review).toHaveBeenCalledWith({
+        schoolId: 'school-1',
+        diagnosisId: 'd-1',
+        decision: 'accepted',
+      }),
+    )
+    expect(await screen.findByText('已经记录这条判断。')).toBeInTheDocument()
+    expect(screen.queryByText('我发现一个新的情况，想让你确认')).not.toBeInTheDocument()
+    expect(screen.getByText(acceptedJudgment.text)).toBeInTheDocument()
+  })
+
+  it('shows every pending judgement newest first', async () => {
+    const older: JudgmentReviewView = {
+      ...reviewView,
+      proposal: {
+        ...reviewView.proposal,
+        id: 'd-old',
+        provisionalJudgment: '较早的待确认判断。',
+        createdAt: '2026-08-16T00:00:00.000Z',
+      },
+    }
+    const newer: JudgmentReviewView = {
+      ...reviewView,
+      proposal: {
+        ...reviewView.proposal,
+        id: 'd-new',
+        provisionalJudgment: '较新的待确认判断。',
+        createdAt: '2026-08-18T00:00:00.000Z',
+      },
+    }
+    const api = baseApi()
+    vi.mocked(api.judgments.listPending).mockResolvedValue([newer, older])
+
+    renderWorkspace(api)
+
+    expect(await screen.findByText('较新的待确认判断。')).toBeInTheDocument()
+    expect(screen.getByText('较早的待确认判断。')).toBeInTheDocument()
+    const newerHeading = screen.getByRole('heading', { name: '较新的待确认判断。' })
+    const olderHeading = screen.getByRole('heading', { name: '较早的待确认判断。' })
+    expect(
+      newerHeading.compareDocumentPosition(olderHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(screen.getAllByText('我发现一个新的情况，想让你确认')).toHaveLength(2)
   })
 })

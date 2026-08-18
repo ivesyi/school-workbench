@@ -144,6 +144,7 @@ function api(
     },
     judgments: {
       listAccepted: vi.fn().mockResolvedValue([]),
+      listPending: vi.fn().mockResolvedValue([]),
       review: vi.fn().mockResolvedValue({ decision: 'accepted', acceptedJudgment: null }),
     },
     stages: {

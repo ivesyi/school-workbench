@@ -51,6 +51,198 @@ function DetailList({
   )
 }
 
+function JudgmentReviewCard({
+  view,
+  onReview,
+}: {
+  view: JudgmentReviewView
+  onReview: (input: {
+    decision: ReviewDiagnosisInput['decision']
+    feedback?: string
+    finalText?: string
+  }) => Promise<void>
+}): React.JSX.Element {
+  const [editing, setEditing] = useState(false)
+  const [editedJudgment, setEditedJudgment] = useState(view.proposal.provisionalJudgment)
+  const [reviewFeedback, setReviewFeedback] = useState('')
+  const [reviewing, setReviewing] = useState(false)
+
+  async function review(decision: ReviewDiagnosisInput['decision']): Promise<void> {
+    setReviewing(true)
+    try {
+      const feedback = reviewFeedback.trim()
+      await onReview({
+        decision,
+        ...(feedback ? { feedback } : {}),
+        ...(decision === 'modified' ? { finalText: editedJudgment } : {}),
+      })
+    } finally {
+      setReviewing(false)
+    }
+  }
+
+  return (
+    <section className="mt-6 rounded-xl border border-border bg-surface p-7">
+      <p className="text-sm font-medium text-primary">我发现一个新的情况，想让你确认</p>
+      <h2 className="mt-2 text-xl font-semibold">{view.proposal.provisionalJudgment}</h2>
+      {view.grounding.stageTargets.length > 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">
+          这个阶段原本希望：{view.grounding.stageTargets[0]?.text}
+        </p>
+      ) : null}
+      <p className="mt-2 text-sm text-muted-foreground">
+        依据 {view.proposal.evidenceCount} 条
+        {view.counterFacts.length > 0
+          ? ` · 有 ${view.counterFacts.length} 条相反迹象`
+          : ' · 没有找到与它不一致的记录'}
+      </p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        这条是 AI 助手看过这所学校的情况后整理的，仍然要你确认才算数。
+      </p>
+
+      <details className="mt-5 rounded-lg border border-border px-4 py-3 text-sm">
+        <summary className="cursor-pointer font-medium">为什么这样判断？</summary>
+        <div className="mt-4 space-y-4 leading-6 text-muted-foreground">
+          <div>
+            <p className="font-medium text-foreground">我看到的事实</p>
+            {view.facts.map((fact) => (
+              <p key={fact.id}>{fact.text}</p>
+            ))}
+          </div>
+          <DetailList title="这些事实可能说明什么" items={view.proposal.interpretations} />
+          <div>
+            <p className="font-medium text-foreground">支持这个判断的依据</p>
+            {view.evidence.map((item) => (
+              <p key={item.id}>
+                {item.title}（{item.sourceLabel}）{item.excerpt ? `：${item.excerpt}` : ''}
+                {item.uri ? (
+                  <a className="ml-2 underline" href={item.uri}>
+                    查看原文
+                  </a>
+                ) : null}
+              </p>
+            ))}
+          </div>
+          <div>
+            <p className="font-medium text-foreground">与这个判断不一致的依据</p>
+            {view.counterFacts.length > 0 ? (
+              view.counterFacts.map((fact) => <p key={fact.id}>{fact.text}</p>)
+            ) : (
+              <p>已经找过与这条判断相反的记录，这一轮没有找到。</p>
+            )}
+          </div>
+          <DetailList title="还有哪些可能的解释" items={view.proposal.alternativeHypotheses} />
+          <DetailList title="目前还不能确定什么" items={view.proposal.unresolvedQuestions} />
+          {view.proposal.mechanism ? (
+            <div>
+              <p className="font-medium text-foreground">我认为背后的机制</p>
+              <p>{view.proposal.mechanism}</p>
+            </div>
+          ) : null}
+          <DetailList
+            title="下一轮值得重点观察什么"
+            items={view.proposal.recommendedObservations}
+          />
+          <DetailList title="建议采取的行动" items={view.proposal.proposedActions} />
+          <DetailList title="怎么验证这些行动是否起作用" items={view.proposal.impactMeasures} />
+          <div>
+            <p className="font-medium text-foreground">这条判断的出处</p>
+            <p>学校：{view.grounding.schoolName}</p>
+            <p>阶段：{view.grounding.stageTitle}</p>
+            {view.grounding.stageTargets.map((target) => (
+              <p key={target.id}>
+                本阶段目标 · {target.label}：{target.text}
+              </p>
+            ))}
+            {view.grounding.criteria.map((criterion) => (
+              <p key={criterion.id}>
+                判断标准 · {criterion.title}（{criterion.packTitle} 第 {criterion.packVersion}{' '}
+                版）：{criterion.description}
+              </p>
+            ))}
+          </div>
+        </div>
+      </details>
+
+      {editing ? (
+        <div className="mt-5 space-y-4">
+          <div>
+            <label
+              className="mb-2 block text-sm font-medium"
+              htmlFor={`review-feedback-${view.proposal.id}`}
+            >
+              你觉得哪里不准确？
+            </label>
+            <Textarea
+              id={`review-feedback-${view.proposal.id}`}
+              value={reviewFeedback}
+              onChange={(event) => setReviewFeedback(event.target.value)}
+              placeholder="例如：不是中层不会拆，是校长一直没有真正放权。"
+            />
+          </div>
+          <div>
+            <label
+              className="mb-2 block text-sm font-medium"
+              htmlFor={`review-final-text-${view.proposal.id}`}
+            >
+              改成你的判断
+            </label>
+            <Textarea
+              id={`review-final-text-${view.proposal.id}`}
+              value={editedJudgment}
+              onChange={(event) => setEditedJudgment(event.target.value)}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            原来的这条判断、你写的意见和最终文字都会一起留下来。
+          </p>
+        </div>
+      ) : null}
+
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Button type="button" disabled={reviewing} onClick={() => void review('accepted')}>
+          认同
+        </Button>
+        {editing ? (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={reviewing || editedJudgment.trim().length === 0}
+            onClick={() => void review('modified')}
+          >
+            确认修改
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={reviewing}
+            onClick={() => setEditing(true)}
+          >
+            我想改一下
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={reviewing}
+          onClick={() => void review('needs_more_evidence')}
+        >
+          先补充更多依据
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={reviewing}
+          onClick={() => void review('rejected')}
+        >
+          不认同
+        </Button>
+      </div>
+    </section>
+  )
+}
+
 export function SchoolWorkspacePage(): React.JSX.Element {
   const { schoolId = '' } = useParams()
   const api = useWorkbenchApi()
@@ -58,12 +250,8 @@ export function SchoolWorkspacePage(): React.JSX.Element {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [reviewing, setReviewing] = useState(false)
-  const [proposal, setProposal] = useState<JudgmentReviewView | null>(null)
+  const [pending, setPending] = useState<JudgmentReviewView[]>([])
   const [accepted, setAccepted] = useState<AcceptedJudgmentView[]>([])
-  const [editing, setEditing] = useState(false)
-  const [editedJudgment, setEditedJudgment] = useState('')
-  const [reviewFeedback, setReviewFeedback] = useState('')
   const [stageWorkspace, setStageWorkspace] = useState<StageWorkspaceView>({ state: 'none' })
   const [stageFeedbackOpen, setStageFeedbackOpen] = useState(false)
   const [stageFeedback, setStageFeedback] = useState('')
@@ -84,11 +272,13 @@ export function SchoolWorkspacePage(): React.JSX.Element {
     void Promise.all([
       api.schools.get(schoolId),
       api.judgments.listAccepted(schoolId).catch(() => []),
+      api.judgments.listPending(schoolId).catch(() => []),
     ])
-      .then(([schoolResult, acceptedResult]) => {
+      .then(([schoolResult, acceptedResult, pendingResult]) => {
         if (!current) return
         setSchool(schoolResult)
         setAccepted(acceptedResult)
+        setPending(pendingResult)
       })
       .catch((reason: unknown) => {
         if (current) setError(reason instanceof Error ? reason.message : '读取学校时遇到问题')
@@ -175,10 +365,11 @@ export function SchoolWorkspacePage(): React.JSX.Element {
     try {
       const run = await api.agent.run({ schoolId, message: text })
       if (run.proposal) {
-        setProposal(run.proposal)
-        setEditedJudgment(run.proposal.proposal.provisionalJudgment)
-        setReviewFeedback('')
-        setEditing(false)
+        const next = run.proposal
+        setPending((items) => [
+          next,
+          ...items.filter((item) => item.proposal.id !== next.proposal.id),
+        ])
         setMessage('')
         return
       }
@@ -237,41 +428,40 @@ export function SchoolWorkspacePage(): React.JSX.Element {
     await submitSituation()
   }
 
-  async function review(decision: ReviewDiagnosisInput['decision']): Promise<void> {
-    if (!proposal) return
-    setReviewing(true)
+  async function review(
+    view: JudgmentReviewView,
+    input: {
+      decision: ReviewDiagnosisInput['decision']
+      feedback?: string
+      finalText?: string
+    },
+  ): Promise<void> {
     setError(null)
     try {
-      const feedback = reviewFeedback.trim()
-      const input: ReviewDiagnosisInput = {
+      const outcome = await api.judgments.review({
         schoolId,
-        diagnosisId: proposal.proposal.id,
-        decision,
-        ...(feedback ? { feedback } : {}),
-        ...(decision === 'modified' ? { finalText: editedJudgment } : {}),
-      }
-      const outcome = await api.judgments.review(input)
+        diagnosisId: view.proposal.id,
+        decision: input.decision,
+        ...(input.feedback ? { feedback: input.feedback } : {}),
+        ...(input.finalText ? { finalText: input.finalText } : {}),
+      })
 
       if (outcome.acceptedJudgment) {
         const acceptedJudgment = outcome.acceptedJudgment
         setAccepted((items) => [acceptedJudgment, ...items])
         setResultMessage(
-          decision === 'modified' ? '已经按你的修改记录这条判断。' : '已经记录这条判断。',
+          input.decision === 'modified' ? '已经按你的修改记录这条判断。' : '已经记录这条判断。',
         )
         await refreshStage()
-      } else if (decision === 'needs_more_evidence') {
+      } else if (input.decision === 'needs_more_evidence') {
         setResultMessage('已记下：先补充更多依据，这条判断暂不进入正式记录。')
       } else {
         setResultMessage('已记下你的意见，这条判断没有进入正式记录。')
       }
 
-      setProposal(null)
-      setEditing(false)
-      setReviewFeedback('')
+      setPending((items) => items.filter((item) => item.proposal.id !== view.proposal.id))
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '确认判断时遇到问题')
-    } finally {
-      setReviewing(false)
     }
   }
 
@@ -485,169 +675,13 @@ export function SchoolWorkspacePage(): React.JSX.Element {
         </Alert>
       ) : null}
 
-      {proposal ? (
-        <section className="mt-6 rounded-xl border border-border bg-surface p-7">
-          <p className="text-sm font-medium text-primary">我发现一个新的情况，想让你确认</p>
-          <h2 className="mt-2 text-xl font-semibold">{proposal.proposal.provisionalJudgment}</h2>
-          {proposal.grounding.stageTargets.length > 0 ? (
-            <p className="mt-4 text-sm text-muted-foreground">
-              这个阶段原本希望：{proposal.grounding.stageTargets[0]?.text}
-            </p>
-          ) : null}
-          <p className="mt-2 text-sm text-muted-foreground">
-            依据 {proposal.proposal.evidenceCount} 条
-            {proposal.counterFacts.length > 0
-              ? ` · 有 ${proposal.counterFacts.length} 条相反迹象`
-              : ' · 没有找到与它不一致的记录'}
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            这条是 AI 助手看过这所学校的情况后整理的，仍然要你确认才算数。
-          </p>
-
-          <details className="mt-5 rounded-lg border border-border px-4 py-3 text-sm">
-            <summary className="cursor-pointer font-medium">为什么这样判断？</summary>
-            <div className="mt-4 space-y-4 leading-6 text-muted-foreground">
-              <div>
-                <p className="font-medium text-foreground">我看到的事实</p>
-                {proposal.facts.map((fact) => (
-                  <p key={fact.id}>{fact.text}</p>
-                ))}
-              </div>
-              <DetailList title="这些事实可能说明什么" items={proposal.proposal.interpretations} />
-              <div>
-                <p className="font-medium text-foreground">支持这个判断的依据</p>
-                {proposal.evidence.map((item) => (
-                  <p key={item.id}>
-                    {item.title}（{item.sourceLabel}）{item.excerpt ? `：${item.excerpt}` : ''}
-                    {item.uri ? (
-                      <a className="ml-2 underline" href={item.uri}>
-                        查看原文
-                      </a>
-                    ) : null}
-                  </p>
-                ))}
-              </div>
-              <div>
-                <p className="font-medium text-foreground">与这个判断不一致的依据</p>
-                {proposal.counterFacts.length > 0 ? (
-                  proposal.counterFacts.map((fact) => <p key={fact.id}>{fact.text}</p>)
-                ) : (
-                  <p>已经找过与这条判断相反的记录，这一轮没有找到。</p>
-                )}
-              </div>
-              <DetailList
-                title="还有哪些可能的解释"
-                items={proposal.proposal.alternativeHypotheses}
-              />
-              <DetailList
-                title="目前还不能确定什么"
-                items={proposal.proposal.unresolvedQuestions}
-              />
-              {proposal.proposal.mechanism ? (
-                <div>
-                  <p className="font-medium text-foreground">我认为背后的机制</p>
-                  <p>{proposal.proposal.mechanism}</p>
-                </div>
-              ) : null}
-              <DetailList
-                title="下一轮值得重点观察什么"
-                items={proposal.proposal.recommendedObservations}
-              />
-              <DetailList title="建议采取的行动" items={proposal.proposal.proposedActions} />
-              <DetailList
-                title="怎么验证这些行动是否起作用"
-                items={proposal.proposal.impactMeasures}
-              />
-              <div>
-                <p className="font-medium text-foreground">这条判断的出处</p>
-                <p>学校：{proposal.grounding.schoolName}</p>
-                <p>阶段：{proposal.grounding.stageTitle}</p>
-                {proposal.grounding.stageTargets.map((target) => (
-                  <p key={target.id}>
-                    本阶段目标 · {target.label}：{target.text}
-                  </p>
-                ))}
-                {proposal.grounding.criteria.map((criterion) => (
-                  <p key={criterion.id}>
-                    判断标准 · {criterion.title}（{criterion.packTitle} 第 {criterion.packVersion}{' '}
-                    版）：{criterion.description}
-                  </p>
-                ))}
-              </div>
-            </div>
-          </details>
-
-          {editing ? (
-            <div className="mt-5 space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium" htmlFor="review-feedback">
-                  你觉得哪里不准确？
-                </label>
-                <Textarea
-                  id="review-feedback"
-                  value={reviewFeedback}
-                  onChange={(event) => setReviewFeedback(event.target.value)}
-                  placeholder="例如：不是中层不会拆，是校长一直没有真正放权。"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium" htmlFor="review-final-text">
-                  改成你的判断
-                </label>
-                <Textarea
-                  id="review-final-text"
-                  value={editedJudgment}
-                  onChange={(event) => setEditedJudgment(event.target.value)}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                原来的这条判断、你写的意见和最终文字都会一起留下来。
-              </p>
-            </div>
-          ) : null}
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Button type="button" disabled={reviewing} onClick={() => void review('accepted')}>
-              认同
-            </Button>
-            {editing ? (
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={reviewing || editedJudgment.trim().length === 0}
-                onClick={() => void review('modified')}
-              >
-                确认修改
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={reviewing}
-                onClick={() => setEditing(true)}
-              >
-                我想改一下
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={reviewing}
-              onClick={() => void review('needs_more_evidence')}
-            >
-              先补充更多依据
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={reviewing}
-              onClick={() => void review('rejected')}
-            >
-              不认同
-            </Button>
-          </div>
-        </section>
-      ) : null}
+      {pending.map((view) => (
+        <JudgmentReviewCard
+          key={view.proposal.id}
+          view={view}
+          onReview={(input) => review(view, input)}
+        />
+      ))}
 
       {stageWorkspace.state === 'suggested' ? (
         <section className="mt-6 rounded-xl border border-border bg-surface p-7">

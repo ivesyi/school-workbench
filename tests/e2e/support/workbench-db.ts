@@ -44,13 +44,11 @@ export function firstSchoolId(database: SqliteHandle): string {
   return (database.prepare('SELECT id FROM schools LIMIT 1').get() as { id: string }).id
 }
 
-export function seedAcceptedJudgment(
+export function seedProposedJudgment(
   database: SqliteHandle,
   options: { schoolId: string; statement: string; suffix: string; createdAt?: string },
-): void {
+): string {
   const proposalId = `e2e-proposal-${options.suffix}`
-  const reviewId = `e2e-review-${options.suffix}`
-  const judgmentId = `e2e-judgment-${options.suffix}`
   const scopeJson = JSON.stringify({ kind: 'school', schoolId: options.schoolId })
   const createdAt = options.createdAt ?? FIXTURE_NOW
   const empty = '[]'
@@ -78,6 +76,18 @@ export function seedAcceptedJudgment(
       JSON.stringify({ directness: 'high', triangulated: true }),
       createdAt,
     )
+  return proposalId
+}
+
+export function seedAcceptedJudgment(
+  database: SqliteHandle,
+  options: { schoolId: string; statement: string; suffix: string; createdAt?: string },
+): void {
+  const proposalId = seedProposedJudgment(database, options)
+  const reviewId = `e2e-review-${options.suffix}`
+  const judgmentId = `e2e-judgment-${options.suffix}`
+  const scopeJson = JSON.stringify({ kind: 'school', schoolId: options.schoolId })
+  const createdAt = options.createdAt ?? FIXTURE_NOW
   database
     .prepare(
       `INSERT INTO human_reviews (id, proposal_id, decision, feedback, final_text, reason, reviewed_at)

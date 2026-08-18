@@ -265,6 +265,11 @@ export interface JudgmentRepository {
   listAcceptedJudgments(schoolId: string): Promise<AcceptedJudgment[]>
   /** The pending proposal and its chain, or null once it has been reviewed. */
   findPendingProposalReview(proposalId: string): Promise<PendingProposalReview | null>
+  /**
+   * Proposed proposals for this school that nobody has reviewed yet, newest first.
+   * Read-only: it does not create a proposal or change one.
+   */
+  listPendingProposalReviews(schoolId: string): Promise<PendingProposalReview[]>
   /** The newest proposal a given Agent Run submitted, if it submitted one. */
   findLatestProposalIdByAgentRun(agentRunId: string): Promise<string | null>
 }

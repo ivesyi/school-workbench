@@ -5,9 +5,14 @@ import { createJudgmentIpcHandlers } from './judgment-ipc'
 
 describe('judgment IPC handlers', () => {
   it('exposes no channel that creates a judgement', () => {
-    expect(Object.keys(judgmentIpcChannels).sort()).toEqual(['listAccepted', 'review'])
+    // listPending is read-only: it rehydrates proposed rows, it does not write them.
+    expect(Object.keys(judgmentIpcChannels).sort()).toEqual([
+      'listAccepted',
+      'listPending',
+      'review',
+    ])
     const handlers = createJudgmentIpcHandlers({} as unknown as JudgmentService)
-    expect(Object.keys(handlers).sort()).toEqual(['listAccepted', 'review'])
+    expect(Object.keys(handlers).sort()).toEqual(['listAccepted', 'listPending', 'review'])
   })
 
   it('validates a review before it reaches the service', async () => {

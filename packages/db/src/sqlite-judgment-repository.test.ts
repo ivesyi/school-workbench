@@ -102,16 +102,80 @@ describe('Judgment vertical slice persistence', () => {
     database.close()
   })
 
+  it('lists unreviewed proposed judgements for a school, newest first', async () => {
+    const database = openWorkbenchDatabase(
+      temporaryDatabasePath('school-workbench-pending-list-'),
+      migrationsFolder,
+    )
+    seedSchool(database, { schoolId: SCHOOL })
+    seedActiveStage(database, { schoolId: SCHOOL })
+    seedSchool(database, { schoolId: 'school-2', name: '另一所学校' })
+    seedActiveStage(database, {
+      schoolId: 'school-2',
+      stageId: 'stage-2',
+      targetId: 'target-2',
+    })
+
+    const older = await submitAssistantProposal(database, {
+      schoolId: SCHOOL,
+      agentRunId: 'run-old',
+      provisionalJudgment: '较早的待确认判断。',
+    })
+    const newer = await submitAssistantProposal(database, {
+      schoolId: SCHOOL,
+      agentRunId: 'run-new',
+      provisionalJudgment: '较新的待确认判断。',
+    })
+    await submitAssistantProposal(database, {
+      schoolId: SCHOOL,
+      agentRunId: 'run-abstain',
+      status: 'insufficient_evidence',
+    })
+    await submitAssistantProposal(database, {
+      schoolId: 'school-2',
+      agentRunId: 'run-other',
+      targetId: 'target-2',
+      provisionalJudgment: '别的学校的待确认判断。',
+    })
+
+    database.client
+      .prepare('UPDATE diagnosis_proposals SET created_at = ? WHERE id = ?')
+      .run('2026-08-17T00:00:00.000Z', older.proposalId)
+    database.client
+      .prepare('UPDATE diagnosis_proposals SET created_at = ? WHERE id = ?')
+      .run('2026-08-18T00:00:00.000Z', newer.proposalId)
+
+    const repository = new SqliteJudgmentRepository(database.db)
+    const pending = await repository.listPendingProposalReviews(SCHOOL)
+    expect(pending.map((item) => item.proposal.id)).toEqual([newer.proposalId, older.proposalId])
+    expect(pending.map((item) => item.proposal.provisionalJudgment)).toEqual([
+      '较新的待确认判断。',
+      '较早的待确认判断。',
+    ])
+
+    const judgmentService = new JudgmentService(repository)
+    await judgmentService.review({
+      schoolId: SCHOOL,
+      diagnosisId: newer.proposalId,
+      decision: 'accepted',
+    })
+    const remaining = await repository.listPendingProposalReviews(SCHOOL)
+    expect(remaining.map((item) => item.proposal.id)).toEqual([older.proposalId])
+    database.close()
+  })
+
   it('has no repository route that stores a proposal outside the assessment contract', () => {
     const database = openWorkbenchDatabase(':memory:', migrationsFolder)
     const repository = new SqliteJudgmentRepository(database.db)
     const surface = Object.getOwnPropertyNames(Object.getPrototypeOf(repository) as object).sort()
+    // listPendingProposalReviews only selects proposed rows; it cannot insert one.
     expect(surface).toEqual([
       'constructor',
       'findLatestProposalIdByAgentRun',
       'findPendingProposalReview',
       'findProposal',
       'listAcceptedJudgments',
+      'listPendingProposalReviews',
       'saveReviewOutcome',
     ])
     database.close()

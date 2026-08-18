@@ -141,6 +141,9 @@ export const reviewOutcomeViewSchema = z.object({
 
 export const acceptedJudgmentListSchema = z.array(acceptedJudgmentViewSchema)
 
+/** Same review-view shape the consultant already sees, just more than one. */
+export const judgmentReviewListSchema = z.array(judgmentReviewViewSchema)
+
 export type JudgmentSource = z.infer<typeof judgmentSourceSchema>
 export type EvidenceReferenceView = z.infer<typeof evidenceReferenceViewSchema>
 export type JudgmentCriterionView = z.infer<typeof judgmentCriterionViewSchema>
@@ -152,12 +155,14 @@ export type ReviewOutcomeView = z.infer<typeof reviewOutcomeViewSchema>
 export type AcceptedJudgmentView = z.infer<typeof acceptedJudgmentViewSchema>
 
 /**
- * Reviewing a judgement is the only judgement-shaped thing the renderer can
- * ask for. There is deliberately no channel that creates one: a judgement can
- * only enter the workbench through the assessment contract an assistant
- * submits against.
+ * The renderer can review a judgement, list ones still waiting, and list ones
+ * already accepted. There is deliberately no channel that creates one: a
+ * judgement can only enter the workbench through the assessment contract an
+ * assistant submits against. `listPending` is a read of rows that already
+ * exist.
  */
 export const judgmentIpcChannels = {
   review: 'judgments:review',
+  listPending: 'judgments:list-pending',
   listAccepted: 'judgments:list-accepted',
 } as const

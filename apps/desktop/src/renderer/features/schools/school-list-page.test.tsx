@@ -27,6 +27,7 @@ describe('SchoolListPage', () => {
       judgments: {
         review: vi.fn(),
         listAccepted: vi.fn().mockResolvedValue([]),
+        listPending: vi.fn().mockResolvedValue([]),
       },
       stages: {
         getWorkspace: vi.fn().mockResolvedValue({ state: 'none' }),
@@ -100,7 +101,7 @@ describe('SchoolListPage archive action', () => {
         get: vi.fn(),
         archive,
       },
-      judgments: { review: vi.fn(), listAccepted: vi.fn() },
+      judgments: { review: vi.fn(), listAccepted: vi.fn(), listPending: vi.fn() },
       stages: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
       states: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
       methodology: { getReviewWorkbench: vi.fn(), signOff: vi.fn() },
@@ -149,7 +150,7 @@ describe('SchoolListPage recovery guidance', () => {
         get: vi.fn(),
         archive: vi.fn(),
       },
-      judgments: { review: vi.fn(), listAccepted: vi.fn() },
+      judgments: { review: vi.fn(), listAccepted: vi.fn(), listPending: vi.fn() },
       stages: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
       states: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
       methodology: { getReviewWorkbench: vi.fn(), signOff: vi.fn() },

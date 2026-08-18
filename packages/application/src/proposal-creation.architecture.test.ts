@@ -106,7 +106,11 @@ describe('creating a judgement', () => {
 
   it('offers the renderer no channel that creates one', () => {
     const channels = read('packages/shared/src/judgments.ts')
+    // listPending is a read of already-persisted proposed rows. Adding it does
+    // not open a second create path: nothing on this channel inserts a proposal.
     expect(channels).toMatch(/judgmentIpcChannels = \{\s*review:/)
+    expect(channels).toMatch(/listPending: 'judgments:list-pending'/)
+    expect(channels).toMatch(/listAccepted: 'judgments:list-accepted'/)
     expect(channels).not.toMatch(/submitSituation/)
 
     for (const path of [

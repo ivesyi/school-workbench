@@ -17,6 +17,7 @@ import {
   confirmStateInputSchema,
   createSchoolInputSchema,
   judgmentIpcChannels,
+  judgmentReviewListSchema,
   methodologyIpcChannels,
   packReviewWorkbenchViewSchema,
   reviewDiagnosisInputSchema,
@@ -64,6 +65,13 @@ const api: WorkbenchApi = {
         reviewDiagnosisInputSchema.parse(input),
       )
       return reviewOutcomeViewSchema.parse(result)
+    },
+    async listPending(schoolId) {
+      const result: unknown = await ipcRenderer.invoke(
+        judgmentIpcChannels.listPending,
+        schoolIdSchema.parse(schoolId),
+      )
+      return judgmentReviewListSchema.parse(result)
     },
     async listAccepted(schoolId) {
       const result: unknown = await ipcRenderer.invoke(

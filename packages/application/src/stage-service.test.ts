@@ -106,6 +106,7 @@ function judgmentRepository(
     listAcceptedJudgments: vi.fn().mockImplementation(async () => [...current()]),
     findPendingProposalReview: vi.fn().mockResolvedValue(null),
     findLatestProposalIdByAgentRun: vi.fn().mockResolvedValue(null),
+    listPendingProposalReviews: vi.fn().mockResolvedValue([]),
   }
 }
 

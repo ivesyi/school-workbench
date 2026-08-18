@@ -121,6 +121,7 @@ function pendingReview(target: DiagnosisProposal): PendingProposalReview {
 
 class StubJudgmentRepository implements JudgmentRepository {
   outcome: ReviewOutcome | null = null
+  pending: PendingProposalReview[] = []
 
   constructor(
     private readonly review: PendingProposalReview | null,
@@ -142,13 +143,23 @@ class StubJudgmentRepository implements JudgmentRepository {
   async findLatestProposalIdByAgentRun(): Promise<string | null> {
     return this.proposalIdByRun
   }
+  async listPendingProposalReviews(): Promise<PendingProposalReview[]> {
+    return this.pending.length > 0 ? this.pending : this.review ? [this.review] : []
+  }
 }
 
 describe('JudgmentService', () => {
   it('has no way to create a judgement of its own', () => {
     const service = new JudgmentService(new StubJudgmentRepository(null, null))
     const surface = Object.getOwnPropertyNames(Object.getPrototypeOf(service) as object)
-    expect(surface.sort()).toEqual(['constructor', 'findAgentRunOutcome', 'listAccepted', 'review'])
+    // listPending only reads proposed rows; it is not a second create path.
+    expect(surface.sort()).toEqual([
+      'constructor',
+      'findAgentRunOutcome',
+      'listAccepted',
+      'listPending',
+      'review',
+    ])
   })
 
   it('renders an assistant judgement with everything PRD 18 asks the consultant to audit', async () => {
@@ -204,6 +215,33 @@ describe('JudgmentService', () => {
       new StubJudgmentRepository(pendingReview(target), target.id),
     )
     expect(await service.findAgentRunOutcome('school-2', 'run-1')).toEqual({ kind: 'none' })
+  })
+
+  it('lists pending judgements in the same review-view a run would return', async () => {
+    const older = proposal({
+      id: 'proposal-old',
+      provisionalJudgment: '较早的待确认判断。',
+      createdAt: '2026-08-16T00:00:00.000Z',
+    })
+    const newer = proposal({
+      id: 'proposal-new',
+      provisionalJudgment: '较新的待确认判断。',
+      createdAt: '2026-08-18T00:00:00.000Z',
+    })
+    const abstention = proposal({
+      id: 'proposal-abstain',
+      status: 'insufficient_evidence',
+      provisionalJudgment: null,
+    })
+    const repository = new StubJudgmentRepository(null, null)
+    repository.pending = [pendingReview(newer), pendingReview(older), pendingReview(abstention)]
+    const service = new JudgmentService(repository)
+
+    const views = await service.listPending('school-1')
+    expect(views.map((item) => item.proposal.id)).toEqual(['proposal-new', 'proposal-old'])
+    expect(views[0]?.source).toBe('assistant')
+    expect(views[0]?.evidence[0]?.sourceLabel).toBe('飞书文档')
+    expect(views[0]?.proposal.provisionalJudgment).toBe('较新的待确认判断。')
   })
 
   it('keeps the consultant feedback alongside the final text when a judgement is rewritten', async () => {

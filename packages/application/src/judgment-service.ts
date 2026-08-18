@@ -198,4 +198,20 @@ export class JudgmentService {
       createdAt: item.createdAt,
     }))
   }
+
+  /**
+   * Pending judgements for this school, newest first, in the same review-view
+   * the consultant already sees after a run. Read-only: it cannot create one.
+   */
+  async listPending(schoolId: string): Promise<JudgmentReviewView[]> {
+    const parsedSchoolId = schoolIdSchema.parse(schoolId)
+    const reviews = await this.judgmentRepository.listPendingProposalReviews(parsedSchoolId)
+    const views: JudgmentReviewView[] = []
+    for (const review of reviews) {
+      if (review.proposal.schoolId !== parsedSchoolId) continue
+      const view = toAssistantReviewView(review)
+      if (view) views.push(view)
+    }
+    return views
+  }
 }

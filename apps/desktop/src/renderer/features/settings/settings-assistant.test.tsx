@@ -95,7 +95,7 @@ const failedCheck: AssistantConnectionCheckView = {
 function api(settings: Partial<WorkbenchApi['settings']> = {}): WorkbenchApi {
   return {
     schools: { list: vi.fn(), create: vi.fn(), get: vi.fn(), archive: vi.fn() },
-    judgments: { review: vi.fn(), listAccepted: vi.fn() },
+    judgments: { review: vi.fn(), listAccepted: vi.fn(), listPending: vi.fn() },
     stages: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
     states: { getWorkspace: vi.fn(), adjust: vi.fn(), confirm: vi.fn() },
     methodology: { getReviewWorkbench: vi.fn(), signOff: vi.fn() },
